@@ -1,6 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { ArtisanProfile } from '@/types';
+import { BadgeCheck } from 'lucide-react';
+import BackButton from '@/components/BackButton';
 
 // Fetch artisan data using Firestore REST API for Server-Side Rendering
 async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
@@ -32,6 +34,7 @@ async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
       lat: Number(fields.lat.doubleValue || fields.lat.integerValue),
       lng: Number(fields.lng.doubleValue || fields.lng.integerValue),
       portfolioPhotoUrls: extractArray(fields.portfolioPhotoUrls),
+      isCertificateVerified: fields.isCertificateVerified?.booleanValue || false,
       verified: fields.verified.booleanValue,
       ratingAverage: Number(fields.ratingAverage.doubleValue || fields.ratingAverage.integerValue),
       ratingCount: Number(fields.ratingCount.integerValue),
@@ -47,11 +50,11 @@ async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
 export async function generateMetadata({ params }: { params: { artisanId: string } }): Promise<Metadata> {
   const artisan = await getArtisan(params.artisanId);
   if (!artisan) {
-    return { title: 'Artisan Not Found' };
+    return { title: 'Technician Not Found' };
   }
   
   return {
-    title: `${artisan.trade} in ${artisan.neighborhood} | Artisan Marketplace`,
+    title: `${artisan.trade} in ${artisan.neighborhood} | NEED`,
     description: artisan.bio.substring(0, 160),
     openGraph: {
       images: artisan.portfolioPhotoUrls.length > 0 ? [artisan.portfolioPhotoUrls[0]] : [],
@@ -65,7 +68,7 @@ export default async function ArtisanProfilePage({ params }: { params: { artisan
   if (!artisan) {
     return (
       <div className="text-center py-20">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Artisan Not Found</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Technician Not Found</h2>
         <Link href="/" className="text-blue-600 hover:underline">Return to Search</Link>
       </div>
     );
@@ -77,11 +80,21 @@ export default async function ArtisanProfilePage({ params }: { params: { artisan
         <div className="p-5 md:p-8">
           <div className="flex flex-col md:flex-row justify-between items-start gap-6">
             <div className="w-full">
-              <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+              <div className="flex items-center gap-4 mb-4">
+                <BackButton />
                 <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">{artisan.trade}</h1>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
                 {artisan.verified && (
-                  <span className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">
-                    ✓ Verified Professional
+                  <span className="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap flex items-center gap-1 shadow-sm">
+                    <BadgeCheck className="w-4 h-4" />
+                    Verified ID
+                  </span>
+                )}
+                {artisan.isCertificateVerified && (
+                  <span className="bg-amber-50 text-amber-600 border border-amber-200 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap flex items-center gap-1 shadow-sm">
+                    <BadgeCheck className="w-4 h-4" />
+                    Certified Pro
                   </span>
                 )}
               </div>
@@ -104,7 +117,7 @@ export default async function ArtisanProfilePage({ params }: { params: { artisan
                 href={`/artisans/${artisan.artisanId}/request`}
                 className="block w-full text-center bg-blue-600 text-white font-bold text-lg py-4 px-6 rounded-xl hover:bg-blue-700 transition shadow-md hover:shadow-lg"
               >
-                Request This Artisan
+                Request This Technician
               </Link>
               <p className="text-center text-sm text-gray-500 mt-3">
                 {artisan.available ? '🟢 Available for work' : '🔴 Currently busy'}
@@ -144,7 +157,7 @@ export default async function ArtisanProfilePage({ params }: { params: { artisan
           href={`/artisans/${artisan.artisanId}/request`}
           className="block w-full text-center bg-blue-600 text-white font-bold text-lg py-4 px-6 rounded-xl hover:bg-blue-700 transition"
         >
-          Request This Artisan
+          Request This Technician
         </Link>
       </div>
     </div>

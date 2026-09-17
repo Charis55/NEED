@@ -1,26 +1,38 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-brutal-yellow: #FFE66D;
+  --color-brutal-teal: #4ECDC4;
+  --color-brutal-red: #FF6B6B;
+  --color-brutal-pink: #FF9CEE;
+  --color-brutal-blue: #4D96FF;
+  --color-brutal-bg: #FFF9E6;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer utilities {
+  .brutal-border {
+    @apply border-4 border-black;
+  }
+  .brutal-shadow {
+    @apply shadow-[6px_6px_0px_0px_rgba(0,0,0,1)];
+  }
+  .brutal-shadow-sm {
+    @apply shadow-[4px_4px_0px_0px_rgba(0,0,0,1)];
+  }
+  .brutal-shadow-hover {
+    @apply hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all active:translate-x-[6px] active:translate-y-[6px] active:shadow-none;
+  }
+  .brutal-card {
+    @apply bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rounded-none;
+  }
+  .brutal-btn {
+    @apply border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all active:translate-x-[6px] active:translate-y-[6px] active:shadow-none rounded-none font-bold uppercase tracking-widest text-black flex items-center justify-center;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-brutal-bg);
+  color: #000000;
+  font-family: var(--font-sans), Arial, sans-serif;
+  overflow-x: hidden;
 }

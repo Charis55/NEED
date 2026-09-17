@@ -3,6 +3,7 @@ export interface UserAccount {
   phone: string;
   displayName: string;
   role: "customer" | "artisan";
+  isAdmin?: boolean;
   createdAt: number;
 }
 
@@ -16,6 +17,11 @@ export interface ArtisanProfile {
   lat: number;
   lng: number;
   portfolioPhotoUrls: string[];
+  yearsOfExperience: string;
+  skillLevel: string;
+  hasCertification: boolean;
+  certificateUrl?: string | null;
+  isCertificateVerified?: boolean;
   verified: boolean;
   ratingAverage: number;
   ratingCount: number;
@@ -31,9 +37,13 @@ export interface JobRequest {
   description: string;
   neighborhood: string;
   preferredTime: string;
-  status: "pending" | "accepted" | "declined" | "completed" | "cancelled";
+  offerAmount: number;
+  counterOfferAmount: number | null;
+  platformFee: number | null;
+  status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered";
   createdAt: number;
   completedAt: number | null;
+  reviewed?: boolean;
 }
 
 export interface Review {

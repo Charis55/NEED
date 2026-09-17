@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Search, ChevronLeft, ArrowRight } from "lucide-react";
+import { Search, ArrowRight } from "lucide-react";
+import BackButton from "@/components/BackButton";
 
 export default function SubcategoryPage({ params }: { params: { categorySlug: string } }) {
   // Title case the category slug
@@ -25,48 +26,41 @@ export default function SubcategoryPage({ params }: { params: { categorySlug: st
   ];
 
   return (
-    <div className="bg-[#111111] min-h-screen flex flex-col">
-      {/* Top Black Header */}
-      <div className="px-6 pt-12 pb-8 flex-shrink-0">
+    <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col selection:bg-[var(--color-brutal-pink)] selection:text-black">
+      {/* Top Header */}
+      <div className="px-6 pt-12 pb-8 flex-shrink-0 bg-[var(--color-brutal-blue)] border-b-4 border-black brutal-shadow-sm">
         <div className="flex justify-between items-center mb-8">
-          <Link href="/" className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition">
-            <ChevronLeft className="w-6 h-6" />
-          </Link>
-          <button className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-sm">
-            <Search className="w-5 h-5" />
+          <BackButton className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
+          <button className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none">
+            <Search className="w-6 h-6 text-black stroke-[3]" />
           </button>
         </div>
         
-        <h1 className="text-4xl font-bold text-white mb-4">
+        <h1 className="text-5xl font-black text-black mb-4 uppercase tracking-tighter">
           {title}
         </h1>
       </div>
 
-      {/* Main Content Area (White Rounded Container) */}
-      <div className="flex-1 bg-gray-50 rounded-t-[40px] px-6 pt-10 pb-20 overflow-y-auto">
+      {/* Main Content Area */}
+      <div className="flex-1 bg-[var(--color-brutal-bg)] px-6 pt-10 pb-20 overflow-y-auto">
         <div className="flex flex-col gap-6">
           {subServices.map((service) => (
             <div 
               key={service.id} 
-              className="bg-white rounded-[32px] p-6 shadow-xl shadow-gray-200/50 border border-gray-100 flex flex-col relative"
+              className="bg-white p-6 brutal-card flex flex-col relative hover:-translate-y-1 transition-transform"
             >
-              {/* Fake offset shadow aesthetic from the mockup */}
-              <div className="absolute -bottom-2 -right-2 w-full h-full bg-black rounded-[32px] -z-10 opacity-10"></div>
-              
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">{service.title}</h2>
-              <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              <h2 className="text-3xl font-black text-black mb-2 uppercase tracking-tighter">{service.title}</h2>
+              <p className="text-black font-bold text-sm leading-relaxed mb-8 border-l-4 border-black pl-3">
                 {service.description}
               </p>
               
               <div className="flex justify-end mt-auto">
                 <Link 
                   href={`/services/${params.categorySlug}/${service.id}/swipe`}
-                  className="flex items-center gap-3 font-bold text-gray-900 hover:opacity-80 transition group"
+                  className="flex items-center gap-3 bg-[var(--color-brutal-yellow)] px-4 py-3 brutal-btn"
                 >
-                  <span className="text-sm">Choose an Artisan</span>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-400 flex items-center justify-center text-gray-900 group-hover:scale-110 transition-transform shadow-md shadow-emerald-400/30">
-                    <ArrowRight className="w-5 h-5" />
-                  </div>
+                  <span className="text-sm">FIND A TECHNICIAN</span>
+                  <ArrowRight className="w-5 h-5 stroke-[3]" />
                 </Link>
               </div>
             </div>
