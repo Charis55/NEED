@@ -10,6 +10,7 @@ export interface UserAccount {
 export interface ArtisanProfile {
   artisanId: string;
   userId: string;
+  name?: string;
   trade: string;
   bio: string;
   neighborhood: string;

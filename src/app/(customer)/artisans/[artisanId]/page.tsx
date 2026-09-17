@@ -40,7 +40,7 @@ async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
       ratingCount: Number(fields.ratingCount.integerValue),
       available: fields.available.booleanValue,
       createdAt: Number(fields.createdAt.integerValue),
-    };
+    } as ArtisanProfile;
   } catch (err) {
     console.error("Error fetching artisan:", err);
     return null;

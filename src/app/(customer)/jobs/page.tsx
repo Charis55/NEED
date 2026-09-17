@@ -54,7 +54,7 @@ export default function CustomerJobsPage() {
     try {
       await runTransaction(db, async (transaction) => {
         // 1. Get Artisan Profile
-        const artisanRef = doc(db, "artisans", req.artisanId);
+        const artisanRef = doc(db, "artisans", req.artisanId as string);
         const artisanDoc = await transaction.get(artisanRef);
         
         if (!artisanDoc.exists()) {
