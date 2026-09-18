@@ -10,31 +10,54 @@ export default function ArtisanDashboard() {
   const [loading, setLoading] = useState(true);
   const [counterInputs, setCounterInputs] = useState<Record<string, string>>({});
   const [showCounterFor, setShowCounterFor] = useState<string | null>(null);
+  const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
+  const [showPromoOverlay, setShowPromoOverlay] = useState(false);
 
   useEffect(() => {
-    const fetchRequests = async () => {
-      const user = auth.currentUser;
-      if (!user) return; // In a real app, protect this route via middleware
-
-      try {
-        const q = query(
-          collection(db, "jobRequests"),
-          where("artisanId", "==", user.uid)
-        );
-        
-        const snapshot = await getDocs(q);
-        const results = snapshot.docs.map(doc => doc.data() as JobRequest);
-        
-        results.sort((a, b) => b.createdAt - a.createdAt);
-        setRequests(results);
-      } catch (error) {
-        console.error("Error fetching requests:", error);
-      } finally {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
         setLoading(false);
+        return;
       }
-    };
 
-    fetchRequests();
+      const fetchRequests = async () => {
+        try {
+          const q = query(
+            collection(db, "jobRequests"),
+            where("artisanId", "==", user.uid)
+          );
+          
+          const [snapshot, artisanSnapshot] = await Promise.all([
+            getDocs(q),
+            getDocs(query(collection(db, "artisans"), where("artisanId", "==", user.uid)))
+          ]);
+
+          if (!artisanSnapshot.empty) {
+            const artisanData = artisanSnapshot.docs[0].data();
+            if (artisanData.createdAt) {
+              const createdAtMs = typeof artisanData.createdAt === "number" 
+                ? artisanData.createdAt 
+                : artisanData.createdAt.toMillis?.() || Date.now();
+              const daysSinceSignup = Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24));
+              setPromoDaysLeft(Math.max(0, 30 - daysSinceSignup));
+            }
+          }
+
+          const results = snapshot.docs.map(doc => doc.data() as JobRequest);
+          
+          results.sort((a, b) => b.createdAt - a.createdAt);
+          setRequests(results);
+        } catch (error) {
+          console.error("Error fetching requests:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchRequests();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleUpdateStatus = async (requestId: string, newStatus: JobRequest['status'], counterAmt: number | null = null) => {
@@ -50,18 +73,22 @@ export default function ArtisanDashboard() {
       }
 
       if (newStatus === "countered" && counterAmt) {
+        const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
+        const platformFeeRate = isPromoActive ? 0 : 0.35;
         updatePayload.counterOfferAmount = counterAmt;
-        updatePayload.platformFee = counterAmt * 0.35;
+        updatePayload.platformFee = counterAmt * platformFeeRate;
       }
 
       await updateDoc(reqRef, updatePayload);
       
       setRequests(prev => prev.map(req => {
         if (req.requestId === requestId) {
+          const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
+          const platformFeeRate = isPromoActive ? 0 : 0.35;
           return { 
             ...req, 
             status: newStatus, 
-            ...(newStatus === "countered" ? { counterOfferAmount: counterAmt, platformFee: counterAmt! * 0.35 } : {}) 
+            ...(newStatus === "countered" ? { counterOfferAmount: counterAmt, platformFee: counterAmt! * platformFeeRate } : {}) 
           };
         }
         return req;
@@ -96,6 +123,25 @@ export default function ArtisanDashboard() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 md:px-12 -mt-10">
+        {/* Promo Banner */}
+        {promoDaysLeft !== null && promoDaysLeft > 0 && (
+          <div 
+            onClick={() => setShowPromoOverlay(true)}
+            className="bg-[var(--color-brutal-pink)] border-4 border-black p-4 brutal-shadow-sm mb-8 flex items-center justify-between cursor-pointer hover:-translate-y-1 hover:-translate-x-1 transition-transform rotate-1 group"
+          >
+            <div>
+              <p className="text-black text-sm font-black mb-1 uppercase tracking-widest flex items-center gap-2">
+                <span className="bg-white border-2 border-black px-1 -rotate-2">PROMO ACTIVE</span>
+              </p>
+              <h2 className="text-2xl font-black text-black tracking-tighter uppercase group-hover:underline">First Month Free!</h2>
+            </div>
+            <div className="text-center bg-white border-4 border-black p-2 min-w-[80px]">
+              <p className="text-3xl font-black text-black leading-none">{promoDaysLeft}</p>
+              <p className="text-xs font-black text-black uppercase mt-1">Days Left</p>
+            </div>
+          </div>
+        )}
+
         {/* Mobile Earnings Card */}
         <div className="md:hidden bg-[var(--color-brutal-yellow)] border-4 border-black p-6 brutal-shadow-sm mb-8 flex items-center justify-between -rotate-1">
           <div>
@@ -125,12 +171,15 @@ export default function ArtisanDashboard() {
                 ? req.counterOfferAmount 
                 : (req.offerAmount || 0);
               
-              const platformFee = currentPrice * 0.35;
+              const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
+              const platformFeeRate = isPromoActive ? 0 : 0.35;
+              
+              const platformFee = currentPrice * platformFeeRate;
               const artisanTakeHome = currentPrice - platformFee;
 
               // For dynamic counter offer calculation
               const typingVal = parseInt(counterInputs[req.requestId]?.replace(/,/g, '') || "0", 10);
-              const dynamicFee = typingVal * 0.35;
+              const dynamicFee = typingVal * platformFeeRate;
               const dynamicTakeHome = typingVal - dynamicFee;
 
               return (
@@ -162,7 +211,12 @@ export default function ArtisanDashboard() {
                         <p className="text-4xl font-black text-black tracking-tighter mt-1">₦{currentPrice.toLocaleString()}</p>
                         <div className="mt-4 space-y-1 text-sm font-bold border-t-2 border-black pt-2">
                           <p className="text-[var(--color-brutal-red)] flex justify-between">
-                            <span>Platform Fee (35%)</span> <span>-₦{platformFee.toLocaleString()}</span>
+                            <span>Platform Fee {isPromoActive ? "(0% PROMO)" : "(35%)"}</span> 
+                            {isPromoActive ? (
+                              <span className="text-[var(--color-brutal-teal)]">FREE</span>
+                            ) : (
+                              <span>-₦{platformFee.toLocaleString()}</span>
+                            )}
                           </p>
                           <p className="text-[var(--color-brutal-teal)] flex justify-between text-lg font-black mt-2">
                             <span className="uppercase">Your Earnings</span> <span>₦{artisanTakeHome.toLocaleString()}</span>
@@ -229,10 +283,11 @@ export default function ArtisanDashboard() {
                               </div>
                             </div>
                             
-                            {/* Live Calculation */}
                             {typingVal > 0 && (
                               <div className="flex gap-6 text-sm font-black uppercase mt-4 bg-white brutal-border p-3">
-                                <span className="text-[var(--color-brutal-red)]">Platform Cut: -₦{dynamicFee.toLocaleString()}</span>
+                                <span className="text-[var(--color-brutal-red)]">
+                                  Platform Cut: {isPromoActive ? 'FREE' : `-₦${dynamicFee.toLocaleString()}`}
+                                </span>
                                 <span className="text-[var(--color-brutal-teal)]">You Keep: ₦{dynamicTakeHome.toLocaleString()}</span>
                               </div>
                             )}
@@ -258,6 +313,35 @@ export default function ArtisanDashboard() {
           </div>
         )}
       </div>
+
+      {/* Promo Overlay Modal */}
+      {showPromoOverlay && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-8 border-black p-8 md:p-12 max-w-lg w-full brutal-shadow-lg relative rotate-1">
+            <button 
+              onClick={() => setShowPromoOverlay(false)}
+              className="absolute top-4 right-4 w-12 h-12 bg-[var(--color-brutal-red)] border-4 border-black text-white font-black text-2xl brutal-shadow-sm hover:translate-x-1 hover:translate-y-1 hover:shadow-none"
+            >
+              X
+            </button>
+            <div className="bg-[var(--color-brutal-yellow)] border-4 border-black inline-block px-4 py-2 mb-6 -rotate-2">
+              <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tighter">FIRST MONTH FREE!</h2>
+            </div>
+            <p className="text-xl font-bold text-black leading-tight mb-6">
+              Welcome to Need! As a new artisan, you keep <span className="bg-[var(--color-brutal-teal)] border-2 border-black px-2 py-0.5 inline-block text-white">100% of your profits</span> for your first 30 days.
+            </p>
+            <p className="text-lg font-bold text-gray-700 mb-8 border-l-4 border-black pl-4">
+              We've waived our standard 35% platform fee. Any job you accept or counter-offer during this period will have absolutely zero fees taken out. Go make that money!
+            </p>
+            <button 
+              onClick={() => setShowPromoOverlay(false)}
+              className="w-full bg-[var(--color-brutal-blue)] text-black text-2xl font-black py-4 border-4 border-black brutal-shadow-sm hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all uppercase"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

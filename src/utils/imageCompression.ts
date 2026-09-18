@@ -10,9 +10,9 @@ export const compressImage = (file: File, maxSizeMB: number = 1): Promise<File> 
         let width = img.width;
         let height = img.height;
 
-        // Max dimensions
-        const MAX_WIDTH = 1024;
-        const MAX_HEIGHT = 1024;
+        // Max resolution for 1MB can comfortably be up to 2048x2048 to retain high preview quality
+        const MAX_WIDTH = 2048;
+        const MAX_HEIGHT = 2048;
 
         if (width > height) {
           if (width > MAX_WIDTH) {
@@ -38,7 +38,7 @@ export const compressImage = (file: File, maxSizeMB: number = 1): Promise<File> 
         ctx.drawImage(img, 0, 0, width, height);
 
         // Try reducing quality to ensure it fits the size
-        let quality = 0.9;
+        let quality = 0.95; // Start very high
         const compressToBlob = (q: number) => {
           canvas.toBlob(
             (blob) => {
@@ -47,9 +47,9 @@ export const compressImage = (file: File, maxSizeMB: number = 1): Promise<File> 
                 return;
               }
               
-              // If still too large and we can compress more
+              // If still too large and we can compress more, reduce quality by a small step
               if (blob.size / 1024 / 1024 > maxSizeMB && q > 0.1) {
-                compressToBlob(q - 0.1);
+                compressToBlob(q - 0.05);
               } else {
                 const compressedFile = new File([blob], file.name, {
                   type: "image/jpeg",

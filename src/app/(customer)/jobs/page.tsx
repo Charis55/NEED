@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, runTransaction } from "firebase/firestore";
 import { JobRequest, ArtisanProfile } from "@/types";
+import GlobalSpinner from "@/components/GlobalSpinner";
+import { useAlert } from "@/components/AlertProvider";
 
 export default function CustomerJobsPage() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
@@ -11,6 +13,7 @@ export default function CustomerJobsPage() {
   const [reviewingJob, setReviewingJob] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -45,7 +48,7 @@ export default function CustomerJobsPage() {
       ));
     } catch (error) {
       console.error("Failed to update status", error);
-      alert("Error updating status");
+      showAlert("Error updating status", "error");
     }
   };
 
@@ -99,23 +102,31 @@ export default function CustomerJobsPage() {
         r.requestId === req.requestId ? { ...r, reviewed: true } : r
       ));
 
-      alert("Review submitted successfully!");
+      showAlert("Review submitted successfully!", "success");
       setReviewingJob(null);
     } catch (err) {
       console.error(err);
-      alert("Failed to submit review");
+      showAlert("Failed to submit review", "error");
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-4">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">My Bookings</h1>
+    <div className="max-w-4xl mx-auto pt-16 px-4 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+      <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] mt-4">
+        MY BOOKINGS
+      </h1>
       
       {loading ? (
-        <p className="text-gray-500">Loading your requests...</p>
+        <GlobalSpinner text="LOADING YOUR REQUESTS" />
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 border border-gray-200 text-center">
-          <p className="text-gray-500 text-lg">You haven't requested any jobs yet.</p>
+        <div className="bg-[var(--color-brutal-yellow)] brutal-border p-12 text-center shadow-[8px_8px_0_0_#000] rotate-1 max-w-2xl mx-auto my-12">
+          <div className="w-24 h-24 bg-white border-4 border-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0_0_#000] -rotate-6">
+            <span className="text-5xl">🛠️</span>
+          </div>
+          <h2 className="text-3xl font-black text-black uppercase tracking-tighter mb-4">No Bookings Yet!</h2>
+          <p className="text-black font-bold text-lg bg-white border-2 border-black inline-block px-4 py-2 -rotate-1">
+            When you request a job, it will appear here.
+          </p>
         </div>
       ) : (
         <div className="space-y-6">

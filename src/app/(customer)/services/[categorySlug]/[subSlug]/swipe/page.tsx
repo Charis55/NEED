@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck } from "lucide-react";
+import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck, X, Check } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import GlobalSpinner from "@/components/GlobalSpinner";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, limit } from "firebase/firestore";
 import { ArtisanProfile } from "@/types";
@@ -32,11 +33,13 @@ function SwipeCard({
   artisan, 
   removeCard, 
   onAccept,
+  onImageClick,
   isFront 
 }: { 
   artisan: ArtisanProfile & { distance?: number }, 
   removeCard: (id: string, swipe: "left" | "right") => void,
   onAccept: (id: string) => void,
+  onImageClick: (url: string) => void,
   isFront: boolean 
 }) {
   const x = useMotionValue(0);
@@ -72,42 +75,57 @@ function SwipeCard({
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
       <div className="p-6 flex-1 flex flex-col">
-        <div className="flex items-start gap-4 mb-6 border-b-4 border-black pb-4">
-          <div className="w-20 h-20 bg-gray-100 flex-shrink-0 brutal-border brutal-shadow-sm">
-            <img 
-              src={artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/150?u=" + artisan.artisanId} 
-              alt={artisan.name} 
-              className="w-full h-full object-cover grayscale contrast-125"
-              draggable="false"
-            />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{artisan.name || "Pro Technician"}</h2>
-            <p className="text-black font-bold text-sm mb-2 uppercase">{artisan.yearsOfExperience || "3-5 years"} exp</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1 bg-[var(--color-brutal-yellow)] text-black border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_0_#000]">
-                <Star className="w-3 h-3 fill-current" />
-                <span>{artisan.ratingAverage > 0 ? artisan.ratingAverage.toFixed(1) : "NEW"}</span>
-              </div>
-              {artisan.isCertificateVerified && (
-                <div className="inline-flex items-center gap-1 bg-[var(--color-brutal-teal)] text-black border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_0_#000]">
-                  <BadgeCheck className="w-3 h-3 stroke-[3]" />
-                  <span>CERTIFIED</span>
+        <div 
+          className="flex-1 flex flex-col cursor-pointer" 
+          onClick={() => {
+            // Prevent navigating if they are just interacting with the buttons
+            const router = require('next/navigation').useRouter; // Hook cannot be called here, need to pass router or use window
+            window.location.href = `/artisan/${artisan.artisanId}`;
+          }}
+        >
+          <div className="flex items-start gap-4 mb-6 border-b-4 border-black pb-4">
+            <div 
+              className="w-20 h-20 bg-gray-100 flex-shrink-0 brutal-border brutal-shadow-sm hover:scale-105 transition-transform"
+              onClick={(e) => {
+                e.stopPropagation();
+                onImageClick(artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/1024?u=" + artisan.artisanId);
+              }}
+            >
+              <img 
+                src={artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/150?u=" + artisan.artisanId} 
+                alt={artisan.name} 
+                className="w-full h-full object-cover grayscale contrast-125"
+                draggable="false"
+              />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{artisan.name || "Pro Technician"}</h2>
+              <p className="text-black font-bold text-sm mb-2 uppercase">{artisan.yearsOfExperience || "3-5 years"} exp</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1 bg-[var(--color-brutal-yellow)] text-black border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_0_#000]">
+                  <Star className="w-3 h-3 fill-current" />
+                  <span>{artisan.ratingAverage > 0 ? artisan.ratingAverage.toFixed(1) : "NEW"}</span>
                 </div>
-              )}
+                {artisan.isCertificateVerified && (
+                  <div className="inline-flex items-center gap-1 bg-[var(--color-brutal-teal)] text-black border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_0_#000]">
+                    <BadgeCheck className="w-3 h-3 stroke-[3]" />
+                    <span>CERTIFIED</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 text-black font-bold text-sm mb-4 bg-[var(--color-brutal-pink)] p-2 brutal-border -rotate-1">
-          <MapPin className="w-4 h-4 stroke-[3]" />
-          <span className="uppercase">{artisan.neighborhood} {artisan.distance !== undefined && `• ${formatDistance(artisan.distance)}`}</span>
-        </div>
+          <div className="flex items-center gap-2 text-black font-bold text-sm mb-4 bg-[var(--color-brutal-pink)] p-2 brutal-border -rotate-1">
+            <MapPin className="w-4 h-4 stroke-[3]" />
+            <span className="uppercase">{artisan.neighborhood} {artisan.distance !== undefined && `• ${formatDistance(artisan.distance)}`}</span>
+          </div>
 
-        <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 mb-auto">
-          <p className="text-black font-medium text-sm leading-snug">
-            "{artisan.bio || "I am a dedicated professional providing high-quality services for my community."}"
-          </p>
+          <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 mb-auto">
+            <p className="text-black font-medium text-sm leading-snug">
+              "{artisan.bio || "I am a dedicated professional providing high-quality services for my community."}"
+            </p>
+          </div>
         </div>
 
         <div className="flex gap-4 mt-6 pt-4 border-t-4 border-black">
@@ -133,8 +151,11 @@ function SwipeCard({
 }
 
 export default function SwipePage({ params }: { params: { categorySlug: string, subSlug: string } }) {
-  const [artisans, setArtisans] = useState<ArtisanProfile[]>([]);
+  const [artisans, setArtisans] = useState<(ArtisanProfile & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortBy, setSortBy] = useState<"recommended" | "distance" | "rating">("recommended");
   const router = useRouter();
 
   useEffect(() => {
@@ -177,6 +198,27 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
     fetchArtisans();
   }, []);
 
+  const handleSort = (type: "recommended" | "distance" | "rating") => {
+    setSortBy(type);
+    setShowSortModal(false);
+    
+    const sorted = [...artisans];
+    if (type === "rating") {
+      sorted.sort((a, b) => b.ratingAverage - a.ratingAverage);
+    } else if (type === "distance") {
+      // Push items without distance to the end
+      sorted.sort((a, b) => {
+        if (a.distance === undefined) return 1;
+        if (b.distance === undefined) return -1;
+        return a.distance - b.distance;
+      });
+    } else {
+      // Recommended: simple mix
+      sorted.sort(() => Math.random() - 0.5);
+    }
+    setArtisans(sorted);
+  };
+
   const removeCard = (id: string, swipe: "left" | "right") => {
     setArtisans(prev => prev.filter(a => a.artisanId !== id));
   };
@@ -196,7 +238,10 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
           <Link href={`/services/${params.categorySlug}`} className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none">
             <ChevronLeft className="w-6 h-6 text-black stroke-[3]" />
           </Link>
-          <button className="w-12 h-12 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none">
+          <button 
+            onClick={() => setShowSortModal(true)}
+            className="w-12 h-12 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none"
+          >
             <SlidersHorizontal className="w-5 h-5 text-black stroke-[3]" />
           </button>
         </div>
@@ -227,10 +272,7 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
         <div className="relative w-full h-[500px]">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow">
-              <div className="animate-pulse flex flex-col items-center">
-                <div className="text-4xl animate-bounce mb-4">🕵️</div>
-                <p className="text-black font-black uppercase tracking-widest bg-[var(--color-brutal-yellow)] px-2 rotate-1 brutal-border">Searching...</p>
-              </div>
+              <GlobalSpinner text="FINDING PROS" />
             </div>
           ) : artisans.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow text-center p-8">
@@ -257,6 +299,7 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
                     artisan={artisan} 
                     removeCard={removeCard} 
                     onAccept={handleAccept}
+                    onImageClick={(url) => setFullscreenImage(url)}
                     isFront={isFront} 
                   />
                 );
@@ -265,6 +308,65 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
           )}
         </div>
       </div>
+
+      {/* Fullscreen Image Lightbox */}
+      {fullscreenImage && (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setFullscreenImage(null)}>
+          <button 
+            onClick={() => setFullscreenImage(null)}
+            className="absolute top-6 right-6 w-12 h-12 bg-white border-4 border-black flex items-center justify-center hover:bg-[var(--color-brutal-red)] hover:text-white transition-colors brutal-shadow-sm z-10"
+          >
+            <X className="w-8 h-8 stroke-[3]" />
+          </button>
+          
+          <img 
+            src={fullscreenImage} 
+            alt="Fullscreen View" 
+            className="max-w-full max-h-[90vh] object-contain border-4 border-black brutal-shadow bg-white"
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>
+      )}
+
+      {/* Sort Modal */}
+      {showSortModal && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-end justify-center p-4 backdrop-blur-sm" onClick={() => setShowSortModal(false)}>
+          <motion.div 
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white border-4 border-black brutal-shadow mb-4 p-6"
+          >
+            <div className="flex justify-between items-center mb-6 border-b-4 border-black pb-4">
+              <h2 className="text-2xl font-black text-black uppercase">Sort Pros</h2>
+              <button onClick={() => setShowSortModal(false)}>
+                <X className="w-6 h-6 stroke-[3]" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {[
+                { id: "recommended", label: "Recommended (Default)", color: "bg-[var(--color-brutal-yellow)]" },
+                { id: "distance", label: "Nearest to me", color: "bg-[var(--color-brutal-teal)]" },
+                { id: "rating", label: "Highest Rated", color: "bg-[var(--color-brutal-pink)]" }
+              ].map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => handleSort(option.id as any)}
+                  className={`w-full p-4 border-4 border-black font-black uppercase flex justify-between items-center transition-transform hover:-translate-y-1 ${
+                    sortBy === option.id ? option.color + " shadow-[4px_4px_0_0_#000]" : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {sortBy === option.id && <Check className="w-6 h-6 stroke-[3]" />}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

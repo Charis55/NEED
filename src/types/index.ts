@@ -1,10 +1,17 @@
 export interface UserAccount {
   userId: string;
   phone: string;
+  firstName?: string;
+  lastName?: string;
   displayName: string;
   role: "customer" | "artisan";
   isAdmin?: boolean;
   createdAt: number;
+  preferences?: {
+    pushNotifications: boolean;
+    messagingNotifications: boolean;
+    locationEnabled: boolean;
+  };
 }
 
 export interface ArtisanProfile {
@@ -56,7 +63,9 @@ export interface Review {
   requestId: string;
   artisanId: string;
   customerId: string;
+  jobTitle: string;
   rating: number;
   comment: string;
+  photos: string[];
   createdAt: number;
 }

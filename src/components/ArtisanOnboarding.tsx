@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useRouter } from "next/navigation";
 import { ArtisanProfile } from "@/types";
 import ngeohash from "ngeohash";
@@ -83,17 +82,34 @@ export default function ArtisanOnboarding() {
       const user = auth.currentUser;
       if (!user) throw new Error("Not authenticated");
 
+      // Helper function to upload to R2
+      const uploadFileToR2 = async (file: File) => {
+        const res = await fetch('/api/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, contentType: file.type })
+        });
+        if (!res.ok) throw new Error("Failed to get upload URL");
+        const { presignedUrl, publicUrl } = await res.json();
+        
+        const uploadRes = await fetch(presignedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file
+        });
+        if (!uploadRes.ok) throw new Error("Failed to upload file to R2");
+        return publicUrl;
+      };
+
       // Upload photos
       const photoUrls: string[] = [];
       if (files) {
         for (let i = 0; i < files.length; i++) {
           let file = files[i];
           if (file.type.startsWith('image/')) {
-            file = await compressImage(file);
+            file = await compressImage(file, 4);
           }
-          const storageRef = ref(storage, `artisan-photos/${user.uid}/${Date.now()}_${file.name}`);
-          const snapshot = await uploadBytes(storageRef, file);
-          const url = await getDownloadURL(snapshot.ref);
+          const url = await uploadFileToR2(file);
           photoUrls.push(url);
         }
       }
@@ -102,12 +118,14 @@ export default function ArtisanOnboarding() {
       let certificateUrl: string | null = null;
       let isCertificateVerified = false;
       if (hasCertification && certificateFile) {
-        const certRef = ref(storage, `artisan-certificates/${user.uid}/${Date.now()}_${certificateFile.name}`);
-        const snapshot = await uploadBytes(certRef, certificateFile);
-        certificateUrl = await getDownloadURL(snapshot.ref);
+        let fileToUpload = certificateFile;
+        if (certificateFile.type.startsWith('image/')) {
+          fileToUpload = await compressImage(certificateFile, 4);
+        }
+        certificateUrl = await uploadFileToR2(fileToUpload);
         
         // Call Server Action to Verify Certificate via AI
-        isCertificateVerified = await verifyCertificateAction(certificateUrl);
+        isCertificateVerified = await verifyCertificateAction(certificateUrl as string);
       }
 
       // Upload police clearance
@@ -115,11 +133,9 @@ export default function ArtisanOnboarding() {
       if (policeClearanceFile) {
         let fileToUpload = policeClearanceFile;
         if (policeClearanceFile.type.startsWith('image/')) {
-          fileToUpload = await compressImage(policeClearanceFile);
+          fileToUpload = await compressImage(policeClearanceFile, 4);
         }
-        const pcRef = ref(storage, `artisan-clearance/${user.uid}/${Date.now()}_${fileToUpload.name}`);
-        const snapshot = await uploadBytes(pcRef, fileToUpload);
-        policeClearanceUrl = await getDownloadURL(snapshot.ref);
+        policeClearanceUrl = await uploadFileToR2(fileToUpload);
       }
       // For testing, we do not throw an error if police clearance is missing
 

@@ -104,6 +104,17 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
         return;
       }
 
+      let platformFeeRate = 0.35;
+      if (artisan?.createdAt) {
+        const createdAtMs = typeof artisan.createdAt === "number" 
+          ? artisan.createdAt 
+          : (artisan.createdAt as any).toMillis?.() || Date.now();
+        const daysSinceSignup = Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24));
+        if (daysSinceSignup <= 30) {
+          platformFeeRate = 0;
+        }
+      }
+
       const requestRef = doc(collection(db, "jobRequests"));
       const newRequest: JobRequest = {
         requestId: requestRef.id,
@@ -116,7 +127,7 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
         preferredTime,
         offerAmount: parsedAmount,
         counterOfferAmount: null,
-        platformFee: parsedAmount * 0.35, // Example 35% fee
+        platformFee: parsedAmount * platformFeeRate,
         status: "pending",
         createdAt: Date.now(),
         completedAt: null,

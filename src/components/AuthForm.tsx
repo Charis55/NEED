@@ -11,8 +11,10 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "@/utils/imageCompression";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { UserAccount } from "@/types";
-import { Eye, EyeOff, ArrowLeft, Upload, X } from "lucide-react";
+import ImageCropper from "@/components/ImageCropper";
+import { Eye, EyeOff, ArrowLeft, Upload, X, Check } from "lucide-react";
 import TermsDisclaimer from "@/components/TermsDisclaimer";
 
 export default function AuthForm() {
@@ -24,6 +26,7 @@ export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConstraints, setShowPasswordConstraints] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   
   // Profile completion fields
@@ -40,6 +43,8 @@ export default function AuthForm() {
   // Profile Image
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
@@ -47,20 +52,60 @@ export default function AuthForm() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setProfileFile(file);
-      setProfilePreview(URL.createObjectURL(file));
+      setCropImageSrc(URL.createObjectURL(file));
+      setShowCropper(true);
+      // Reset input so they can select the same file again if they cancel
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleCropComplete = (croppedFile: File) => {
+    setProfileFile(croppedFile);
+    setProfilePreview(URL.createObjectURL(croppedFile));
+    setShowCropper(false);
+    setCropImageSrc(null);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setCropImageSrc(null);
   };
 
   const uploadAndSetPhoto = async (user: any) => {
     if (profileFile) {
       try {
-        const compressedFile = await compressImage(profileFile, 1);
-        const storageRef = ref(storage, `avatars/${user.uid}.jpg`);
-        await uploadBytes(storageRef, compressedFile);
-        const photoURL = await getDownloadURL(storageRef);
-        await updateProfile(user, { photoURL });
-        return photoURL;
+        const uploadTask = async () => {
+          const compressedFile = await compressImage(profileFile, 3);
+          
+          const res = await fetch('/api/upload-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              filename: profileFile.name,
+              contentType: profileFile.type 
+            })
+          });
+          
+          if (!res.ok) throw new Error("Failed to get upload URL");
+          const { presignedUrl, publicUrl } = await res.json();
+          
+          const uploadRes = await fetch(presignedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': profileFile.type },
+            body: compressedFile
+          });
+          
+          if (!uploadRes.ok) throw new Error("Failed to upload image to R2");
+          
+          await updateProfile(user, { photoURL: publicUrl });
+          return publicUrl;
+        };
+        
+        const photoURL = await Promise.race([
+          uploadTask(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Upload timeout (CORS or network issue)")), 8000))
+        ]);
+        return photoURL as string;
       } catch (err) {
         console.error("Failed to upload profile picture", err);
       }
@@ -95,7 +140,7 @@ export default function AuthForm() {
         if (artisanDoc.exists()) {
           router.push("/dashboard");
         } else {
-          router.push("/onboarding");
+          setStep("role");
         }
       } else {
         router.push("/explore");
@@ -151,7 +196,7 @@ export default function AuthForm() {
           if (artisanDoc.exists()) {
             router.push("/dashboard");
           } else {
-            router.push("/onboarding");
+            setStep("role");
           }
         } else {
           router.push("/explore");
@@ -178,6 +223,18 @@ export default function AuthForm() {
         if (!firstName || !lastName || !phoneNumber) {
           throw new Error("Please fill in all fields.");
         }
+        
+        // Password constraints
+        const minLength = password.length >= 8;
+        const hasUpper = /[A-Z]/.test(password);
+        const hasLower = /[a-z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        
+        if (!minLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+          throw new Error("Password must be at least 8 characters long, contain an uppercase letter, a lowercase letter, a number, and a special character.");
+        }
+
         if (!termsAccepted) {
           throw new Error("You must accept the Security Disclaimer & Terms to continue.");
         }
@@ -186,8 +243,6 @@ export default function AuthForm() {
         
         await updateProfile(result.user, { displayName: fullName });
         
-        const uploadedPhotoURL = await uploadAndSetPhoto(result.user);
-
         const newUser: UserAccount = {
           userId: result.user.uid,
           phone: phoneNumber,
@@ -196,6 +251,8 @@ export default function AuthForm() {
           createdAt: Date.now(),
         };
         await setDoc(doc(db, "users", result.user.uid), newUser);
+        
+        const uploadedPhotoURL = await uploadAndSetPhoto(result.user);
         
         if (role === "artisan") {
           router.push("/onboarding");
@@ -236,8 +293,6 @@ export default function AuthForm() {
         await updateProfile(user, { displayName: finalName });
       }
 
-      const uploadedPhotoURL = await uploadAndSetPhoto(user);
-
       const newUser: UserAccount = {
         userId: user.uid,
         phone: user.phoneNumber || phoneNumber || "",
@@ -247,6 +302,8 @@ export default function AuthForm() {
       };
 
       await setDoc(doc(db, "users", user.uid), newUser);
+
+      const uploadedPhotoURL = await uploadAndSetPhoto(user);
 
       if (role === "artisan") {
         router.push("/onboarding"); 
@@ -264,6 +321,13 @@ export default function AuthForm() {
   if (step === "role") {
     return (
       <>
+      {showCropper && cropImageSrc && (
+        <ImageCropper 
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
       <div className="w-full max-w-md md:max-w-5xl mx-auto md:flex brutal-card bg-[var(--color-brutal-yellow)] relative">
         <div className="w-full md:w-1/2 p-6 md:p-10 border-b-4 md:border-b-0 md:border-r-4 border-black relative">
           <div className="absolute -top-4 -left-4 w-12 h-12 bg-[var(--color-brutal-teal)] brutal-border flex items-center justify-center -rotate-6 z-10">
@@ -314,7 +378,7 @@ export default function AuthForm() {
                 </div>
                 <div className="text-sm font-bold text-gray-500 uppercase">
                   <p>Upload a clear photo</p>
-                  <p className="text-xs mt-1">Max 1MB (auto-compressed)</p>
+                  <p className="text-xs mt-1">Max 3MB (auto-compressed)</p>
                 </div>
                 <input 
                   type="file" 
@@ -404,6 +468,13 @@ export default function AuthForm() {
 
   return (
     <>
+    {showCropper && cropImageSrc && (
+      <ImageCropper 
+        imageSrc={cropImageSrc}
+        onCropComplete={handleCropComplete}
+        onCancel={handleCropCancel}
+      />
+    )}
     <div className="w-full max-w-md md:max-w-5xl mx-auto md:flex brutal-card bg-white relative">
       {/* Left side: Form */}
       <div className="w-full md:w-1/2 p-6 md:p-10 border-b-4 md:border-b-0 md:border-r-4 border-black relative">
@@ -513,7 +584,7 @@ export default function AuthForm() {
                   </div>
                   <div className="text-sm font-bold text-gray-500 uppercase">
                     <p>Upload a clear photo</p>
-                    <p className="text-xs mt-1">Max 1MB</p>
+                    <p className="text-xs mt-1">Max 3MB</p>
                   </div>
                   <input 
                     type="file" 
@@ -583,6 +654,7 @@ export default function AuthForm() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => !isLogin && setShowPasswordConstraints(true)}
                 placeholder="••••••••"
                 className="w-full pl-5 pr-14 py-4 text-black font-medium focus:outline-none bg-transparent placeholder:text-gray-400"
                 required
@@ -595,8 +667,48 @@ export default function AuthForm() {
                 {showPassword ? <EyeOff className="w-6 h-6 stroke-[3]" /> : <Eye className="w-6 h-6 stroke-[3]" />}
               </button>
             </div>
-            {!isLogin && (
-              <p className="text-sm font-bold text-black mt-2 bg-[var(--color-brutal-yellow)] inline-block px-1 border-2 border-black -rotate-1">Min 6 chars</p>
+            
+            {!isLogin && showPasswordConstraints && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-4 border-black brutal-shadow-sm p-4 z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="flex justify-between items-center border-b-[3px] border-black pb-2 mb-3">
+                  <h3 className="text-black font-black uppercase text-sm">Password Requirements</h3>
+                  <button type="button" onClick={() => setShowPasswordConstraints(false)} className="text-black hover:text-[var(--color-brutal-red)] transition-colors hover:scale-110">
+                    <X className="w-5 h-5 stroke-[3]" />
+                  </button>
+                </div>
+                <p className="text-black font-bold text-xs mb-3 bg-[var(--color-brutal-yellow)] inline-block px-1.5 border-2 border-black -rotate-1">To keep your account secure:</p>
+                <ul className="space-y-2.5 mb-4">
+                  {[
+                    { label: "Minimum 8 characters", passed: password.length >= 8 },
+                    { label: "Require uppercase character", passed: /[A-Z]/.test(password) },
+                    { label: "Require lowercase character", passed: /[a-z]/.test(password) },
+                    { label: "Require special character", passed: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
+                    { label: "Require numeric character", passed: /\d/.test(password) }
+                  ].map((req, idx) => (
+                    <li key={idx} className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 border-black flex items-center justify-center flex-shrink-0 transition-colors ${req.passed ? 'bg-[var(--color-brutal-green)]' : 'bg-white'}`}>
+                        {req.passed && <Check className="w-3 h-3 text-black stroke-[4]" />}
+                      </div>
+                      <span className={`text-xs font-black uppercase leading-tight ${req.passed ? 'text-gray-500 line-through decoration-black decoration-2' : 'text-black'}`}>{req.label}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  type="button" 
+                  onClick={() => setShowPasswordConstraints(false)}
+                  className="w-full py-2 bg-[var(--color-brutal-teal)] border-2 border-black text-black font-black text-sm uppercase hover:-translate-y-1 hover:shadow-[2px_2px_0_0_#000] transition-all"
+                >
+                  Got it
+                </button>
+              </div>
+            )}
+
+            {isLogin && (
+              <div className="mt-2 text-right">
+                <Link href="/forgot-password" className="text-sm font-black uppercase text-black hover:text-[var(--color-brutal-blue)] hover:underline decoration-2 underline-offset-2 transition-colors">
+                  Forgot Password?
+                </Link>
+              </div>
             )}
           </div>
 
@@ -614,9 +726,6 @@ export default function AuthForm() {
                 </div>
                 <span className="text-lg font-black uppercase text-black">Remember Me</span>
               </label>
-              <button type="button" className="text-lg font-black uppercase text-black hover:underline decoration-4 underline-offset-4">
-                Forgot?
-              </button>
             </div>
           )}
 

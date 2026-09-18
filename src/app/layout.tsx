@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { FCMProvider } from "@/hooks/useFCM";
+import { AlertProvider } from "@/components/AlertProvider";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-geist-sans",
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <FCMProvider>{children}</FCMProvider>
+        <AlertProvider>
+          <FCMProvider>{children}</FCMProvider>
+        </AlertProvider>
       </body>
     </html>
   );

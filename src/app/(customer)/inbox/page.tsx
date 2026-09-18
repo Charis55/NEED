@@ -1,141 +1,140 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import { JobRequest } from "@/types";
-import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { collection, query, where, getDocs, doc, getDoc, orderBy, onSnapshot } from "firebase/firestore";
+import { JobRequest, ArtisanProfile } from "@/types";
+import GlobalSpinner from "@/components/GlobalSpinner";
+import { useAlert } from "@/components/AlertProvider";
 import Link from "next/link";
+import UserAvatar from "@/components/UserAvatar";
+import { MessageCircle } from "lucide-react";
+
+interface ChatListItem {
+  job: JobRequest;
+  artisan: ArtisanProfile | null;
+  unreadCount: number;
+}
 
 export default function InboxPage() {
-  const [requests, setRequests] = useState<JobRequest[]>([]);
+  const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
 
   useEffect(() => {
-    const fetchRequests = async () => {
+    const fetchChats = async () => {
       const user = auth.currentUser;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+      if (!user) return; 
 
       try {
+        // We only want accepted or completed jobs for the chat list
         const q = query(
-          collection(db, "job_requests"),
+          collection(db, "jobRequests"), 
           where("customerId", "==", user.uid)
         );
-        
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({
-          requestId: doc.id,
-          ...doc.data()
-        })) as JobRequest[];
-
-        // Sort by createdAt descending (client-side since we didn't index this specifically yet)
-        data.sort((a, b) => b.createdAt - a.createdAt);
+        const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
         
-        setRequests(data);
+        // Filter locally because Firestore OR queries are complex
+        const activeJobs = allJobs.filter(j => j.status === "accepted" || j.status === "completed");
+        
+        // Sort by newest first
+        activeJobs.sort((a, b) => b.createdAt - a.createdAt);
+
+        // Fetch artisan info for each job
+        const listItems: ChatListItem[] = [];
+        
+        for (const job of activeJobs) {
+          let artisan: ArtisanProfile | null = null;
+          if (job.artisanId) {
+            const artDoc = await getDoc(doc(db, "artisans", job.artisanId));
+            if (artDoc.exists()) {
+              artisan = artDoc.data() as ArtisanProfile;
+            }
+          }
+          
+          listItems.push({
+            job,
+            artisan,
+            unreadCount: 0 // We will implement real unread counts later in the chat logic
+          });
+        }
+
+        setChatList(listItems);
       } catch (error) {
-        console.error("Error fetching requests:", error);
+        console.error("Error fetching chats:", error);
+        showAlert("Failed to load your inbox", "error");
       } finally {
         setLoading(false);
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        fetchRequests();
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
+    const timer = setTimeout(() => fetchChats(), 500);
+    return () => clearTimeout(timer);
   }, []);
 
-  const getStatusDisplay = (status: string) => {
-    switch (status) {
-      case "pending":
-        return { icon: Clock, color: "bg-[var(--color-brutal-yellow)]", text: "Pending Review" };
-      case "accepted":
-        return { icon: CheckCircle, color: "bg-[var(--color-brutal-green)]", text: "Accepted" };
-      case "rejected":
-        return { icon: XCircle, color: "bg-[var(--color-brutal-red)]", text: "Declined" };
-      case "completed":
-        return { icon: CheckCircle, color: "bg-[var(--color-brutal-blue)]", text: "Completed" };
-      default:
-        return { icon: AlertCircle, color: "bg-gray-200", text: status };
-    }
-  };
-
   return (
-    <div className="max-w-xl mx-auto pt-16 px-6">
+    <div className="max-w-2xl mx-auto pt-12 px-4 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)]">
-        INBOX
+        MESSAGES
       </h1>
-
+      
       {loading ? (
-        <div className="bg-white border-4 border-black p-8 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex justify-center">
-          <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      ) : requests.length === 0 ? (
-        <div className="bg-white border-4 border-black p-10 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-center">
-          <InboxIcon className="w-16 h-16 mx-auto mb-4" />
-          <h2 className="text-2xl font-black uppercase text-black mb-2">No Messages</h2>
-          <p className="text-black font-bold">You don't have any job requests yet.</p>
-          <Link href="/explore" className="inline-block mt-6 px-6 py-3 bg-[var(--color-brutal-green)] border-4 border-black font-black uppercase hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-            Find an Artisan
-          </Link>
+        <GlobalSpinner text="LOADING CHATS" color="bg-[var(--color-brutal-pink)]" />
+      ) : chatList.length === 0 ? (
+        <div className="bg-white border-4 border-black p-8 brutal-shadow text-center">
+          <MessageCircle className="w-12 h-12 mx-auto mb-4 stroke-[3] text-black" />
+          <p className="text-black font-black uppercase text-xl">No Active Chats</p>
+          <p className="text-gray-600 font-bold mt-2">When an artisan accepts your job, you can chat with them here.</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {requests.map((request) => {
-            const { icon: StatusIcon, color, text } = getStatusDisplay(request.status);
-            const date = new Date(request.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-            
-            return (
-              <div key={request.requestId} className="bg-white border-4 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden group">
-                <div className={`absolute top-0 right-0 px-3 py-1 border-b-4 border-l-4 border-black font-black text-xs uppercase flex items-center gap-1 ${color}`}>
-                  <StatusIcon className="w-3 h-3" /> {text}
-                </div>
+        <div className="space-y-4">
+          {chatList.map((item) => (
+            <Link key={item.job.requestId} href={`/chat/${item.job.requestId}`}>
+              <div className="bg-white border-4 border-black p-4 brutal-shadow flex items-center hover:-translate-y-1 transition-transform group cursor-pointer">
                 
-                <p className="text-xs font-black text-black bg-[var(--color-brutal-pink)] inline-block px-2 border-2 border-black -rotate-2 mb-3">
-                  {date}
-                </p>
-                
-                <h3 className="text-xl font-black uppercase text-black mb-1">{request.subcategory}</h3>
-                <p className="text-black font-bold text-sm mb-4">Request sent to artisan</p>
-                
-                {request.status === "accepted" && (
-                  <div className="mt-4 pt-4 border-t-4 border-black border-dashed">
-                    <p className="text-sm font-black text-black">The artisan has accepted your offer!</p>
+                {/* Artisan Avatar */}
+                <div className="relative mr-4 shrink-0">
+                  <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
+                    {/* We don't have photoURL in ArtisanProfile type currently, so we use a fallback */}
+                    <UserAvatar name={item.artisan?.name || "Artisan"} className="w-full h-full text-2xl text-black font-black" />
                   </div>
-                )}
+                  {/* Unread Badge */}
+                  {item.unreadCount > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-[var(--color-brutal-red)] border-2 border-black w-6 h-6 rounded-full flex items-center justify-center">
+                      <span className="text-white font-black text-xs">{item.unreadCount}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-black text-black text-lg truncate uppercase">
+                      {item.artisan?.name || "Unknown Artisan"}
+                    </h3>
+                    <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
+                      {new Date(item.job.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-bold text-gray-600 truncate mr-2">
+                      {item.job.subcategory}
+                    </p>
+                    
+                    {item.job.status === "completed" && (
+                      <span className="text-[10px] font-black text-white bg-[var(--color-brutal-blue)] border-2 border-black px-2 py-0.5 uppercase tracking-wider shrink-0">
+                        COMPLETED
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-            );
-          })}
+            </Link>
+          ))}
         </div>
       )}
     </div>
-  );
-}
-
-function InboxIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-    </svg>
   );
 }

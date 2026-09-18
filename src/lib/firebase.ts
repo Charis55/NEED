@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyB_Hc8lgDxkW_lmTLctK3mvx72fBLIfPNY",
   authDomain: "momentum-b4215.firebaseapp.com",
   projectId: "momentum-b4215",
-  storageBucket: "momentum-b4215.firebasestorage.app",
+  storageBucket: "momentum-b4215.appspot.com",
   messagingSenderId: "48438248184",
   appId: "1:48438248184:web:c52578c24ca34ffd9a710d",
   measurementId: "G-YKYMMGT4CL"
