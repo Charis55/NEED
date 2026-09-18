@@ -93,7 +93,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       {/* Top Header */}
       <div className="px-6 pt-12 pb-6 flex-shrink-0 bg-[var(--color-brutal-blue)] border-b-4 border-black brutal-shadow-sm transition-all">
         <div className="flex justify-between items-center mb-6">
-          <BackButton className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
+          <BackButton href="/explore" className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
           <button 
             onClick={() => setIsSearchOpen(!isSearchOpen)}
             className={`w-12 h-12 brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none ${isSearchOpen ? 'bg-[var(--color-brutal-pink)]' : 'bg-white'}`}
