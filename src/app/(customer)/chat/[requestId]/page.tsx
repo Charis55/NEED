@@ -393,7 +393,7 @@ export default function ChatPage() {
         </div>
         
         <div className="flex-1 min-w-0">
-          <h2 className="font-black text-black text-xl uppercase truncate">{artisan?.name || "Unknown Artisan"}</h2>
+          <h2 className="font-black text-black text-xl uppercase truncate">{artisan?.name || "Unknown Technician"}</h2>
           <p className="text-black font-bold text-xs truncate bg-white border-2 border-black px-1 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000]">
             {job?.subcategory}
           </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -9,8 +9,10 @@ import BackButton from "@/components/BackButton";
 import { ArrowRight, MapPin, Clock, Info } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
 
-export default function RequestArtisanPage({ params }: { params: { artisanId: string } }) {
+export default function RequestArtisanPage({ params }: { params: Promise<{ artisanId: string }> }) {
+  const unwrappedParams = use(params);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
+  const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
   const [description, setDescription] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
   const [offerAmount, setOfferAmount] = useState("");
@@ -28,7 +30,7 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
   useEffect(() => {
     const fetchArtisan = async () => {
       try {
-        const docRef = doc(db, "artisans", params.artisanId);
+        const docRef = doc(db, "artisans", unwrappedParams.artisanId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setArtisan(docSnap.data() as ArtisanProfile);
@@ -43,7 +45,7 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
       }
     };
     fetchArtisan();
-  }, [params.artisanId]);
+  }, [unwrappedParams.artisanId]);
 
   const detectLocation = () => {
     setIsLocating(true);
@@ -119,9 +121,9 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
       const newRequest: JobRequest = {
         requestId: requestRef.id,
         customerId: user.uid,
-        artisanId: params.artisanId,
-        trade: artisan.trade || "Unknown",
-        subcategory: artisan.subcategory || "Unknown",
+        artisanId: unwrappedParams.artisanId,
+        trade: artisan.services?.[selectedServiceIndex]?.trade || artisan.trade || "Unknown",
+        subcategory: artisan.services?.[selectedServiceIndex]?.subcategory || artisan.subcategory || "Unknown",
         description,
         neighborhood: locationData.name,
         preferredTime,
@@ -177,7 +179,21 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
             <div>
               <p className="text-sm font-bold uppercase text-gray-500 mb-1">Requesting</p>
               <h2 className="text-xl font-black uppercase tracking-tighter leading-none">{artisan.name}</h2>
-              <p className="text-xs font-bold text-black border-l-2 border-black pl-1 mt-1">{artisan.subcategory || artisan.trade}</p>
+              {artisan.services && artisan.services.length > 1 ? (
+                <select 
+                  className="mt-2 text-xs font-bold text-black border-2 border-black p-1 bg-[var(--color-brutal-pink)] outline-none cursor-pointer w-full"
+                  value={selectedServiceIndex}
+                  onChange={(e) => setSelectedServiceIndex(Number(e.target.value))}
+                >
+                  {artisan.services.map((svc, i) => (
+                    <option key={i} value={i}>{svc.trade} • {svc.subcategory}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs font-bold text-black border-l-2 border-black pl-1 mt-1">
+                  {artisan.services?.[0]?.subcategory || artisan.subcategory || artisan.trade}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -208,7 +224,7 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
             <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-1">
               <MapPin className="w-5 h-5 stroke-[3]" /> Location *
             </label>
-            <p className="text-xs font-bold text-gray-500 mb-3">We need your location so the artisan knows where to go.</p>
+            <p className="text-xs font-bold text-gray-500 mb-3">We need your location so the technician knows where to go.</p>
             
             {locationData ? (
               <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center">
@@ -256,7 +272,7 @@ export default function RequestArtisanPage({ params }: { params: { artisanId: st
               Your Offer
             </label>
             <p className="text-xs font-bold text-black mb-3 leading-tight border-l-2 border-black pl-2">
-              The artisan can accept, decline, or counter this offer.
+              The technician can accept, decline, or counter this offer.
             </p>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black font-black text-xl">₦</span>

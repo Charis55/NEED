@@ -47,23 +47,25 @@ async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
   }
 }
 
-export async function generateMetadata({ params }: { params: { artisanId: string } }): Promise<Metadata> {
-  const artisan = await getArtisan(params.artisanId);
+export async function generateMetadata({ params }: { params: Promise<{ artisanId: string }> }): Promise<Metadata> {
+  const unwrappedParams = await params;
+  const artisan = await getArtisan(unwrappedParams.artisanId);
+  
   if (!artisan) {
-    return { title: 'Technician Not Found' };
+    return {
+      title: 'Artisan Not Found',
+    };
   }
   
   return {
-    title: `${artisan.trade} in ${artisan.neighborhood} | NEED`,
-    description: artisan.bio.substring(0, 160),
-    openGraph: {
-      images: artisan.portfolioPhotoUrls.length > 0 ? [artisan.portfolioPhotoUrls[0]] : [],
-    }
+    title: `${artisan.businessName || artisan.name} | NEED Artisan`,
+    description: artisan.bio || `Hire ${artisan.businessName || artisan.name} on NEED.`,
   };
 }
 
-export default async function ArtisanProfilePage({ params }: { params: { artisanId: string } }) {
-  const artisan = await getArtisan(params.artisanId);
+export default async function ArtisanProfilePage({ params }: { params: Promise<{ artisanId: string }> }) {
+  const unwrappedParams = await params;
+  const artisan = await getArtisan(unwrappedParams.artisanId);
 
   if (!artisan) {
     return (

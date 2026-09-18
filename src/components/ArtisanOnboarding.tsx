@@ -15,8 +15,17 @@ const tradeCategories = Object.values(servicesData);
 
 export default function ArtisanOnboarding() {
   const [step, setStep] = useState(1);
-  const [tradeCategory, setTradeCategory] = useState(tradeCategories[0].id);
-  const [subcategory, setSubcategory] = useState(tradeCategories[0].subServices[0].title);
+  const [services, setServices] = useState<{
+    tradeCategory: string;
+    subcategory: string;
+    hasCertification: boolean;
+    certificateFile: File | null;
+  }[]>([{
+    tradeCategory: tradeCategories[0].id,
+    subcategory: tradeCategories[0].subServices[0].title,
+    hasCertification: false,
+    certificateFile: null
+  }]);
   
   // Location
   const [locationData, setLocationData] = useState<{lat: number, lng: number, name: string} | null>(null);
@@ -26,8 +35,6 @@ export default function ArtisanOnboarding() {
   // Survey fields
   const [yearsOfExperience, setYearsOfExperience] = useState("< 1 year");
   const [skillLevel, setSkillLevel] = useState("Intermediate");
-  const [hasCertification, setHasCertification] = useState(false);
-  const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [policeClearanceFile, setPoliceClearanceFile] = useState<File | null>(null);
 
   const [bio, setBio] = useState("");
@@ -73,6 +80,29 @@ export default function ArtisanOnboarding() {
     );
   };
 
+  const handleAddService = () => {
+    if (services.length >= 5) return;
+    setServices([...services, {
+      tradeCategory: tradeCategories[0].id,
+      subcategory: tradeCategories[0].subServices[0].title,
+      hasCertification: false,
+      certificateFile: null
+    }]);
+  };
+
+  const handleRemoveService = (index: number) => {
+    setServices(services.filter((_, i) => i !== index));
+  };
+
+  const updateService = (index: number, field: string, value: any) => {
+    const newServices = [...services];
+    (newServices[index] as any)[field] = value;
+    if (field === 'tradeCategory') {
+      newServices[index].subcategory = servicesData[value].subServices[0].title;
+    }
+    setServices(newServices);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -114,18 +144,31 @@ export default function ArtisanOnboarding() {
         }
       }
 
-      // Upload certificate if provided
-      let certificateUrl: string | null = null;
-      let isCertificateVerified = false;
-      if (hasCertification && certificateFile) {
-        let fileToUpload = certificateFile;
-        if (certificateFile.type.startsWith('image/')) {
-          fileToUpload = await compressImage(certificateFile, 4);
-        }
-        certificateUrl = await uploadFileToR2(fileToUpload);
+      // Upload certificates for all services
+      const finalServices = [];
+      const serviceKeys = [];
+      for (const svc of services) {
+        let certificateUrl: string | null = null;
+        let isCertificateVerified = false;
         
-        // Call Server Action to Verify Certificate via AI
-        isCertificateVerified = await verifyCertificateAction(certificateUrl as string);
+        if (svc.hasCertification && svc.certificateFile) {
+          let fileToUpload = svc.certificateFile;
+          if (svc.certificateFile.type.startsWith('image/')) {
+            fileToUpload = await compressImage(svc.certificateFile, 4);
+          }
+          certificateUrl = await uploadFileToR2(fileToUpload);
+          isCertificateVerified = await verifyCertificateAction(certificateUrl);
+        }
+        
+        const tradeTitle = servicesData[svc.tradeCategory].title;
+        finalServices.push({
+          trade: tradeTitle,
+          subcategory: svc.subcategory,
+          hasCertification: svc.hasCertification,
+          certificateUrl,
+          isCertificateVerified
+        });
+        serviceKeys.push(`${svc.tradeCategory}:${svc.subcategory}`);
       }
 
       // Upload police clearance
@@ -146,13 +189,21 @@ export default function ArtisanOnboarding() {
       const profile: ArtisanProfile = {
         artisanId: user.uid,
         userId: user.uid,
-        trade: servicesData[tradeCategory].title,
-        subcategory,
+        name: user.displayName || "New User",
+        
+        // Single fields for backwards compatibility
+        trade: finalServices[0].trade,
+        subcategory: finalServices[0].subcategory,
+        hasCertification: finalServices[0].hasCertification,
+        certificateUrl: finalServices[0].certificateUrl,
+        isCertificateVerified: finalServices[0].isCertificateVerified,
+        
+        // New array fields
+        services: finalServices,
+        serviceKeys: serviceKeys,
+        
         yearsOfExperience,
         skillLevel,
-        hasCertification,
-        certificateUrl,
-        isCertificateVerified,
         bio,
         neighborhood: locationData.name,
         geohash,
@@ -169,7 +220,7 @@ export default function ArtisanOnboarding() {
       };
 
       await setDoc(doc(db, "artisans", user.uid), profile);
-      router.push("/dashboard");
+      router.push("/technician/dashboard");
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to create profile");
@@ -193,34 +244,73 @@ export default function ArtisanOnboarding() {
         
         {step === 1 && (
           <div className="space-y-6">
-            <div>
-              <label className="block text-lg font-black text-black mb-2 uppercase">Primary Trade</label>
-              <select
-                value={tradeCategory}
-                onChange={(e) => {
-                  setTradeCategory(e.target.value);
-                  setSubcategory(servicesData[e.target.value].subServices[0].title);
-                }}
-                className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-bg)] text-black font-medium transition-colors"
-              >
-                {tradeCategories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-lg font-black text-black mb-2 uppercase">Specific Service (Subcategory)</label>
-              <select
-                value={subcategory}
-                onChange={(e) => setSubcategory(e.target.value)}
-                className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-bg)] text-black font-medium transition-colors"
-              >
-                {servicesData[tradeCategory]?.subServices.map((sub) => (
-                  <option key={sub.id} value={sub.title}>{sub.title}</option>
-                ))}
-              </select>
-            </div>
+            <h3 className="text-2xl font-black text-black mb-4 uppercase border-b-4 border-black pb-2">Your Services</h3>
+            {services.map((svc, index) => (
+              <div key={index} className="p-4 bg-[var(--color-brutal-bg)] border-4 border-black relative">
+                {services.length > 1 && (
+                  <button type="button" onClick={() => handleRemoveService(index)} className="absolute -top-4 -right-4 w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center font-black hover:scale-110 transition-transform text-white">X</button>
+                )}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-black mb-1 uppercase">Primary Trade</label>
+                    <select
+                      value={svc.tradeCategory}
+                      onChange={(e) => updateService(index, 'tradeCategory', e.target.value)}
+                      className="w-full p-2 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-medium transition-colors"
+                    >
+                      {tradeCategories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-black text-black mb-1 uppercase">Specific Service (Subcategory)</label>
+                    <select
+                      value={svc.subcategory}
+                      onChange={(e) => updateService(index, 'subcategory', e.target.value)}
+                      className="w-full p-2 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-medium transition-colors"
+                    >
+                      {servicesData[svc.tradeCategory]?.subServices.map((sub) => (
+                        <option key={sub.id} value={sub.title}>{sub.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-start gap-2 p-2 bg-[var(--color-brutal-pink)] brutal-border cursor-pointer brutal-shadow-sm hover:-translate-x-0.5 hover:-translate-y-0.5 transition-transform mt-2">
+                      <input
+                        type="checkbox"
+                        checked={svc.hasCertification}
+                        onChange={(e) => updateService(index, 'hasCertification', e.target.checked)}
+                        className="w-5 h-5 border-2 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-0.5"
+                      />
+                      <span className="text-sm font-black text-black leading-tight uppercase">I have certification for this service</span>
+                    </label>
+                  </div>
+                  {svc.hasCertification && (
+                    <div className="p-4 bg-white brutal-border border-dashed mt-2">
+                      <label className="block text-sm font-black text-black mb-1 uppercase">Upload Certificate</label>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => {
+                          if (e.target.files) updateService(index, 'certificateFile', e.target.files[0]);
+                        }}
+                        className="w-full text-xs text-black file:mr-2 file:py-1 file:px-2 file:border-2 file:border-black file:font-black file:bg-[var(--color-brutal-yellow)] file:text-black cursor-pointer uppercase"
+                      />
+                      {svc.certificateFile && (
+                        <p className="text-xs font-black mt-2 bg-[var(--color-brutal-teal)] inline-block px-1 border-2 border-black">Selected: {svc.certificateFile.name}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            
+            {services.length < 5 && (
+              <button type="button" onClick={handleAddService} className="w-full p-3 bg-[var(--color-brutal-teal)] brutal-border border-dashed hover:-translate-y-1 transition-transform font-black uppercase text-sm">
+                + Add Another Service (Max 5)
+              </button>
+            )}
             
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Service Location *</label>
@@ -287,34 +377,6 @@ export default function ArtisanOnboarding() {
               </select>
             </div>
 
-            <div>
-              <label className="flex items-start gap-4 p-4 bg-[var(--color-brutal-yellow)] brutal-border cursor-pointer brutal-shadow-sm hover:-translate-x-1 hover:-translate-y-1 transition-transform">
-                <input
-                  type="checkbox"
-                  checked={hasCertification}
-                  onChange={(e) => setHasCertification(e.target.checked)}
-                  className="w-6 h-6 border-4 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-1"
-                />
-                <span className="text-lg font-black text-black leading-tight uppercase">I have formal training, an apprenticeship, or professional certification.</span>
-              </label>
-            </div>
-
-            {hasCertification && (
-              <div className="p-6 bg-white brutal-border border-dashed mt-4 relative">
-                <div className="absolute top-0 left-0 w-full h-full bg-[var(--color-brutal-teal)] opacity-20 pointer-events-none"></div>
-                <label className="block text-xl font-black text-black mb-2 uppercase relative z-10">Upload Certificate</label>
-                <p className="text-sm font-bold text-black mb-4 relative z-10 border-l-4 border-black pl-2">Uploading a valid certificate significantly increases your chances of being selected for jobs. Our engine will verify its authenticity.</p>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => e.target.files && setCertificateFile(e.target.files[0])}
-                  className="w-full text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-pink)] file:text-black hover:file:bg-[var(--color-brutal-red)] cursor-pointer file:uppercase file:transition-colors relative z-10"
-                />
-                {certificateFile && (
-                  <p className="text-sm font-black text-black mt-4 bg-[var(--color-brutal-yellow)] inline-block px-2 border-2 border-black rotate-1 relative z-10">Selected: {certificateFile.name}</p>
-                )}
-              </div>
-            )}
           </div>
         )}
 

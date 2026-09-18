@@ -161,7 +161,7 @@ export default function CustomerJobsPage() {
                 {req.status === "countered" && (
                   <div className="flex gap-4 mt-4 bg-purple-50 p-4 rounded-lg border border-purple-100">
                     <div className="flex-1">
-                      <p className="text-sm text-purple-900 font-medium mb-3">The artisan has proposed a new price.</p>
+                      <p className="text-sm text-purple-900 font-medium mb-3">The technician has proposed a new price.</p>
                       <div className="flex gap-3">
                         <button 
                           onClick={() => handleUpdateStatus(req.requestId, "accepted")}

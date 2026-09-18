@@ -43,7 +43,7 @@ export default function LandingPage() {
           if (userDoc.exists()) {
             const data = userDoc.data();
             if (data.role === "artisan") {
-              router.push("/dashboard");
+              router.push("/technician/dashboard");
             } else {
               router.push("/explore");
             }

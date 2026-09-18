@@ -85,7 +85,7 @@ export default function InboxPage() {
         <div className="bg-white border-4 border-black p-8 brutal-shadow text-center">
           <MessageCircle className="w-12 h-12 mx-auto mb-4 stroke-[3] text-black" />
           <p className="text-black font-black uppercase text-xl">No Active Chats</p>
-          <p className="text-gray-600 font-bold mt-2">When an artisan accepts your job, you can chat with them here.</p>
+          <p className="text-gray-600 font-bold mt-2">When a technician accepts your job, you can chat with them here.</p>
         </div>
       ) : (
         <div className="space-y-4">

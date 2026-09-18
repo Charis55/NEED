@@ -9,8 +9,10 @@ import { notFound } from "next/navigation";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+import { use } from "react";
+
 export default function SubcategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
-  const unwrappedParams = React.use(params);
+  const unwrappedParams = use(params);
   const category = servicesData[unwrappedParams.categorySlug];
   const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -29,14 +31,20 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       try {
         const q = query(
           collection(db, "artisans"),
-          where("trade", "==", category.title)
+          where("available", "==", true)
         );
         const snapshot = await getDocs(q);
         const counts: Record<string, number> = {};
         
         snapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.subcategory) {
+          if (data.services && Array.isArray(data.services)) {
+            data.services.forEach((svc: any) => {
+              if (svc.trade === category.title && svc.subcategory) {
+                counts[svc.subcategory] = (counts[svc.subcategory] || 0) + 1;
+              }
+            });
+          } else if (data.trade === category.title && data.subcategory) {
             counts[data.subcategory] = (counts[data.subcategory] || 0) + 1;
           }
         });

@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { ArtisanProfile, Review } from "@/types";
 import { ChevronLeft, Star, MapPin, BadgeCheck, Clock, Calendar, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
+import GlobalSpinner from "@/components/GlobalSpinner";
 
-export default function ArtisanProfilePage({ params }: { params: { artisanId: string } }) {
+export default function ArtisanProfilePage({ params }: { params: Promise<{ artisanId: string }> }) {
+  const unwrappedParams = use(params);
   const router = useRouter();
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -19,7 +21,7 @@ export default function ArtisanProfilePage({ params }: { params: { artisanId: st
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const docRef = doc(db, "artisans", params.artisanId);
+        const docRef = doc(db, "artisans", unwrappedParams.artisanId);
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
@@ -28,7 +30,7 @@ export default function ArtisanProfilePage({ params }: { params: { artisanId: st
           // Fetch Reviews
           const q = query(
             collection(db, "reviews"),
-            where("artisanId", "==", params.artisanId),
+            where("artisanId", "==", unwrappedParams.artisanId),
           );
           const reviewSnap = await getDocs(q);
           const reviewData = reviewSnap.docs.map(d => d.data() as Review).sort((a, b) => b.createdAt - a.createdAt);
@@ -44,12 +46,12 @@ export default function ArtisanProfilePage({ params }: { params: { artisanId: st
     };
     
     fetchProfile();
-  }, [params.artisanId, router]);
+  }, [unwrappedParams.artisanId, router]);
 
   if (loading) {
     return (
-      <div className="bg-[var(--color-brutal-bg)] min-h-screen flex items-center justify-center">
-        <div className="text-4xl animate-bounce">🛠️</div>
+      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center p-4">
+        <GlobalSpinner text="LOADING TECHNICIAN" />
       </div>
     );
   }
@@ -84,9 +86,19 @@ export default function ArtisanProfilePage({ params }: { params: { artisanId: st
           </div>
           
           <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-tight">{artisan.name || "Technician"}</h1>
-          <p className="text-black font-bold uppercase mt-1 bg-[var(--color-brutal-pink)] px-2 rotate-1 border-2 border-black inline-block">
-            {artisan.trade} • {artisan.subcategory}
-          </p>
+          {artisan.services && artisan.services.length > 0 ? (
+            <div className="flex flex-wrap justify-center gap-2 mt-2 max-w-sm">
+              {artisan.services.map((svc, i) => (
+                <p key={i} className={`text-black text-xs font-bold uppercase bg-[var(--color-brutal-pink)] px-2 ${i % 2 === 0 ? 'rotate-1' : '-rotate-1'} border-2 border-black inline-block`}>
+                  {svc.trade} • {svc.subcategory}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-black font-bold uppercase mt-1 bg-[var(--color-brutal-pink)] px-2 rotate-1 border-2 border-black inline-block">
+              {artisan.trade} • {artisan.subcategory}
+            </p>
+          )}
 
           <div className="flex items-center gap-3 mt-4">
             <div className="inline-flex items-center gap-1 bg-white text-black border-2 border-black px-3 py-1 font-black text-sm shadow-[2px_2px_0_0_#000]">

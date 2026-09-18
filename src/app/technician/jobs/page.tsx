@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { JobRequest } from "@/types";
+import GlobalSpinner from "@/components/GlobalSpinner";
 
 export default function ArtisanDashboard() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
@@ -22,15 +23,24 @@ export default function ArtisanDashboard() {
 
       const fetchRequests = async () => {
         try {
-          const q = query(
+          const directQ = query(
             collection(db, "jobRequests"),
             where("artisanId", "==", user.uid)
           );
           
-          const [snapshot, artisanSnapshot] = await Promise.all([
-            getDocs(q),
+          const broadcastQ = query(
+            collection(db, "jobRequests"),
+            where("isBroadcast", "==", true),
+            where("status", "==", "pending")
+          );
+
+          const [directSnapshot, broadcastSnapshot, artisanSnapshot] = await Promise.all([
+            getDocs(directQ),
+            getDocs(broadcastQ),
             getDocs(query(collection(db, "artisans"), where("artisanId", "==", user.uid)))
           ]);
+
+          let validServices: { trade: string, subcategory: string }[] = [];
 
           if (!artisanSnapshot.empty) {
             const artisanData = artisanSnapshot.docs[0].data();
@@ -41,12 +51,28 @@ export default function ArtisanDashboard() {
               const daysSinceSignup = Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24));
               setPromoDaysLeft(Math.max(0, 30 - daysSinceSignup));
             }
+
+            if (artisanData.services && artisanData.services.length > 0) {
+              validServices = artisanData.services;
+            } else {
+              validServices = [{ trade: artisanData.trade, subcategory: artisanData.subcategory }];
+            }
           }
 
-          const results = snapshot.docs.map(doc => doc.data() as JobRequest);
+          const directResults = directSnapshot.docs.map(doc => doc.data() as JobRequest);
+          const allBroadcastResults = broadcastSnapshot.docs.map(doc => doc.data() as JobRequest);
           
-          results.sort((a, b) => b.createdAt - a.createdAt);
-          setRequests(results);
+          // Only show broadcast jobs that match the artisan's services
+          const matchedBroadcastResults = allBroadcastResults.filter(job => 
+            validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory)
+          );
+
+          // Combine and deduplicate
+          const combined = [...directResults, ...matchedBroadcastResults];
+          const uniqueResults = Array.from(new Map(combined.map(item => [item.requestId, item])).values());
+          
+          uniqueResults.sort((a, b) => b.createdAt - a.createdAt);
+          setRequests(uniqueResults);
         } catch (error) {
           console.error("Error fetching requests:", error);
         } finally {
@@ -67,6 +93,12 @@ export default function ArtisanDashboard() {
       const updatePayload: any = { 
         status: newStatus 
       };
+
+      const user = auth.currentUser;
+      const req = requests.find(r => r.requestId === requestId);
+      if (req?.isBroadcast && user) {
+        updatePayload.artisanId = user.uid;
+      }
 
       if (newStatus === "completed") {
         updatePayload.completedAt = Date.now();
@@ -107,54 +139,17 @@ export default function ArtisanDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
-      {/* Top Banner */}
-      <div className="bg-[var(--color-brutal-blue)] pt-16 pb-24 px-6 md:px-12 border-b-4 border-black brutal-shadow-sm">
-        <div className="max-w-4xl mx-auto flex justify-between items-end">
-          <div>
-            <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">DASHBOARD</h1>
-            <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-white inline-block pr-3 -rotate-1">Manage your jobs and earnings.</p>
-          </div>
-          <div className="hidden md:block bg-[var(--color-brutal-yellow)] border-4 border-black p-6 brutal-shadow-sm rotate-2">
-            <p className="text-black text-sm font-black mb-1 uppercase tracking-widest">Available Balance</p>
-            <p className="text-4xl font-black text-black">₦0.00</p>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Job Requests</h1>
+        <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 mb-10 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming and active jobs.</p>
 
-      <div className="max-w-4xl mx-auto px-4 md:px-12 -mt-10">
-        {/* Promo Banner */}
-        {promoDaysLeft !== null && promoDaysLeft > 0 && (
-          <div 
-            onClick={() => setShowPromoOverlay(true)}
-            className="bg-[var(--color-brutal-pink)] border-4 border-black p-4 brutal-shadow-sm mb-8 flex items-center justify-between cursor-pointer hover:-translate-y-1 hover:-translate-x-1 transition-transform rotate-1 group"
-          >
-            <div>
-              <p className="text-black text-sm font-black mb-1 uppercase tracking-widest flex items-center gap-2">
-                <span className="bg-white border-2 border-black px-1 -rotate-2">PROMO ACTIVE</span>
-              </p>
-              <h2 className="text-2xl font-black text-black tracking-tighter uppercase group-hover:underline">First Month Free!</h2>
-            </div>
-            <div className="text-center bg-white border-4 border-black p-2 min-w-[80px]">
-              <p className="text-3xl font-black text-black leading-none">{promoDaysLeft}</p>
-              <p className="text-xs font-black text-black uppercase mt-1">Days Left</p>
-            </div>
-          </div>
-        )}
-
-        {/* Mobile Earnings Card */}
-        <div className="md:hidden bg-[var(--color-brutal-yellow)] border-4 border-black p-6 brutal-shadow-sm mb-8 flex items-center justify-between -rotate-1">
-          <div>
-            <p className="text-black text-sm font-black mb-1 uppercase tracking-widest">Available Balance</p>
-            <p className="text-3xl font-black text-black">₦0.00</p>
-          </div>
-        </div>
 
         <h2 className="text-3xl font-black text-black mb-6 uppercase tracking-tighter border-b-4 border-black pb-2 inline-block">Recent Job Requests</h2>
         
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="text-4xl animate-bounce">🛠️</div>
+            <GlobalSpinner text="LOADING REQUESTS" />
           </div>
         ) : requests.length === 0 ? (
           <div className="bg-white p-12 text-center brutal-border brutal-shadow-sm">
@@ -196,7 +191,9 @@ export default function ArtisanDashboard() {
                         `}>
                           {req.status === 'countered' ? 'Awaiting Customer' : req.status}
                         </span>
-                        <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">Job Details</h3>
+                        <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
+                          {req.isBroadcast && req.status === "pending" ? "Broadcast Request" : "Job Details"}
+                        </h3>
                         <p className="text-sm text-black font-bold flex items-center gap-2 uppercase tracking-widest">
                           <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">📍 {req.neighborhood}</span>
                           <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">🕒 {req.preferredTime}</span>

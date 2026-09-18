@@ -102,7 +102,9 @@ export default function AdminDashboard() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                      {artisan.trade}
+                      {artisan.services && artisan.services.length > 0 
+                        ? Array.from(new Set(artisan.services.map(s => s.trade))).join(', ')
+                        : artisan.trade}
                       {artisan.verified && <BadgeCheck className="w-5 h-5 text-emerald-500" />}
                     </h3>
                     <div className="flex items-center text-sm text-gray-500 mt-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck, X, Check } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
@@ -25,8 +25,8 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 function formatDistance(meters: number) {
-  if (meters < 1000) return `${Math.round(meters)}m away`;
-  return `${(meters / 1000).toFixed(1)}km away`;
+  if (meters < 1000) return `${Math.round(meters)} meters away`;
+  return `${(meters / 1000).toFixed(1)} kilometers away`;
 }
 
 function SwipeCard({ 
@@ -150,7 +150,8 @@ function SwipeCard({
   );
 }
 
-export default function SwipePage({ params }: { params: { categorySlug: string, subSlug: string } }) {
+export default function SwipePage({ params }: { params: Promise<{ categorySlug: string, subSlug: string }> }) {
+  const unwrappedParams = use(params);
   const [artisans, setArtisans] = useState<(ArtisanProfile & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
@@ -161,7 +162,11 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
   useEffect(() => {
     const fetchArtisans = async () => {
       try {
-        const q = query(collection(db, "artisans"), limit(20));
+        const q = query(
+          collection(db, "artisans"),
+          where("available", "==", true)
+          // To scale, add: where("serviceKeys", "array-contains", `${unwrappedParams.categorySlug}:${unwrappedParams.subSlug}`)
+        );
         const snap = await getDocs(q);
         const data = snap.docs.map(doc => doc.data() as ArtisanProfile);
 
@@ -235,7 +240,7 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
       {/* Top Header */}
       <div className="px-6 pt-12 pb-4">
         <div className="flex justify-between items-center mb-6">
-          <Link href={`/services/${params.categorySlug}`} className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none">
+          <Link href={`/services/${unwrappedParams.categorySlug}`} className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none">
             <ChevronLeft className="w-6 h-6 text-black stroke-[3]" />
           </Link>
           <button 
@@ -278,12 +283,20 @@ export default function SwipePage({ params }: { params: { categorySlug: string, 
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow text-center p-8">
               <div>
                 <p className="text-black font-black text-xl uppercase mb-6">No more pros found here.</p>
-                <button 
-                  onClick={() => router.back()}
-                  className="bg-[var(--color-brutal-blue)] px-6 py-4 brutal-btn w-full"
-                >
-                  GO BACK
-                </button>
+                <div className="space-y-4">
+                  <button 
+                    onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
+                    className="bg-[var(--color-brutal-pink)] px-6 py-4 brutal-btn w-full"
+                  >
+                    POST JOB FOR ANYONE
+                  </button>
+                  <button 
+                    onClick={() => router.back()}
+                    className="bg-[var(--color-brutal-blue)] px-6 py-4 brutal-btn w-full"
+                  >
+                    GO BACK
+                  </button>
+                </div>
               </div>
             </div>
           ) : (

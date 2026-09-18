@@ -138,7 +138,7 @@ export default function AuthForm() {
       if (userData.role === "artisan") {
         const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
         if (artisanDoc.exists()) {
-          router.push("/dashboard");
+          router.push("/technician/dashboard");
         } else {
           setStep("role");
         }
@@ -194,7 +194,7 @@ export default function AuthForm() {
         if (userData.role === "artisan") {
           const artisanDoc = await getDoc(doc(db, "artisans", result.user.uid));
           if (artisanDoc.exists()) {
-            router.push("/dashboard");
+            router.push("/technician/dashboard");
           } else {
             setStep("role");
           }
@@ -490,10 +490,10 @@ export default function AuthForm() {
           >
             <ArrowLeft className="w-6 h-6 text-black stroke-[3]" />
           </button>
-          <div className="flex items-center">
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
             <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
             <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
-          </div>
+          </Link>
         </div>
         
         <h2 className="text-4xl font-black mb-2 text-black uppercase leading-none">

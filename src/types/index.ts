@@ -14,12 +14,26 @@ export interface UserAccount {
   };
 }
 
+export interface ArtisanService {
+  trade: string;
+  subcategory: string;
+  hasCertification: boolean;
+  certificateUrl?: string | null;
+  isCertificateVerified?: boolean;
+}
+
 export interface ArtisanProfile {
   artisanId: string;
   userId: string;
   name?: string;
+  
+  // deprecated single-service fields (kept for backward compatibility)
   trade: string;
   subcategory: string;
+  
+  services?: ArtisanService[];
+  serviceKeys?: string[];
+  
   bio: string;
   neighborhood: string;
   geohash: string;
@@ -44,6 +58,7 @@ export interface JobRequest {
   requestId: string;
   customerId: string;
   artisanId: string | null;
+  isBroadcast?: boolean;
   trade: string;
   subcategory: string;
   description: string;

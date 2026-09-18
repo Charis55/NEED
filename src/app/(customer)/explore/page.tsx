@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Menu, Wrench, Zap, Scissors, Brush, Hammer, Droplet } from "lucide-react";
-import { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
+import { Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { auth, db } from "@/lib/firebase";
 import { User } from "firebase/auth";
+import { collection, getDocs, query } from "firebase/firestore";
 import UserAvatar from "@/components/UserAvatar";
 import GlobalSearch from "@/components/GlobalSearch";
 import { servicesData } from "@/data/services";
@@ -26,8 +27,13 @@ const GENERATED_IMAGE_IDS = [
   "home-appliance-repair"
 ];
 
+type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
+
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
+  const [sortBy, setSortBy] = useState<SortType>("Most Available");
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -36,15 +42,58 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const snapshot = await getDocs(collection(db, "artisans"));
+        const counts: Record<string, number> = {};
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.services && Array.isArray(data.services)) {
+            data.services.forEach((svc: any) => {
+              if (svc.trade) {
+                counts[svc.trade] = (counts[svc.trade] || 0) + 1;
+              }
+            });
+          } else if (data.trade) {
+            // Fallback for older profiles
+            counts[data.trade] = (counts[data.trade] || 0) + 1;
+          }
+        });
+        setArtisanCounts(counts);
+      } catch (err) {
+        console.error("Failed to fetch artisan counts:", err);
+      }
+    }
+    fetchCounts();
+  }, []);
+
   const formattedDate = user?.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.') 
     : '09.11.2022';
+
+  const sortedCategories = useMemo(() => {
+    const categories = Object.values(servicesData);
+    return categories.sort((a, b) => {
+      if (sortBy === "A-Z") return a.title.localeCompare(b.title);
+      if (sortBy === "Z-A") return b.title.localeCompare(a.title);
+      if (sortBy === "Most Available") {
+        const countA = artisanCounts[a.title] || 0;
+        const countB = artisanCounts[b.title] || 0;
+        return countB - countA;
+      }
+      if (sortBy === "Most Specific Services") {
+        return b.subServices.length - a.subServices.length;
+      }
+      return 0;
+    });
+  }, [sortBy, artisanCounts]);
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Section */}
       <div className="bg-[var(--color-brutal-green)] border-b-8 border-black px-6 pt-12 pb-10 mb-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-8 relative">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
               <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="w-full h-full text-2xl text-black font-black" />
@@ -54,11 +103,28 @@ export default function Dashboard() {
               <p className="text-black font-black text-xs mt-0.5 border-black border-2 bg-white px-2 py-0.5 inline-block -rotate-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">{formattedDate}</p>
             </div>
           </div>
-          <button className="flex flex-col gap-1.5 items-center justify-center w-12 h-12 border-4 border-black bg-[var(--color-brutal-pink)] p-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all cursor-pointer">
-            <span className="w-full h-1 bg-black"></span>
-            <span className="w-full h-1 bg-black"></span>
-            <span className="w-full h-1 bg-black"></span>
+          
+          <button 
+            onClick={() => setIsSortOpen(!isSortOpen)}
+            className="flex items-center justify-center w-12 h-12 border-4 border-black bg-[var(--color-brutal-pink)] p-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all cursor-pointer"
+          >
+            <SlidersHorizontal className="w-6 h-6 stroke-[3]" />
           </button>
+
+          {isSortOpen && (
+            <div className="absolute top-16 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
+              <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
+              {(["A-Z", "Z-A", "Most Available", "Most Specific Services"] as SortType[]).map(type => (
+                <button
+                  key={type}
+                  onClick={() => { setSortBy(type); setIsSortOpen(false); }}
+                  className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortBy === type ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <h1 className="text-[4rem] font-black text-black mb-10 tracking-tighter leading-[0.85] uppercase" style={{ textShadow: "4px 4px 0px #fff" }}>
@@ -72,8 +138,14 @@ export default function Dashboard() {
 
       {/* Categories Section */}
       <div className="px-6 mt-10">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-black uppercase">Services</h2>
+          <span className="text-xs font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1">
+            {sortBy === "Most Available" ? "By Availability" : sortBy === "Most Specific Services" ? "By Specificity" : sortBy}
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-4 md:gap-6">
-          {Object.values(servicesData).map((category, index) => {
+          {sortedCategories.map((category, index) => {
             const style = BRUTAL_CARD_STYLES[index % BRUTAL_CARD_STYLES.length];
             const hasImage = GENERATED_IMAGE_IDS.includes(category.id);
             
