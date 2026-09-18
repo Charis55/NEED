@@ -306,7 +306,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
                     POST JOB FOR ANYONE
                   </button>
                   <button 
-                    onClick={() => router.back()}
+                    onClick={() => router.push('/explore')}
                     className="bg-[var(--color-brutal-blue)] px-6 py-4 brutal-btn w-full"
                   >
                     GO BACK

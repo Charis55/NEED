@@ -11,6 +11,8 @@ import { db } from "@/lib/firebase";
 
 import { use } from "react";
 
+type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
+
 export default function SubcategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
   const unwrappedParams = use(params);
   const category = servicesData[unwrappedParams.categorySlug];
@@ -19,8 +21,9 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
   
   // Search and Sort state
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"A-Z" | "Z-A" | "Availability">("A-Z");
+  const [sortBy, setSortBy] = useState<SortType>("A-Z");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
 
   if (!category) {
     notFound();
@@ -76,8 +79,11 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
     const countA = artisanCounts[a.title] || 0;
     const countB = artisanCounts[b.title] || 0;
     
-    if (sortBy === "Availability") {
-      // Sort by count descending, then alphabetically if tied
+    if (sortBy === "Most Available") {
+      if (countB !== countA) return countB - countA;
+      return a.title.localeCompare(b.title);
+    } else if (sortBy === "Most Specific Services") {
+      // For sub-services this sorts by availability count descending as a proxy
       if (countB !== countA) return countB - countA;
       return a.title.localeCompare(b.title);
     } else if (sortBy === "A-Z") {
@@ -92,44 +98,60 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Header */}
       <div className="px-6 pt-12 pb-6 flex-shrink-0 bg-[var(--color-brutal-blue)] border-b-4 border-black brutal-shadow-sm transition-all">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 relative">
           <BackButton href="/explore" className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
-          <button 
-            onClick={() => setIsSearchOpen(!isSearchOpen)}
-            className={`w-12 h-12 brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none ${isSearchOpen ? 'bg-[var(--color-brutal-pink)]' : 'bg-white'}`}
-          >
-            <Search className="w-6 h-6 text-black stroke-[3]" />
-          </button>
+          
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => { setIsSearchOpen(!isSearchOpen); setIsSortOpen(false); }}
+              className={`w-12 h-12 brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none ${isSearchOpen ? 'bg-[var(--color-brutal-pink)]' : 'bg-white'}`}
+            >
+              <Search className="w-6 h-6 text-black stroke-[3]" />
+            </button>
+            
+            <button 
+              onClick={() => { setIsSortOpen(!isSortOpen); setIsSearchOpen(false); }}
+              className="flex items-center justify-center w-12 h-12 border-4 border-black bg-[var(--color-brutal-pink)] p-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all cursor-pointer"
+            >
+              <SlidersHorizontal className="w-6 h-6 stroke-[3]" />
+            </button>
+          </div>
+
+          {/* Sort Popup - Same style as Dashboard */}
+          {isSortOpen && (
+            <div className="absolute top-16 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
+              <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
+              {(["A-Z", "Z-A", "Most Available", "Most Specific Services"] as SortType[]).map(type => (
+                <button
+                  key={type}
+                  onClick={() => { setSortBy(type); setIsSortOpen(false); }}
+                  className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortBy === type ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         
-        <h1 className="text-5xl font-black text-black mb-6 uppercase tracking-tighter">
-          {title}
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-5xl font-black text-black uppercase tracking-tighter">
+            {title}
+          </h1>
+          <span className="text-[10px] font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1 shrink-0 ml-3">
+            {sortBy === "Most Available" ? "By Availability" : sortBy === "Most Specific Services" ? "By Specificity" : sortBy}
+          </span>
+        </div>
         
-        {/* Search and Filter Controls */}
-        <div className={`overflow-hidden transition-all duration-300 ${isSearchOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <div className="flex flex-col gap-4 pb-4">
-            <input 
-              type="text" 
-              placeholder="Search services..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-black font-bold p-4 brutal-border placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-yellow)]"
-            />
-            <div className="flex items-center gap-4">
-              <SlidersHorizontal className="w-6 h-6 text-black stroke-[3] shrink-0" />
-              <select 
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="flex-1 bg-white text-black font-bold p-4 brutal-border appearance-none cursor-pointer focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-yellow)]"
-                style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center' }}
-              >
-                <option value="A-Z">A-Z (Alphabetical)</option>
-                <option value="Z-A">Z-A (Reverse)</option>
-                <option value="Availability">Most Available First</option>
-              </select>
-            </div>
-          </div>
+        {/* Search Controls */}
+        <div className={`overflow-hidden transition-all duration-300 ${isSearchOpen ? 'max-h-24 opacity-100 mt-6' : 'max-h-0 opacity-0'}`}>
+          <input 
+            type="text" 
+            placeholder="Search services..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white text-black font-bold p-4 brutal-border placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-yellow)]"
+          />
         </div>
       </div>
 

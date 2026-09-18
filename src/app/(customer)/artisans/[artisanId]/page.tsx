@@ -83,7 +83,7 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
           <div className="flex flex-col md:flex-row justify-between items-start gap-6">
             <div className="w-full">
               <div className="flex items-center gap-4 mb-4">
-                <BackButton />
+                <BackButton href="/explore" />
                 <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">{artisan.trade}</h1>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">

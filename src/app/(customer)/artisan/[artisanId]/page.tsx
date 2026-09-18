@@ -63,7 +63,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
       {/* Header */}
       <div className="px-6 pt-12 pb-6 flex-shrink-0 bg-white border-b-4 border-black">
         <div className="flex justify-between items-center mb-6">
-          <BackButton className="w-12 h-12 bg-white text-black brutal-border brutal-shadow-sm flex items-center justify-center p-0 hover:-translate-y-1 transition-transform" />
+          <BackButton href="/explore" className="w-12 h-12 bg-white text-black brutal-border brutal-shadow-sm flex items-center justify-center p-0 hover:-translate-y-1 transition-transform" />
           
           <button 
             onClick={() => router.push(`/artisans/${artisan.artisanId}/request`)}

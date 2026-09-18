@@ -118,7 +118,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <div className="px-6 pt-12 pb-6 border-b-4 border-black bg-white">
         <div className="flex items-center gap-4 mb-6">
-          <BackButton />
+          <BackButton href="/explore" />
         </div>
         
         <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-none mb-4">
