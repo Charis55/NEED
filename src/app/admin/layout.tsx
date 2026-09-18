@@ -53,7 +53,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="bg-gray-900 shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/LOGO.png" alt="NEED Logo" className="h-8 w-auto brightness-0 invert" />
+            <div className="flex items-center">
+              <img src="/LOGO.png" alt="N Logo" className="h-8 w-auto brightness-0 invert" />
+              <span className="text-[28px] font-bold text-white leading-none tracking-tighter -ml-1">EED</span>
+            </div>
             <span className="text-gray-400 text-lg">Admin</span>
           </div>
           <button 

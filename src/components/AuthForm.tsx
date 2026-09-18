@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { auth, db } from "@/lib/firebase";
+import { useState, useEffect, useRef } from "react";
+import { auth, db, storage } from "@/lib/firebase";
 import { 
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { compressImage } from "@/utils/imageCompression";
 import { useRouter } from "next/navigation";
 import { UserAccount } from "@/types";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Upload, X } from "lucide-react";
+import TermsDisclaimer from "@/components/TermsDisclaimer";
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -31,7 +34,39 @@ export default function AuthForm() {
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  
+  // Profile Image
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const router = useRouter();
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setProfileFile(file);
+      setProfilePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadAndSetPhoto = async (user: any) => {
+    if (profileFile) {
+      try {
+        const compressedFile = await compressImage(profileFile, 1);
+        const storageRef = ref(storage, `avatars/${user.uid}.jpg`);
+        await uploadBytes(storageRef, compressedFile);
+        const photoURL = await getDownloadURL(storageRef);
+        await updateProfile(user, { photoURL });
+        return photoURL;
+      } catch (err) {
+        console.error("Failed to upload profile picture", err);
+      }
+    }
+    return user.photoURL || "";
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -143,11 +178,16 @@ export default function AuthForm() {
         if (!firstName || !lastName || !phoneNumber) {
           throw new Error("Please fill in all fields.");
         }
+        if (!termsAccepted) {
+          throw new Error("You must accept the Security Disclaimer & Terms to continue.");
+        }
         fullName = `${firstName} ${lastName}`.trim();
         result = await createUserWithEmailAndPassword(auth, email, password);
         
         await updateProfile(result.user, { displayName: fullName });
         
+        const uploadedPhotoURL = await uploadAndSetPhoto(result.user);
+
         const newUser: UserAccount = {
           userId: result.user.uid,
           phone: phoneNumber,
@@ -180,6 +220,12 @@ export default function AuthForm() {
     setError("");
     setLoading(true);
 
+    if (!termsAccepted) {
+      setError("You must accept the Security Disclaimer & Terms to continue.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("No user authenticated");
@@ -187,7 +233,10 @@ export default function AuthForm() {
       let finalName = user.displayName;
       if (!finalName && firstName && lastName) {
         finalName = `${firstName} ${lastName}`.trim();
+        await updateProfile(user, { displayName: finalName });
       }
+
+      const uploadedPhotoURL = await uploadAndSetPhoto(user);
 
       const newUser: UserAccount = {
         userId: user.uid,
@@ -214,6 +263,7 @@ export default function AuthForm() {
 
   if (step === "role") {
     return (
+      <>
       <div className="w-full max-w-md md:max-w-5xl mx-auto md:flex brutal-card bg-[var(--color-brutal-yellow)] relative">
         <div className="w-full md:w-1/2 p-6 md:p-10 border-b-4 md:border-b-0 md:border-r-4 border-black relative">
           <div className="absolute -top-4 -left-4 w-12 h-12 bg-[var(--color-brutal-teal)] brutal-border flex items-center justify-center -rotate-6 z-10">
@@ -228,7 +278,10 @@ export default function AuthForm() {
             >
               <ArrowLeft className="w-6 h-6 text-black stroke-[3]" />
             </button>
-            <img src="/LOGO.png" alt="NEED Logo" className="h-10 w-auto" />
+            <div className="flex items-center">
+              <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+              <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+            </div>
           </div>
           
           <form onSubmit={handleCompleteProfile}>
@@ -236,6 +289,42 @@ export default function AuthForm() {
             <p className="text-black font-medium mb-8 text-lg bg-white inline-block px-2 brutal-border -rotate-1">Just a few details</p>
             
             {error && <div className="bg-[var(--color-brutal-red)] text-black font-bold p-4 brutal-border brutal-shadow-sm mb-6 uppercase text-sm">{error}</div>}
+
+            <div className="mb-6">
+              <label className="block text-lg font-black text-black mb-2 uppercase">Profile Picture (Optional)</label>
+              <div className="flex items-center gap-4">
+                <div 
+                  className="w-20 h-20 bg-gray-200 brutal-border brutal-shadow-sm flex items-center justify-center cursor-pointer relative overflow-hidden"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {profilePreview ? (
+                    <>
+                      <img src={profilePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setProfileFile(null); setProfilePreview(null); }}
+                        className="absolute top-0 right-0 bg-[var(--color-brutal-red)] text-white p-1 brutal-border hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <Upload className="w-8 h-8 text-black opacity-50" />
+                  )}
+                </div>
+                <div className="text-sm font-bold text-gray-500 uppercase">
+                  <p>Upload a clear photo</p>
+                  <p className="text-xs mt-1">Max 1MB (auto-compressed)</p>
+                </div>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImageSelect} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+              </div>
+            </div>
 
             <div className="mb-6">
               <label className="block text-lg font-black text-black mb-2 uppercase">Phone Number</label>
@@ -266,6 +355,26 @@ export default function AuthForm() {
               </div>
             </div>
 
+            <div className="mb-8 p-4 border-4 border-black bg-[var(--color-brutal-bg)] flex items-start gap-3">
+              <div className="relative flex items-center mt-1">
+                <input 
+                  type="checkbox" 
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="w-6 h-6 border-4 border-black appearance-none checked:bg-black bg-white cursor-pointer flex-shrink-0" 
+                />
+                {termsAccepted && <svg className="w-4 h-4 absolute left-1 top-1 text-white pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+              </div>
+              <div>
+                <p className="text-black font-bold uppercase text-sm leading-tight">
+                  I have read and unconditionally agree to the{" "}
+                  <button type="button" onClick={() => setShowTerms(true)} className="text-[var(--color-brutal-red)] underline decoration-2 underline-offset-2 hover:bg-black hover:text-white transition-colors">
+                    Security Disclaimer & Terms of Service
+                  </button>.
+                </p>
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
@@ -288,10 +397,13 @@ export default function AuthForm() {
           </p>
         </div>
       </div>
+      {showTerms && <TermsDisclaimer role={role} onClose={() => setShowTerms(false)} />}
+      </>
     );
   }
 
   return (
+    <>
     <div className="w-full max-w-md md:max-w-5xl mx-auto md:flex brutal-card bg-white relative">
       {/* Left side: Form */}
       <div className="w-full md:w-1/2 p-6 md:p-10 border-b-4 md:border-b-0 md:border-r-4 border-black relative">
@@ -307,7 +419,10 @@ export default function AuthForm() {
           >
             <ArrowLeft className="w-6 h-6 text-black stroke-[3]" />
           </button>
-          <img src="/LOGO.png" alt="NEED Logo" className="h-10 w-auto" />
+          <div className="flex items-center">
+            <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+            <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+          </div>
         </div>
         
         <h2 className="text-4xl font-black mb-2 text-black uppercase leading-none">
@@ -373,6 +488,42 @@ export default function AuthForm() {
                   </button>
                 </div>
               )}
+
+              <div className="mb-6 mt-4">
+                <label className="block text-lg font-black text-black mb-2 uppercase">Profile Picture (Optional)</label>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-20 h-20 bg-gray-200 brutal-border brutal-shadow-sm flex items-center justify-center cursor-pointer relative overflow-hidden"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {profilePreview ? (
+                      <>
+                        <img src={profilePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setProfileFile(null); setProfilePreview(null); }}
+                          className="absolute top-0 right-0 bg-[var(--color-brutal-red)] text-white p-1 brutal-border hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <Upload className="w-8 h-8 text-black opacity-50" />
+                    )}
+                  </div>
+                  <div className="text-sm font-bold text-gray-500 uppercase">
+                    <p>Upload a clear photo</p>
+                    <p className="text-xs mt-1">Max 1MB</p>
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleImageSelect} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
@@ -469,7 +620,29 @@ export default function AuthForm() {
             </div>
           )}
 
-          <div className={!isLogin ? "mt-8" : ""}>
+          {!isLogin && (
+            <div className="mb-8 p-4 border-4 border-black bg-[var(--color-brutal-bg)] flex items-start gap-3 mt-8">
+              <div className="relative flex items-center mt-1">
+                <input 
+                  type="checkbox" 
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="w-6 h-6 border-4 border-black appearance-none checked:bg-black bg-white cursor-pointer flex-shrink-0" 
+                />
+                {termsAccepted && <svg className="w-4 h-4 absolute left-1 top-1 text-white pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+              </div>
+              <div>
+                <p className="text-black font-bold uppercase text-sm leading-tight">
+                  I have read and unconditionally agree to the{" "}
+                  <button type="button" onClick={() => setShowTerms(true)} className="text-[var(--color-brutal-red)] underline decoration-2 underline-offset-2 hover:bg-black hover:text-white transition-colors">
+                    Security Disclaimer & Terms of Service
+                  </button>.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className={!isLogin ? "mt-4" : ""}>
             <button
               type="submit"
               disabled={loading}
@@ -513,5 +686,7 @@ export default function AuthForm() {
         </p>
       </div>
     </div>
+    {showTerms && <TermsDisclaimer role={role} onClose={() => setShowTerms(false)} />}
+    </>
   );
 }

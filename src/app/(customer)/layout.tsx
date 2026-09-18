@@ -1,31 +1,18 @@
 import { ReactNode } from "react";
 import Link from "next/link";
-import SignOutButton from "@/components/SignOutButton";
+import CustomerDock from "@/components/CustomerDock";
 
 export default function CustomerLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <Link href="/" className="flex items-center">
-              <img src="/LOGO.png" alt="NEED Logo" className="h-8 w-auto" />
-            </Link>
-          <nav className="flex items-center gap-6">
-            <Link href="/explore" className="text-gray-600 hover:text-emerald-500 font-medium transition">
-              Explore
-            </Link>
-            <Link href="/jobs" className="text-gray-600 hover:text-emerald-500 font-medium transition">
-              Bookings
-            </Link>
-            <SignOutButton className="text-gray-500 hover:text-gray-900 text-sm font-medium">
-              Sign Out
-            </SignOutButton>
-          </nav>
-        </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 relative">
+      <Link href="/" className="fixed top-4 left-4 z-50 flex items-center bg-[var(--color-brutal-yellow)] border-4 border-black px-2 py-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform">
+        <img src="/LOGO.png" alt="N Logo" className="h-6 w-auto" />
+        <span className="text-xl font-black text-black leading-none tracking-tighter -ml-0.5 mt-0.5">EED</span>
+      </Link>
+      <main className="max-w-7xl mx-auto pb-8">
         {children}
       </main>
+      <CustomerDock />
     </div>
   );
 }

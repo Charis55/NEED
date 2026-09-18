@@ -12,6 +12,7 @@ export interface ArtisanProfile {
   userId: string;
   name?: string;
   trade: string;
+  subcategory: string;
   bio: string;
   neighborhood: string;
   geohash: string;
@@ -23,6 +24,8 @@ export interface ArtisanProfile {
   hasCertification: boolean;
   certificateUrl?: string | null;
   isCertificateVerified?: boolean;
+  hasPoliceClearance: boolean;
+  policeClearanceUrl?: string | null;
   verified: boolean;
   ratingAverage: number;
   ratingCount: number;
@@ -35,6 +38,7 @@ export interface JobRequest {
   customerId: string;
   artisanId: string | null;
   trade: string;
+  subcategory: string;
   description: string;
   neighborhood: string;
   preferredTime: string;

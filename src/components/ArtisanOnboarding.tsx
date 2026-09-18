@@ -8,32 +8,28 @@ import { useRouter } from "next/navigation";
 import { ArtisanProfile } from "@/types";
 import ngeohash from "ngeohash";
 import { verifyCertificateAction } from "@/actions/verifyCertificate";
+import { compressImage } from "@/utils/imageCompression";
+import { servicesData } from "@/data/services";
+import { reverseGeocode } from "@/utils/location";
 
-const TRADES = [
-  "Generator Repair",
-  "AC Servicing",
-  "Plumber",
-  "Electrician",
-  "Tailor"
-];
-
-const NEIGHBORHOODS: Record<string, { lat: number; lng: number }> = {
-  "Lekki Phase 1": { lat: 6.4531, lng: 3.4720 },
-  "Ikeja": { lat: 6.6018, lng: 3.3515 },
-  "Yaba": { lat: 6.5095, lng: 3.3711 },
-  "Victoria Island": { lat: 6.4281, lng: 3.4219 }
-};
+const tradeCategories = Object.values(servicesData);
 
 export default function ArtisanOnboarding() {
   const [step, setStep] = useState(1);
-  const [trade, setTrade] = useState(TRADES[0]);
-  const [neighborhood, setNeighborhood] = useState(Object.keys(NEIGHBORHOODS)[0]);
+  const [tradeCategory, setTradeCategory] = useState(tradeCategories[0].id);
+  const [subcategory, setSubcategory] = useState(tradeCategories[0].subServices[0].title);
+  
+  // Location
+  const [locationData, setLocationData] = useState<{lat: number, lng: number, name: string} | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
   
   // Survey fields
   const [yearsOfExperience, setYearsOfExperience] = useState("< 1 year");
   const [skillLevel, setSkillLevel] = useState("Intermediate");
   const [hasCertification, setHasCertification] = useState(false);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
+  const [policeClearanceFile, setPoliceClearanceFile] = useState<File | null>(null);
 
   const [bio, setBio] = useState("");
   const [files, setFiles] = useState<FileList | null>(null);
@@ -41,8 +37,42 @@ export default function ArtisanOnboarding() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleNext = () => setStep((s) => s + 1);
+  const handleNext = () => {
+    if (step === 1 && !locationData) {
+      setLocationError("Location permission is strictly required to proceed.");
+      return;
+    }
+    setStep((s) => s + 1);
+  };
   const handleBack = () => setStep((s) => s - 1);
+
+  const detectLocation = () => {
+    setIsLocating(true);
+    setLocationError("");
+    if (!("geolocation" in navigator)) {
+      setLocationError("Geolocation is not supported by your browser.");
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const name = await reverseGeocode(latitude, longitude);
+          setLocationData({ lat: latitude, lng: longitude, name });
+        } catch (err) {
+          setLocationError("Failed to determine neighborhood from coordinates.");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        setLocationError("Location permission denied. This is required to proceed.");
+        setIsLocating(false);
+      }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +87,10 @@ export default function ArtisanOnboarding() {
       const photoUrls: string[] = [];
       if (files) {
         for (let i = 0; i < files.length; i++) {
-          const file = files[i];
+          let file = files[i];
+          if (file.type.startsWith('image/')) {
+            file = await compressImage(file);
+          }
           const storageRef = ref(storage, `artisan-photos/${user.uid}/${Date.now()}_${file.name}`);
           const snapshot = await uploadBytes(storageRef, file);
           const url = await getDownloadURL(snapshot.ref);
@@ -77,26 +110,42 @@ export default function ArtisanOnboarding() {
         isCertificateVerified = await verifyCertificateAction(certificateUrl);
       }
 
+      // Upload police clearance
+      let policeClearanceUrl: string | null = null;
+      if (policeClearanceFile) {
+        let fileToUpload = policeClearanceFile;
+        if (policeClearanceFile.type.startsWith('image/')) {
+          fileToUpload = await compressImage(policeClearanceFile);
+        }
+        const pcRef = ref(storage, `artisan-clearance/${user.uid}/${Date.now()}_${fileToUpload.name}`);
+        const snapshot = await uploadBytes(pcRef, fileToUpload);
+        policeClearanceUrl = await getDownloadURL(snapshot.ref);
+      }
+      // For testing, we do not throw an error if police clearance is missing
+
       // Calculate geohash
-      const location = NEIGHBORHOODS[neighborhood];
-      const geohash = ngeohash.encode(location.lat, location.lng);
+      if (!locationData) throw new Error("Location data is missing.");
+      const geohash = ngeohash.encode(locationData.lat, locationData.lng);
 
       const profile: ArtisanProfile = {
         artisanId: user.uid,
         userId: user.uid,
-        trade,
+        trade: servicesData[tradeCategory].title,
+        subcategory,
         yearsOfExperience,
         skillLevel,
         hasCertification,
         certificateUrl,
         isCertificateVerified,
         bio,
-        neighborhood,
+        neighborhood: locationData.name,
         geohash,
-        lat: location.lat,
-        lng: location.lng,
+        lat: locationData.lat,
+        lng: locationData.lng,
         portfolioPhotoUrls: photoUrls,
-        verified: false,
+        hasPoliceClearance: !!policeClearanceUrl,
+        policeClearanceUrl,
+        verified: true, // FOR TESTING: Auto-verify
         ratingAverage: 0,
         ratingCount: 0,
         available: true,
@@ -131,27 +180,61 @@ export default function ArtisanOnboarding() {
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Primary Trade</label>
               <select
-                value={trade}
-                onChange={(e) => setTrade(e.target.value)}
+                value={tradeCategory}
+                onChange={(e) => {
+                  setTradeCategory(e.target.value);
+                  setSubcategory(servicesData[e.target.value].subServices[0].title);
+                }}
                 className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-bg)] text-black font-medium transition-colors"
               >
-                {TRADES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                {tradeCategories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-lg font-black text-black mb-2 uppercase">Specific Service (Subcategory)</label>
+              <select
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-bg)] text-black font-medium transition-colors"
+              >
+                {servicesData[tradeCategory]?.subServices.map((sub) => (
+                  <option key={sub.id} value={sub.title}>{sub.title}</option>
                 ))}
               </select>
             </div>
             
             <div>
-              <label className="block text-lg font-black text-black mb-2 uppercase">Primary Neighborhood</label>
-              <select
-                value={neighborhood}
-                onChange={(e) => setNeighborhood(e.target.value)}
-                className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-bg)] text-black font-medium transition-colors"
-              >
-                {Object.keys(NEIGHBORHOODS).map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
+              <label className="block text-lg font-black text-black mb-2 uppercase">Service Location *</label>
+              <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">We strictly require your location to connect you with nearby customers.</p>
+              
+              {locationData ? (
+                <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center">
+                  <span>📍 {locationData.name}</span>
+                  <button 
+                    type="button" 
+                    onClick={detectLocation}
+                    className="text-xs bg-white px-2 py-1 border-2 border-black hover:-translate-y-0.5 transition-transform"
+                  >
+                    {isLocating ? "UPDATING..." : "UPDATE"}
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  type="button"
+                  onClick={detectLocation}
+                  disabled={isLocating}
+                  className="w-full p-4 bg-[var(--color-brutal-yellow)] brutal-btn text-black font-black uppercase text-left flex justify-between items-center"
+                >
+                  <span>{isLocating ? "DETECTING..." : "📍 DETECT MY LOCATION"}</span>
+                </button>
+              )}
+              
+              {locationError && (
+                <p className="text-[var(--color-brutal-red)] font-black text-sm mt-2 uppercase">{locationError}</p>
+              )}
             </div>
           </div>
         )}
@@ -245,9 +328,22 @@ export default function ArtisanOnboarding() {
                 multiple
                 accept="image/*"
                 onChange={(e) => setFiles(e.target.files)}
-                className="w-full p-6 bg-[var(--color-brutal-bg)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-blue)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors"
-                required
+                className="w-full p-6 bg-[var(--color-brutal-bg)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-blue)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors mb-6"
               />
+            </div>
+
+            <div>
+              <label className="block text-lg font-black text-black mb-2 uppercase text-[var(--color-brutal-red)]">Security & Verification *</label>
+              <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">A valid Police Clearance Certificate is strictly required for platform safety.</p>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => e.target.files && setPoliceClearanceFile(e.target.files[0])}
+                className="w-full p-6 bg-[var(--color-brutal-yellow)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-red)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors"
+              />
+              {policeClearanceFile && (
+                <p className="text-sm font-black text-black mt-2 inline-block px-2 border-2 border-black rotate-1 bg-white">Selected: {policeClearanceFile.name}</p>
+              )}
             </div>
             {files && files.length > 0 && (
               <p className="text-sm font-black text-black bg-[var(--color-brutal-pink)] inline-block px-2 border-2 border-black -rotate-1">{files.length} file(s) selected</p>

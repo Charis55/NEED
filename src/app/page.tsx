@@ -87,7 +87,10 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full py-8 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <img src="/LOGO.png" alt="NEED Logo" className="h-12 w-auto" />
+          <div className="flex items-center">
+            <img src="/LOGO.png" alt="N Logo" className="h-12 w-auto" />
+            <span className="text-[44px] font-bold text-black leading-none tracking-tighter -ml-2">EED</span>
+          </div>
         </div>
         <div>
           <Link href="/login?mode=signin" className="bg-[var(--color-brutal-yellow)] px-8 py-3 text-lg brutal-btn">
@@ -103,9 +106,9 @@ export default function LandingPage() {
             <ShieldCheck className="w-5 h-5 text-[var(--color-brutal-red)]" />
             100% Verified Pros
           </div>
-          <h1 className="text-6xl md:text-8xl font-black text-black uppercase tracking-tighter mb-8 leading-[1.1]">
+          <h1 className="text-[2.5rem] leading-[1.1] sm:text-6xl md:text-8xl font-black text-black uppercase tracking-tighter mb-8">
             The Raw Way To Hire <br className="hidden md:block"/>
-            <span className="bg-[var(--color-brutal-teal)] px-2 inline-block -rotate-1 mt-2 brutal-border">Trusted Technicians.</span>
+            <span className="bg-[var(--color-brutal-teal)] px-2 inline-block -rotate-1 mt-2 brutal-border max-w-full break-words">Trusted Technicians.</span>
           </h1>
           <p className="text-xl md:text-3xl text-black font-medium mb-12 max-w-3xl leading-snug border-l-8 border-black pl-6">
             From plumbers to electricians to tailors. Browse verified portfolios, read real reviews, and request skilled professionals instantly.

@@ -9,7 +9,10 @@ export default function OnboardingPage() {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-8 text-center relative z-10">
         <Link href="/" className="flex items-center justify-center">
-          <img src="/LOGO.png" alt="NEED Logo" className="h-14 w-auto" />
+          <div className="flex items-center">
+            <img src="/LOGO.png" alt="N Logo" className="h-14 w-auto" />
+            <span className="text-[52px] font-bold text-black leading-none tracking-tighter -ml-2.5">EED</span>
+          </div>
         </Link>
         <p className="mt-4 bg-[var(--color-brutal-yellow)] inline-block px-3 py-1 font-black tracking-widest uppercase text-sm brutal-border rotate-1">Technician Portal</p>
       </div>
