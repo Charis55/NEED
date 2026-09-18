@@ -6,7 +6,7 @@ import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck, X, Check } fr
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, limit } from "firebase/firestore";
+import { collection, getDocs, query, limit, where } from "firebase/firestore";
 import { ArtisanProfile } from "@/types";
 import { useRouter } from "next/navigation";
 
@@ -161,14 +161,29 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
 
   useEffect(() => {
     const fetchArtisans = async () => {
+      setLoading(true);
       try {
         const q = query(
           collection(db, "artisans"),
           where("available", "==", true)
-          // To scale, add: where("serviceKeys", "array-contains", `${unwrappedParams.categorySlug}:${unwrappedParams.subSlug}`)
         );
         const snap = await getDocs(q);
-        const data = snap.docs.map(doc => doc.data() as ArtisanProfile);
+        const allData = snap.docs.map(doc => doc.data() as ArtisanProfile);
+
+        const decodedCategory = decodeURIComponent(unwrappedParams.categorySlug).replace(/-/g, ' ');
+        const decodedSub = decodeURIComponent(unwrappedParams.subSlug).replace(/-/g, ' ');
+
+        // Filter in-memory by subcategory to ensure we only show relevant pros
+        const data = allData.filter(artisan => {
+          if (artisan.services && artisan.services.length > 0) {
+            return artisan.services.some(svc => 
+              svc.trade.toLowerCase() === decodedCategory.toLowerCase() && 
+              svc.subcategory.toLowerCase() === decodedSub.toLowerCase()
+            );
+          }
+          return artisan.trade?.toLowerCase() === decodedCategory.toLowerCase() && 
+                 artisan.subcategory?.toLowerCase() === decodedSub.toLowerCase();
+        });
 
         // Geolocation and Sorting
         if ("geolocation" in navigator) {
@@ -201,7 +216,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
       }
     };
     fetchArtisans();
-  }, []);
+  }, [unwrappedParams.categorySlug, unwrappedParams.subSlug]);
 
   const handleSort = (type: "recommended" | "distance" | "rating") => {
     setSortBy(type);

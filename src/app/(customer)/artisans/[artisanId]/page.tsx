@@ -58,8 +58,8 @@ export async function generateMetadata({ params }: { params: Promise<{ artisanId
   }
   
   return {
-    title: `${artisan.businessName || artisan.name} | NEED Artisan`,
-    description: artisan.bio || `Hire ${artisan.businessName || artisan.name} on NEED.`,
+    title: `${artisan.name || 'Technician'} | NEED Artisan`,
+    description: artisan.bio || `Hire ${artisan.name || 'Technician'} on NEED.`,
   };
 }
 

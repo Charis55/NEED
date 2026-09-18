@@ -114,7 +114,7 @@ export default function InboxPage() {
                     </div>
                     
                     <p className="text-sm font-bold text-gray-700 truncate">
-                      {job.category} • {job.neighborhood}
+                      {job.trade} • {job.neighborhood}
                     </p>
                     
                     <div className="mt-2 flex items-center gap-2">

@@ -157,7 +157,9 @@ export default function ArtisanOnboarding() {
             fileToUpload = await compressImage(svc.certificateFile, 4);
           }
           certificateUrl = await uploadFileToR2(fileToUpload);
-          isCertificateVerified = await verifyCertificateAction(certificateUrl);
+          if (certificateUrl) {
+            isCertificateVerified = await verifyCertificateAction(certificateUrl);
+          }
         }
         
         const tradeTitle = servicesData[svc.tradeCategory].title;
