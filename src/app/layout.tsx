@@ -4,6 +4,8 @@ import "./globals.css";
 import { FCMProvider } from "@/hooks/useFCM";
 import { AlertProvider } from "@/components/AlertProvider";
 
+import { Analytics } from "@vercel/analytics/next";
+
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -29,6 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AlertProvider>
           <FCMProvider>{children}</FCMProvider>
         </AlertProvider>
+        <Analytics />
       </body>
     </html>
   );
