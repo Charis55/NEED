@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 
 import { use } from "react";
 
-type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
+type SortType = "A-Z" | "Z-A" | "Most Available";
 
 export default function SubcategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
   const unwrappedParams = use(params);
@@ -21,7 +21,15 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
   
   // Search and Sort state
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortType>("A-Z");
+  const [sortBy, setSortBy] = useState<SortType>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("subCategorySortBy");
+      if (saved === "A-Z" || saved === "Z-A" || saved === "Most Available") {
+        return saved as SortType;
+      }
+    }
+    return "A-Z";
+  });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
 
@@ -82,10 +90,6 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
     if (sortBy === "Most Available") {
       if (countB !== countA) return countB - countA;
       return a.title.localeCompare(b.title);
-    } else if (sortBy === "Most Specific Services") {
-      // For sub-services this sorts by availability count descending as a proxy
-      if (countB !== countA) return countB - countA;
-      return a.title.localeCompare(b.title);
     } else if (sortBy === "A-Z") {
       return a.title.localeCompare(b.title);
     } else if (sortBy === "Z-A") {
@@ -93,6 +97,14 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
     }
     return 0;
   });
+
+  const handleSortChange = (type: SortType) => {
+    setSortBy(type);
+    setIsSortOpen(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("subCategorySortBy", type);
+    }
+  };
 
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col selection:bg-[var(--color-brutal-pink)] selection:text-black">
@@ -121,10 +133,10 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
           {isSortOpen && (
             <div className="absolute top-16 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
               <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
-              {(["A-Z", "Z-A", "Most Available", "Most Specific Services"] as SortType[]).map(type => (
+              {(["A-Z", "Z-A", "Most Available"] as SortType[]).map(type => (
                 <button
                   key={type}
-                  onClick={() => { setSortBy(type); setIsSortOpen(false); }}
+                  onClick={() => handleSortChange(type)}
                   className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortBy === type ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
                 >
                   {type}

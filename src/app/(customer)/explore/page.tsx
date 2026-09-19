@@ -32,8 +32,23 @@ type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [sortBy, setSortBy] = useState<SortType>("Most Available");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("exploreSortBy");
+    if (saved === "A-Z" || saved === "Z-A" || saved === "Most Available" || saved === "Most Specific Services") {
+      setSortBy(saved as SortType);
+    }
+  }, []);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>({});
+
+  const handleSortChange = (type: SortType) => {
+    setSortBy(type);
+    setIsSortOpen(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("exploreSortBy", type);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -117,7 +132,7 @@ export default function Dashboard() {
               {(["A-Z", "Z-A", "Most Available", "Most Specific Services"] as SortType[]).map(type => (
                 <button
                   key={type}
-                  onClick={() => { setSortBy(type); setIsSortOpen(false); }}
+                  onClick={() => handleSortChange(type)}
                   className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortBy === type ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
                 >
                   {type}

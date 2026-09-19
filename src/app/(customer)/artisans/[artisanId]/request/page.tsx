@@ -291,7 +291,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white brutal-btn py-4 text-xl flex items-center justify-between px-6"
+            className="w-full bg-black !text-white brutal-btn py-4 text-xl flex items-center justify-between px-6"
           >
             <span>{loading ? "SUBMITTING..." : "SEND REQUEST"}</span>
             {!loading && <ArrowRight className="w-6 h-6 stroke-[3]" />}

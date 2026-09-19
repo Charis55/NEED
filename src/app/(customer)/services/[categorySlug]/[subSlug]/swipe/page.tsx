@@ -50,9 +50,9 @@ function SwipeCard({
     const swipeThreshold = 100;
     if (info.offset.x > swipeThreshold) {
       removeCard(artisan.artisanId, "right");
-      onAccept(artisan.artisanId);
     } else if (info.offset.x < -swipeThreshold) {
       removeCard(artisan.artisanId, "left");
+      onAccept(artisan.artisanId);
     }
   };
 
@@ -99,7 +99,7 @@ function SwipeCard({
               />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{artisan.name || "Pro Technician"}</h2>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{((artisan as any).firstName && (artisan as any).lastName) ? `${(artisan as any).firstName} ${(artisan as any).lastName}` : (artisan.name || "Technician")}</h2>
               <p className="text-black font-bold text-sm mb-2 uppercase">{artisan.yearsOfExperience || "3-5 years"} exp</p>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-1 bg-[var(--color-brutal-yellow)] text-black border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_0_#000]">
@@ -131,14 +131,16 @@ function SwipeCard({
         <div className="flex gap-4 mt-6 pt-4 border-t-4 border-black">
           <button 
             className="flex-1 bg-white brutal-btn text-lg py-3"
-            onClick={() => removeCard(artisan.artisanId, "left")}
+            onClick={() => {
+              removeCard(artisan.artisanId, "right");
+            }}
           >
             SKIP
           </button>
           <button 
             className="flex-[2] bg-[var(--color-brutal-teal)] brutal-btn text-lg py-3"
             onClick={() => {
-              removeCard(artisan.artisanId, "right");
+              removeCard(artisan.artisanId, "left");
               onAccept(artisan.artisanId);
             }}
           >
@@ -244,8 +246,8 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
   };
 
   const handleAccept = (artisanId: string) => {
-    // Navigate to the Request Job page
-    router.push(`/artisans/${artisanId}/request`);
+    // Navigating automatically is disabled
+    // router.push(`/artisans/${artisanId}/request`);
   };
 
   const tags = ["#appliances", "#samsung", "#bosch", "#apple", "#vacuum", "#internet", "#TV", "#laptop"];
@@ -267,7 +269,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
         </div>
         
         <h1 className="text-4xl font-black text-black mb-6 uppercase tracking-tighter leading-none max-w-[200px] border-l-8 border-black pl-4">
-          CHOOSE A PRO
+          CHOOSE A TECHNICIAN
         </h1>
       </div>
 
