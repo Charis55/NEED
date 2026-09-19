@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 
 import { use } from "react";
 
-type SortType = "A-Z" | "Z-A" | "Most Available";
+type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 
 export default function SubcategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
   const unwrappedParams = use(params);
@@ -146,11 +146,11 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
           )}
         </div>
         
-        <div className="flex justify-between items-center">
-          <h1 className="text-5xl font-black text-black uppercase tracking-tighter">
+        <div className="flex justify-between items-start gap-4">
+          <h1 className="text-5xl font-black text-black uppercase tracking-tighter break-words min-w-0 flex-1">
             {title}
           </h1>
-          <span className="text-[10px] font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1 shrink-0 ml-3">
+          <span className="text-[10px] font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1 shrink-0 mt-2">
             {sortBy === "Most Available" ? "By Availability" : sortBy === "Most Specific Services" ? "By Specificity" : sortBy}
           </span>
         </div>

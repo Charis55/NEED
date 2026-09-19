@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, limit, where } from "firebase/firestore";
 import { ArtisanProfile } from "@/types";
 import { useRouter } from "next/navigation";
+import { servicesData } from "@/data/services";
 
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3; // metres
@@ -250,7 +251,10 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
     // router.push(`/artisans/${artisanId}/request`);
   };
 
-  const tags = ["#appliances", "#samsung", "#bosch", "#apple", "#vacuum", "#internet", "#TV", "#laptop"];
+  const category = servicesData[unwrappedParams.categorySlug];
+  const tags = category 
+    ? category.subServices.slice(0, 10).map(sub => `#${sub.title.replace(/\s+/g, '').toLowerCase()}`)
+    : ["#service", "#professional", "#expert", "#technician"];
 
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans overflow-hidden selection:bg-[var(--color-brutal-pink)] selection:text-black">
@@ -294,7 +298,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
         <div className="relative w-full h-[500px]">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow">
-              <GlobalSpinner text="FINDING PROS" />
+              <GlobalSpinner text="FINDING A TECHNICIAN" />
             </div>
           ) : artisans.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow text-center p-8">

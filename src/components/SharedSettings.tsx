@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import { updateProfile, updateEmail, deleteUser, User } from "firebase/auth";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import SignOutButton from "@/components/SignOutButton";
 import { UserAccount } from "@/types";
 import { useRouter } from "next/navigation";
@@ -168,20 +169,9 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       const compressed = await compressImage(croppedFile, 3);
       
-      const res = await fetch('/api/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: croppedFile.name, contentType: croppedFile.type })
-      });
-      if (!res.ok) throw new Error("Failed to get upload URL");
-      const { presignedUrl, publicUrl } = await res.json();
-      
-      const uploadRes = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': croppedFile.type },
-        body: compressed
-      });
-      if (!uploadRes.ok) throw new Error("Failed to upload image to R2");
+      const storageRef = ref(storage, `profile_pictures/${user.uid}_${Date.now()}.jpg`);
+      await uploadBytes(storageRef, compressed, { contentType: croppedFile.type });
+      const publicUrl = await getDownloadURL(storageRef);
 
       const oldPhotoURL = user.photoURL;
 
@@ -191,7 +181,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       setPhotoURL(publicUrl);
       showAlert("Profile picture updated!", "success");
       
-      if (oldPhotoURL) {
+      if (oldPhotoURL && !oldPhotoURL.includes("firebasestorage.googleapis.com")) {
         fetch('/api/delete-file', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -214,20 +204,9 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       const user = auth.currentUser || authUser;
       if (!user) throw new Error("Not authenticated");
 
-      const res = await fetch('/api/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: `cert_${Date.now()}_${file.name}`, contentType: file.type })
-      });
-      if (!res.ok) throw new Error("Failed to get upload URL");
-      const { presignedUrl, publicUrl } = await res.json();
-      
-      const uploadRes = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file
-      });
-      if (!uploadRes.ok) throw new Error("Failed to upload certificate");
+      const certRef = ref(storage, `certificates/${user.uid}/${Date.now()}_${file.name}`);
+      await uploadBytes(certRef, file, { contentType: file.type });
+      const publicUrl = await getDownloadURL(certRef);
 
       const newCerts = [...certificates, publicUrl];
       await updateDoc(doc(db, "artisans", user.uid), { certificates: newCerts });

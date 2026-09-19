@@ -160,7 +160,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Header */}
       <div className="px-6 pt-12 pb-6 flex items-center gap-4 bg-[var(--color-brutal-blue)] border-b-4 border-black brutal-shadow-sm">
-        <BackButton href="/explore" className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
+        <BackButton className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
         <h1 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">
           Book Service
         </h1>
