@@ -292,20 +292,23 @@ export default function ChatPage() {
   };
 
   const uploadFileToR2 = async (file: File | Blob, name: string) => {
-    const res = await fetch('/api/upload-url', {
+    const formData = new FormData();
+    // Reconstruct File from Blob if needed, ensuring it has a name
+    const fileObj = file instanceof File ? file : new File([file], name, { type: file.type || "application/octet-stream" });
+    formData.append("file", fileObj);
+
+    const res = await fetch('/api/upload-direct', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: name, contentType: file.type })
+      body: formData
     });
-    if (!res.ok) throw new Error("Failed to get upload URL");
-    const { presignedUrl, publicUrl } = await res.json();
     
-    const uploadRes = await fetch(presignedUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.type },
-      body: file
-    });
-    if (!uploadRes.ok) throw new Error("Failed to upload file to R2");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      console.error("Upload error response:", errorData);
+      throw new Error(errorData.error || "Failed to upload file");
+    }
+    
+    const { publicUrl } = await res.json();
     return publicUrl;
   };
 
@@ -360,25 +363,6 @@ export default function ChatPage() {
     if (!user) return;
 
     try {
-      // Helper function to upload to R2
-      const uploadFileToR2 = async (file: File | Blob, name: string) => {
-        const res = await fetch('/api/upload-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: name, contentType: file.type })
-        });
-        if (!res.ok) throw new Error("Failed to get upload URL");
-        const { presignedUrl, publicUrl } = await res.json();
-        
-        const uploadRes = await fetch(presignedUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type },
-          body: file
-        });
-        if (!uploadRes.ok) throw new Error("Failed to upload file to R2");
-        return publicUrl;
-      };
-
       // 1. Upload photos (4MB max)
       const photoUrls: string[] = [];
       for (const file of photos) {

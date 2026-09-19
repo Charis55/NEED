@@ -77,26 +77,16 @@ export default function AuthForm() {
         const uploadTask = async () => {
           const compressedFile = await compressImage(profileFile, 3);
           
-          const res = await fetch('/api/upload-url', {
+          const formData = new FormData();
+          formData.append("file", compressedFile);
+
+          const res = await fetch('/api/upload-direct', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              filename: profileFile.name,
-              contentType: profileFile.type 
-            })
+            body: formData
           });
           
-          if (!res.ok) throw new Error("Failed to get upload URL");
-          const { presignedUrl, publicUrl } = await res.json();
-          
-          const uploadRes = await fetch(presignedUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': profileFile.type },
-            body: compressedFile
-          });
-          
-          if (!uploadRes.ok) throw new Error("Failed to upload image to R2");
-          
+          if (!res.ok) throw new Error("Failed to upload image");
+          const { publicUrl } = await res.json();
           await updateProfile(user, { photoURL: publicUrl });
           return publicUrl;
         };
