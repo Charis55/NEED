@@ -5,6 +5,7 @@ import { FCMProvider } from "@/hooks/useFCM";
 import { AlertProvider } from "@/components/AlertProvider";
 
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <FCMProvider>{children}</FCMProvider>
         </AlertProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
