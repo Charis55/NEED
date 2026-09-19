@@ -299,7 +299,32 @@ export default function ArtisanDashboard() {
                           onClick={() => handleUpdateStatus(req.requestId, "payment_pending")}
                           className="w-full bg-[var(--color-brutal-blue)] py-5 text-xl brutal-btn"
                         >
-                          MARK JOB AS COMPLETED
+                          MARK JOB AS FINISHED
+                        </button>
+                      </div>
+                    )}
+
+                    {req.status === "payment_pending" && (
+                      <div className="mt-6 p-4 bg-[var(--color-brutal-yellow)] border-4 border-black brutal-shadow text-center">
+                        <h4 className="font-black uppercase mb-4">Waiting for Payment</h4>
+                        {req.proofOfPaymentUrl && (
+                          <div className="mb-4">
+                            <p className="font-bold text-sm mb-2">Customer uploaded Proof of Payment:</p>
+                            <a 
+                              href={req.proofOfPaymentUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-block bg-white px-4 py-2 border-2 border-black font-black uppercase brutal-shadow-sm hover:-translate-y-1 transition-transform"
+                            >
+                              VIEW PROOF OF PAYMENT
+                            </a>
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => handleUpdateStatus(req.requestId, "completed")}
+                          className="w-full bg-[var(--color-brutal-green)] py-4 text-xl brutal-btn"
+                        >
+                          CONFIRM PAYMENT RECEIVED
                         </button>
                       </div>
                     )}

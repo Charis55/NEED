@@ -12,7 +12,6 @@ import UserAvatar from "@/components/UserAvatar";
 import { ChevronLeft, Send, Image as ImageIcon, X, Mic } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
-import PaymentModal from "@/components/PaymentModal";
 
 interface Message {
   id: string;
@@ -373,24 +372,6 @@ export default function ChatPage() {
     }
   };
 
-  const handlePaymentSuccess = async (method: "cash" | "paystack", reference?: string) => {
-    try {
-      const reqRef = doc(db, "jobRequests", requestId);
-      await updateDoc(reqRef, {
-        status: "completed",
-        paymentMethod: method,
-        completedAt: Date.now()
-      });
-      
-      setJob(prev => prev ? { ...prev, status: "completed", paymentMethod: method } : prev);
-      setShowPaymentModal(false);
-      showAlert("Payment confirmed successfully!", "success");
-    } catch (err) {
-      console.error("Payment confirmation failed:", err);
-      showAlert("Failed to confirm payment", "error");
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center">
@@ -422,18 +403,61 @@ export default function ChatPage() {
         </div>
       </div>
       
-      {/* Payment Pending Notification */}
-      {job?.status === "payment_pending" && (
-        <div className="bg-[var(--color-brutal-yellow)] border-b-4 border-black p-4 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
-          <p className="font-black uppercase text-black mb-2">Technician marked job as finished!</p>
-          <button 
-            onClick={() => setShowPaymentModal(true)}
-            className="bg-[var(--color-brutal-green)] border-4 border-black px-6 py-2 font-black uppercase text-black brutal-shadow hover:-translate-y-1 transition-transform"
+      {/* Liability Disclaimer */}
+      <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-3 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
+        <p className="font-black text-black text-xs uppercase leading-tight mb-2">
+          Disclaimer: You must upload a Proof of Payment (receipt/screenshot) after paying the technician. If there is a dispute and no proof is provided, you may be held liable.
+        </p>
+        
+        {job?.proofOfPaymentUrl ? (
+          <a 
+            href={job.proofOfPaymentUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block bg-white text-black font-black uppercase text-xs border-2 border-black px-4 py-2 brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
           >
-            COMPLETE PAYMENT
-          </button>
-        </div>
-      )}
+            VIEW PROOF OF PAYMENT
+          </a>
+        ) : (
+          <div>
+            <input 
+              type="file" 
+              accept="image/*" 
+              id="pop-upload" 
+              className="hidden" 
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                
+                try {
+                  showAlert("Uploading Proof of Payment...", "success");
+                  // Compress to 2MB max
+                  const compressed = await compressImage(file, 2);
+                  const popRef = ref(storage, `proof_of_payments/${job?.requestId}_${Date.now()}.jpg`);
+                  await uploadBytes(popRef, compressed, { contentType: file.type });
+                  const url = await getDownloadURL(popRef);
+                  
+                  await updateDoc(doc(db, "jobRequests", requestId), {
+                    proofOfPaymentUrl: url
+                  });
+                  
+                  setJob(prev => prev ? { ...prev, proofOfPaymentUrl: url } : prev);
+                  showAlert("Proof of Payment uploaded successfully!", "success");
+                } catch (err) {
+                  console.error(err);
+                  showAlert("Failed to upload Proof of Payment", "error");
+                }
+              }}
+            />
+            <label 
+              htmlFor="pop-upload"
+              className="inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-xs border-2 border-black px-4 py-2 cursor-pointer brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
+            >
+              UPLOAD PROOF OF PAYMENT
+            </label>
+          </div>
+        )}
+      </div>
 
       {/* Completed Job Notification & Review Button */}
       {job?.status === "completed" && (
@@ -452,16 +476,6 @@ export default function ChatPage() {
             </span>
           )}
         </div>
-      )}
-
-      {/* Payment Modal */}
-      {showPaymentModal && job && (
-        <PaymentModal 
-          amount={job.offerAmount || 0}
-          email={auth.currentUser?.email || ""}
-          onSuccess={handlePaymentSuccess}
-          onClose={() => setShowPaymentModal(false)}
-        />
       )}
 
       {/* Pinned Photo Retention Message */}

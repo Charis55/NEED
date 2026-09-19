@@ -125,8 +125,8 @@ export default function ArtisanDashboard() {
           </div>
           <p className="text-black text-sm font-black mb-2 uppercase tracking-widest">Total Earnings</p>
           <p className="text-5xl md:text-7xl font-black text-black tracking-tighter">₦{stats.totalEarnings.toLocaleString()}</p>
-          <Link href="/technician/jobs" className="mt-6 inline-block bg-black text-white px-6 py-3 font-black uppercase text-sm tracking-widest hover:bg-[var(--color-brutal-teal)] hover:text-black transition-colors border-2 border-black">
-            View Job History
+          <Link href="/technician/earnings" className="mt-6 inline-block bg-black text-white px-6 py-3 font-black uppercase text-sm tracking-widest hover:bg-[var(--color-brutal-teal)] hover:text-black transition-colors border-2 border-black">
+            View Payment History
           </Link>
         </div>
 

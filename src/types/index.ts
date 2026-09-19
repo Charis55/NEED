@@ -68,7 +68,8 @@ export interface JobRequest {
   counterOfferAmount: number | null;
   platformFee: number | null;
   status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered" | "payment_pending";
-  paymentMethod?: "cash" | "paystack";
+  paymentMethod?: "cash" | "transfer";
+  proofOfPaymentUrl?: string;
   createdAt: number;
   completedAt: number | null;
   reviewed?: boolean;
