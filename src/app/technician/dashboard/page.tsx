@@ -5,6 +5,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import Link from "next/link";
 import { ClipboardList, Star, TrendingUp, CheckCircle } from "lucide-react";
+import GlobalSpinner from "@/components/GlobalSpinner";
 
 export default function ArtisanDashboard() {
   const [loading, setLoading] = useState(true);
@@ -83,7 +84,7 @@ export default function ArtisanDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--color-brutal-bg)] flex justify-center items-center">
-        <div className="w-16 h-16 border-8 border-black border-t-[var(--color-brutal-teal)] rounded-full animate-spin"></div>
+        <GlobalSpinner size="lg" text="LOADING DASHBOARD" color="bg-[var(--color-brutal-blue)]" />
       </div>
     );
   }
