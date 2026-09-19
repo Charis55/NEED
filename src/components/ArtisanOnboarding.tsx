@@ -81,10 +81,18 @@ export default function ArtisanOnboarding() {
   };
 
   const handleAddService = () => {
-    if (services.length >= 5) return;
+    const uniqueCategories = new Set(services.map(s => s.tradeCategory));
+    let defaultCategory = tradeCategories[0].id;
+    
+    if (uniqueCategories.size >= 5 && !uniqueCategories.has(defaultCategory)) {
+      defaultCategory = Array.from(uniqueCategories)[0] as string;
+    }
+
+    const categoryData = tradeCategories.find(c => c.id === defaultCategory) || tradeCategories[0];
+
     setServices([...services, {
-      tradeCategory: tradeCategories[0].id,
-      subcategory: tradeCategories[0].subServices[0].title,
+      tradeCategory: defaultCategory,
+      subcategory: categoryData.subServices[0].title,
       hasCertification: false,
       certificateFile: null
     }]);
@@ -260,9 +268,18 @@ export default function ArtisanOnboarding() {
                       onChange={(e) => updateService(index, 'tradeCategory', e.target.value)}
                       className="w-full p-2 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-medium transition-colors"
                     >
-                      {tradeCategories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.title}</option>
-                      ))}
+                      {tradeCategories.map((c) => {
+                        const uniqueCategories = new Set(services.map(s => s.tradeCategory));
+                        const isAtLimit = uniqueCategories.size >= 5;
+                        const isAlreadySelected = uniqueCategories.has(c.id);
+                        const disabled = isAtLimit && !isAlreadySelected;
+                        
+                        return (
+                          <option key={c.id} value={c.id} disabled={disabled}>
+                            {c.title} {disabled ? '(Limit Reached)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div>
@@ -308,11 +325,9 @@ export default function ArtisanOnboarding() {
               </div>
             ))}
             
-            {services.length < 5 && (
-              <button type="button" onClick={handleAddService} className="w-full p-3 bg-[var(--color-brutal-teal)] brutal-border border-dashed hover:-translate-y-1 transition-transform font-black uppercase text-sm">
-                + Add Another Service (Max 5)
-              </button>
-            )}
+            <button type="button" onClick={handleAddService} className="w-full py-4 bg-[var(--color-brutal-teal)] border-4 border-black text-black font-black uppercase tracking-widest mt-4 brutal-shadow hover:-translate-y-1 hover:shadow-[6px_6px_0_0_#000] transition-all">
+              + Add Another Service
+            </button>
             
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Service Location *</label>
