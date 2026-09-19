@@ -31,18 +31,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          id="google-adsense"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4445454590724783"
+          crossOrigin="anonymous"
+        ></script>
+      </head>
       <body className="min-h-full flex flex-col">
         <AlertProvider>
           <FCMProvider>{children}</FCMProvider>
           <GlobalNotificationListener />
         </AlertProvider>
-        <Script
-          id="google-adsense"
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4445454590724783"
-          crossOrigin="anonymous"
-          strategy="lazyOnload"
-        />
         <Analytics />
         <SpeedInsights />
       </body>
