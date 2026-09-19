@@ -6,7 +6,7 @@ import { collection, doc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { JobRequest } from "@/types";
 import BackButton from "@/components/BackButton";
-import { ArrowRight, MapPin, Clock } from "lucide-react";
+import { ArrowRight, MapPin, Clock, ChevronLeft } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
 
 export default function BroadcastJobPage({ params }: { params: Promise<{ categorySlug: string, subSlug: string }> }) {
@@ -118,7 +118,12 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <div className="px-6 pt-12 pb-6 border-b-4 border-black bg-white">
         <div className="flex items-center gap-4 mb-6">
-          <BackButton href="/explore" />
+          <button 
+            onClick={() => router.back()}
+            className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none"
+          >
+            <ChevronLeft className="w-6 h-6 text-black stroke-[3]" />
+          </button>
         </div>
         
         <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-none mb-4">
@@ -144,7 +149,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
             <p className="text-xs font-bold text-gray-500 mb-3">We need your location so available technicians know where to go.</p>
             
             {locationData ? (
-              <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center">
+              <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center border-4 border-black">
                 <span>{locationData.name}</span>
                 <button type="button" onClick={detectLocation} className="text-sm border-b-2 border-black pb-0.5 hover:text-white transition-colors">Update</button>
               </div>
@@ -153,7 +158,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
                 type="button"
                 onClick={detectLocation}
                 disabled={isLocating}
-                className="w-full bg-[var(--color-brutal-yellow)] brutal-btn py-4 text-black font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                className="w-full bg-[var(--color-brutal-yellow)] brutal-btn py-4 text-black font-black uppercase tracking-widest flex items-center justify-center gap-2 border-4 border-black"
               >
                 {isLocating ? "Detecting..." : "Detect Location"}
               </button>
@@ -172,7 +177,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
               value={preferredTime}
               onChange={(e) => setPreferredTime(e.target.value)}
               placeholder="e.g. Today at 2 PM, Tomorrow morning"
-              className="w-full p-4 brutal-input text-lg font-bold"
+              className="w-full p-4 brutal-input text-lg font-bold border-4 border-black"
             />
           </div>
 
@@ -189,7 +194,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what needs to be fixed or installed..."
-              className="w-full p-4 brutal-input text-lg font-medium resize-none"
+              className="w-full p-4 brutal-input text-lg font-medium resize-none border-4 border-black"
             />
           </div>
 
@@ -215,7 +220,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
                   }
                 }}
                 placeholder="0"
-                className="w-full pl-10 pr-4 py-4 brutal-input text-xl font-black"
+                className="w-full pl-10 pr-4 py-4 brutal-input text-xl font-black border-4 border-black"
               />
             </div>
           </div>
@@ -226,7 +231,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
               disabled={loading}
               className="w-full bg-[var(--color-brutal-blue)] py-5 brutal-btn text-xl uppercase flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
             >
-              <span className="relative z-10">{loading ? "POSTING JOB..." : "POST JOB TO ALL PROS"}</span>
+              <span className="relative z-10">{loading ? "POSTING JOB..." : "POST JOB FOR EVERYONE"}</span>
               {!loading && <ArrowRight className="relative z-10 w-6 h-6 group-hover:translate-x-2 transition-transform" strokeWidth={3} />}
             </button>
           </div>

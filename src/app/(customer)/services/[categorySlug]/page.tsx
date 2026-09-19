@@ -191,11 +191,10 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
                   </p>
                   
                   <div className="flex flex-col gap-4 mt-auto">
-                    {/* Technician Count Pill */}
                     <div className="flex items-center gap-2">
                       <div className={`inline-flex items-center gap-2 px-3 py-1 brutal-border border-black font-black text-xs uppercase shadow-[2px_2px_0_0_#000] ${isAvailable ? 'bg-[var(--color-brutal-teal)] text-black' : 'bg-gray-300 text-gray-700'}`}>
                         <Users className="w-4 h-4 stroke-[3]" />
-                        <span>{loading ? "..." : count} PRO{count !== 1 ? 'S' : ''} READY</span>
+                        <span>{loading ? "..." : count} TECHNICIAN{count !== 1 ? 'S' : ''} READY</span>
                       </div>
                     </div>
 
@@ -209,7 +208,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
                           href={`/services/${unwrappedParams.categorySlug}/${service.id}/swipe`}
                           className="flex items-center gap-3 bg-[var(--color-brutal-yellow)] px-4 py-3 brutal-btn w-full justify-center"
                         >
-                          <span className="text-sm font-black text-black">FIND A PRO</span>
+                          <span className="text-sm font-black text-black">FIND A TECHNICIAN</span>
                           <ArrowRight className="w-5 h-5 stroke-[3] text-black" />
                         </Link>
                       ) : (

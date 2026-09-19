@@ -51,9 +51,9 @@ function SwipeCard({
     const swipeThreshold = 100;
     if (info.offset.x > swipeThreshold) {
       removeCard(artisan.artisanId, "right");
+      onAccept(artisan.artisanId);
     } else if (info.offset.x < -swipeThreshold) {
       removeCard(artisan.artisanId, "left");
-      onAccept(artisan.artisanId);
     }
   };
 
@@ -303,7 +303,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
           ) : artisans.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow text-center p-8">
               <div>
-                <p className="text-black font-black text-xl uppercase mb-6">No more pros found here.</p>
+                <p className="text-black font-black text-xl uppercase mb-6">No more technicians found here.</p>
                 <div className="space-y-4">
                   <button 
                     onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
@@ -312,7 +312,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
                     POST JOB FOR ANYONE
                   </button>
                   <button 
-                    onClick={() => router.push('/explore')}
+                    onClick={() => router.push(`/services/${unwrappedParams.categorySlug}`)}
                     className="bg-[var(--color-brutal-blue)] px-6 py-4 brutal-btn w-full"
                   >
                     GO BACK
@@ -374,7 +374,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
             className="w-full max-w-md bg-white border-4 border-black brutal-shadow mb-4 p-6"
           >
             <div className="flex justify-between items-center mb-6 border-b-4 border-black pb-4">
-              <h2 className="text-2xl font-black text-black uppercase">Sort Pros</h2>
+              <h2 className="text-2xl font-black text-black uppercase">Sort Technicians</h2>
               <button onClick={() => setShowSortModal(false)}>
                 <X className="w-6 h-6 stroke-[3]" />
               </button>

@@ -56,11 +56,18 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         setPhotoURL(user.photoURL || null);
         
         try {
+          // Initialize from auth profile first
+          if (user.displayName) {
+            const parts = user.displayName.split(' ');
+            setFirstName(parts[0] || "");
+            setLastName(parts.slice(1).join(' ') || "");
+          }
+
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data() as UserAccount;
-            setFirstName(data.firstName || "");
-            setLastName(data.lastName || "");
+            if (data.firstName) setFirstName(data.firstName);
+            if (data.lastName) setLastName(data.lastName);
             setPhone(data.phone || "");
             
             if (data.preferences) {

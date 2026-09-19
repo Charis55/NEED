@@ -123,7 +123,7 @@ export default function EarningsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col font-sans selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Header */}
-      <div className="bg-[var(--color-brutal-yellow)] border-b-8 border-black p-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
+      <div className="bg-[var(--color-brutal-yellow)] border-b-8 border-black p-4 pt-16 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
           onClick={() => router.back()}
           className="w-12 h-12 bg-white border-4 border-black flex justify-center items-center mr-4 brutal-shadow hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-transform"
