@@ -8,7 +8,8 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import { ChevronLeft, Calendar, DollarSign, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAlert } from "@/components/AlertProvider";
-import PaymentModal from "@/components/PaymentModal";
+import dynamic from "next/dynamic";
+const PaymentModal = dynamic(() => import("@/components/PaymentModal"), { ssr: false });
 
 interface WeeklyEarning {
   weekKey: string;
