@@ -326,9 +326,9 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
                 <div className="space-y-4">
                   <button 
                     onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
-                    className="bg-[var(--color-brutal-pink)] px-6 py-4 brutal-btn w-full"
+                    className="bg-[var(--color-brutal-pink)] px-6 py-4 brutal-btn w-full text-sm sm:text-base whitespace-nowrap"
                   >
-                    POST JOB FOR ANYONE
+                    POST TO GLOBAL JOB BOARD (UP FOR GRABS)
                   </button>
                   <button 
                     onClick={() => router.push(`/services/${unwrappedParams.categorySlug}`)}
@@ -361,6 +361,19 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
           )}
         </div>
       </div>
+
+      {/* Global Job Board Fallback */}
+      {!loading && artisans.length > 0 && (
+        <div className="px-6 mt-4 mb-8 max-w-md mx-auto w-full">
+          <button 
+            onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
+            className="bg-[var(--color-brutal-yellow)] px-6 py-4 brutal-btn w-full text-sm sm:text-base font-black border-4 border-black shadow-[4px_4px_0_0_#000] uppercase tracking-tighter"
+          >
+            CAN'T FIND ANYONE? POST TO GLOBAL JOB BOARD
+          </button>
+        </div>
+      )}
+
 
       {/* Fullscreen Image Lightbox */}
       {fullscreenImage && (

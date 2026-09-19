@@ -9,13 +9,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.need.navigation.AppNavigation
 import com.example.need.ui.theme.NeedTheme
+import com.google.firebase.FirebaseApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // TODO: Android Studio Agent - Initialize Firebase App here if not using an Application class
-        // FirebaseApp.initializeApp(this)
+        FirebaseApp.initializeApp(this)
 
         setContent {
             NeedTheme {

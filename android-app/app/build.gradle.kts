@@ -1,8 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // TODO: Android Studio Agent - Initialize Firebase here by uncommenting the plugin
-    // id("com.google.gms.google-services") 
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -42,8 +41,9 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -65,12 +65,13 @@ dependencies {
     // Icons
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Firebase (Agent will fill this out)
-    // implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-    // implementation("com.google.firebase:firebase-auth-ktx")
-    // implementation("com.google.firebase:firebase-firestore-ktx")
-    // implementation("com.google.firebase:firebase-storage-ktx")
-    
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-analytics")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

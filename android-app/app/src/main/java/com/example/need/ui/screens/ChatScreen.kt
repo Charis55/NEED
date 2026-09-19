@@ -2,98 +2,105 @@ package com.example.need.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.need.ui.components.BrutalButton
 import com.example.need.ui.components.brutalStyle
 import com.example.need.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    jobRequestId: String,
+    requestId: String,
+    userRole: String,
     onBack: () -> Unit
 ) {
-    // TODO: Agent - Subscribe to Firestore messages for jobRequestId
+    var message by remember { mutableStateOf("") }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BrutalBg)
     ) {
-        // Header
+        // Chat Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(BrutalBlue)
+                .background(White)
                 .brutalStyle(borderWidth = 0.dp, shadowOffset = 4.dp)
-                .padding(top = 40.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "BACK",
                 fontWeight = FontWeight.Black,
                 modifier = Modifier
                     .brutalStyle(borderWidth = 2.dp, shadowOffset = 2.dp)
-                    .background(White)
+                    .background(BrutalYellow)
                     .padding(8.dp)
-                    // .clickable { onBack() }
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = "PARTNER NAME",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 20.sp,
-                    color = Black
-                )
-                Text(
-                    text = "SUBCATEGORY",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .background(White)
-                        .brutalStyle(borderWidth = 2.dp, shadowOffset = 2.dp)
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                )
+            Text("JOB #$requestId", fontWeight = FontWeight.Black, fontSize = 20.sp)
+        }
+
+        // Messages List
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Customer Message Bubble
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (userRole == "customer") Arrangement.End else Arrangement.Start) {
+                    Box(modifier = Modifier.fillMaxWidth(0.8f).brutalStyle(borderWidth = 3.dp).background(if (userRole == "customer") BrutalPink else White).padding(16.dp)) {
+                        Text("Hey! I need you to fix a broken pipe under my sink as soon as possible.", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            // Artisan Message Bubble
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (userRole == "artisan") Arrangement.End else Arrangement.Start) {
+                    Box(modifier = Modifier.fillMaxWidth(0.8f).brutalStyle(borderWidth = 3.dp).background(if (userRole == "artisan") BrutalTeal else White).padding(16.dp)) {
+                        Text("I can be there in 30 minutes! Can you send a picture?", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
-        // Messages List (Weight 1f)
-        Box(modifier = Modifier.weight(1f)) {
-            // TODO: Render LazyColumn with messages here
-        }
-
-        // Input Area
+        // Input Box
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(White)
-                .brutalStyle(borderWidth = 0.dp, shadowOffset = 0.dp)
+                .brutalStyle(borderWidth = 0.dp, shadowOffset = -2.dp)
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Input field
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .brutalStyle()
-                    .background(BrutalBg)
-                    .padding(16.dp)
-            ) {
-                Text(text = "Type a message...", color = Color.Gray, fontWeight = FontWeight.Bold)
+            Box(modifier = Modifier.size(48.dp).brutalStyle(borderWidth = 2.dp).background(BrutalYellow), contentAlignment = Alignment.Center) {
+                Text("+", fontWeight = FontWeight.Black, fontSize = 24.sp)
             }
-            
-            // Send Button
-            Box(
-                modifier = Modifier
-                    .brutalStyle()
-                    .background(BrutalPink)
-                    .padding(16.dp)
-            ) {
-                Text(text = "SEND", fontWeight = FontWeight.Black)
-            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedTextField(
+                value = message,
+                onValueChange = { message = it },
+                modifier = Modifier.weight(1f).brutalStyle(borderWidth = 3.dp).background(White),
+                placeholder = { Text("Type a message...", fontWeight = FontWeight.Bold) },
+                colors = TextFieldDefaults.outlinedTextFieldColors(focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            BrutalButton(
+                text = "SEND",
+                backgroundColor = BrutalTeal,
+                onClick = { /* TODO: Agent - Send to Firestore */ }
+            )
         }
     }
 }

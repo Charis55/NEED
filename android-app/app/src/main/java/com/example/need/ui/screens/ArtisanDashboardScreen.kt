@@ -2,7 +2,8 @@ package com.example.need.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,27 +27,10 @@ fun ArtisanDashboardScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 96.dp) // Room for dock
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 96.dp)
+                .padding(24.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "DASHBOARD",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 28.sp,
-                    modifier = Modifier
-                        .brutalStyle(borderWidth = 4.dp, shadowOffset = 4.dp)
-                        .background(BrutalYellow)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-
             // TODO: Agent - Fetch Artisan profile status and earnings from Firestore
             
             // Status Card

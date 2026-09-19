@@ -19,7 +19,8 @@ fun BrutalButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    backgroundColor: Color
+    backgroundColor: Color,
+    textColor: Color = Black
 ) {
     Box(
         modifier = modifier
@@ -31,7 +32,7 @@ fun BrutalButton(
     ) {
         Text(
             text = text.uppercase(),
-            color = Black,
+            color = textColor,
             fontWeight = FontWeight.Black,
             fontSize = 16.sp
         )

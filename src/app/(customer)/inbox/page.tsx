@@ -37,7 +37,7 @@ export default function InboxPage() {
         const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
         
         // Filter locally because Firestore OR queries are complex
-        const activeJobs = allJobs.filter(j => j.status === "accepted" || j.status === "completed");
+        const activeJobs = allJobs.filter(j => j.status === "accepted" || j.status === "completed" || j.status === "payment_pending");
         
         // Sort by newest first
         activeJobs.sort((a, b) => b.createdAt - a.createdAt);

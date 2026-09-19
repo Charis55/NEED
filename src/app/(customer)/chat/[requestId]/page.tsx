@@ -145,8 +145,10 @@ export default function ChatPage() {
         
         const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (audioBlob.size > 0 && waveformRef.current.length > 0) {
+        if (audioBlob.size > 0) {
           sendVoiceNote(audioBlob, [...waveformRef.current]);
+        } else {
+          showAlert("Voice note was empty", "error");
         }
       };
       mediaRecorderRef.current.stop();
@@ -295,7 +297,7 @@ export default function ChatPage() {
     const formData = new FormData();
     // Reconstruct File from Blob if needed, ensuring it has a name
     const fileObj = file instanceof File ? file : new File([file], name, { type: file.type || "application/octet-stream" });
-    formData.append("file", fileObj);
+    formData.append("file", fileObj, name);
 
     const res = await fetch('/api/upload-direct', {
       method: 'POST',
@@ -494,9 +496,7 @@ export default function ChatPage() {
                   showAlert("Uploading Proof of Payment...", "success");
                   // Compress to 2MB max
                   const compressed = await compressImage(file, 2);
-                  const popRef = ref(storage, `proof_of_payments/${job?.requestId}_${Date.now()}.jpg`);
-                  await uploadBytes(popRef, compressed, { contentType: file.type });
-                  const url = await getDownloadURL(popRef);
+                  const url = await uploadFileToR2(compressed, file.name);
                   
                   await updateDoc(doc(db, "jobRequests", requestId), {
                     proofOfPaymentUrl: url,

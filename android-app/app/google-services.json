@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "48438248184",
+    "project_id": "momentum-b4215",
+    "storage_bucket": "momentum-b4215.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:48438248184:android:d321423908c834889a710d",
+        "android_client_info": {
+          "package_name": "com.example.della"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "48438248184-m6qlpkvufo044ia8mpo9d9e8cv5rfhbk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-qurMczu1qD2OIS8ckGvFSwMhOYqc8zI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "48438248184-m6qlpkvufo044ia8mpo9d9e8cv5rfhbk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:48438248184:android:9662337b419c8fc59a710d",
+        "android_client_info": {
+          "package_name": "com.example.need"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "48438248184-m6qlpkvufo044ia8mpo9d9e8cv5rfhbk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-qurMczu1qD2OIS8ckGvFSwMhOYqc8zI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "48438248184-m6qlpkvufo044ia8mpo9d9e8cv5rfhbk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

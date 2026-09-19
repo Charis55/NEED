@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, CheckCircle, Info, X } from "lucide-react";
 
@@ -31,7 +31,7 @@ export function useAlert() {
 export function AlertProvider({ children }: { children: ReactNode }) {
   const [alerts, setAlerts] = useState<AlertMessage[]>([]);
 
-  const showAlert = (message: string, type: AlertType, action?: { label?: string; onClick: () => void }, avatarUrl?: string) => {
+  const showAlert = useCallback((message: string, type: AlertType, action?: { label?: string; onClick: () => void }, avatarUrl?: string) => {
     const id = Math.random().toString(36).substr(2, 9);
     setAlerts((prev) => [...prev, { id, type, message, action, avatarUrl }]);
 
@@ -39,7 +39,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     setTimeout(() => {
       setAlerts((prev) => prev.filter((alert) => alert.id !== id));
     }, 4000);
-  };
+  }, []);
 
   const removeAlert = (id: string) => {
     setAlerts((prev) => prev.filter((alert) => alert.id !== id));

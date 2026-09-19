@@ -12,3 +12,6 @@ val BrutalTeal = Color(0xFF23A094)
 
 val Black = Color(0xFF000000)
 val White = Color(0xFFFFFFFF)
+val Transparent = Color(0x00000000)
+val Gray = Color(0xFF888888)
+val LightGray = Color(0xFFF0F0F0)
