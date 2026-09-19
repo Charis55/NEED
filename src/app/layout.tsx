@@ -3,6 +3,7 @@ import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { FCMProvider } from "@/hooks/useFCM";
 import { AlertProvider } from "@/components/AlertProvider";
+import Script from "next/script";
 
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -35,6 +36,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <FCMProvider>{children}</FCMProvider>
           <GlobalNotificationListener />
         </AlertProvider>
+        <Script
+          id="google-adsense"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4445454590724783"
+          crossOrigin="anonymous"
+          strategy="lazyOnload"
+        />
         <Analytics />
         <SpeedInsights />
       </body>
