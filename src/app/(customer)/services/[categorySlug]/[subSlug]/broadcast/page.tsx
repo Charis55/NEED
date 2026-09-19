@@ -83,7 +83,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
         return;
       }
 
-      const platformFeeRate = 0.35;
+      const platformFeeRate = 0.20;
 
       const requestRef = doc(collection(db, "jobRequests"));
       const newRequest: JobRequest = {

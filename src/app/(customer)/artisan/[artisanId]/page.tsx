@@ -13,6 +13,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
   const unwrappedParams = use(params);
   const router = useRouter();
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
+  const [artisanUser, setArtisanUser] = useState<any>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"about" | "reviews">("about");
@@ -26,6 +27,11 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
         
         if (docSnap.exists()) {
           setArtisan(docSnap.data() as ArtisanProfile);
+          
+          const userDocSnap = await getDoc(doc(db, "users", unwrappedParams.artisanId));
+          if (userDocSnap.exists()) {
+            setArtisanUser(userDocSnap.data());
+          }
           
           // Fetch Reviews
           const q = query(
@@ -85,7 +91,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
             />
           </div>
           
-          <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-tight">{artisan.name || "Technician"}</h1>
+          <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-tight">{artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName}` : "Technician")}</h1>
           {artisan.services && artisan.services.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-2 mt-2 max-w-sm">
               {artisan.services.map((svc, i) => (
@@ -216,7 +222,11 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
                   {review.photos && review.photos.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                       {review.photos.map((photo, i) => (
-                        <div key={i} className="w-20 h-20 flex-shrink-0 border-2 border-black bg-gray-200">
+                        <div 
+                          key={i} 
+                          className="w-20 h-20 flex-shrink-0 border-2 border-black bg-gray-200 cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => setFullscreenImage(photo)}
+                        >
                           <img src={photo} alt="Work done" className="w-full h-full object-cover" />
                         </div>
                       ))}

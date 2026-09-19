@@ -7,7 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { JobRequest } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
-import { ChevronLeft, Calendar, DollarSign, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Calendar, DollarSign, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAlert } from "@/components/AlertProvider";
 import dynamicImport from "next/dynamic";
@@ -23,10 +23,72 @@ interface WeeklyEarning {
   isPaid: boolean;
 }
 
+type JobWithFee = JobRequest & { platformFee: number };
+
+const JobEarningRow = ({ job, onPayClick }: { job: JobRequest, onPayClick: (j: JobWithFee) => void }) => {
+  const [expanded, setExpanded] = useState(false);
+  const earn = job.counterOfferAmount || job.offerAmount || 0;
+  const platformFee = earn * 0.20;
+  const isSettled = (job as any).commissionPaid;
+  
+  return (
+    <div className="border-2 border-black mb-3 bg-gray-50 flex flex-col">
+      <div 
+        onClick={() => setExpanded(!expanded)} 
+        className="flex justify-between items-center p-3 hover:bg-[var(--color-brutal-yellow)] transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          {expanded ? <ChevronUp className="w-5 h-5 stroke-[3] shrink-0" /> : <ChevronDown className="w-5 h-5 stroke-[3] shrink-0" />}
+          <div>
+            <p className="font-bold uppercase text-sm truncate max-w-[200px]">{job.subcategory}</p>
+            <p className="text-xs font-bold text-gray-500">
+              {new Date(job.completedAt || job.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col items-end">
+           <span className="font-black text-lg">₦{earn.toLocaleString()}</span>
+           {isSettled ? (
+             <span className="text-[10px] bg-[var(--color-brutal-green)] px-2 py-0.5 font-black uppercase text-black border border-black mt-1">Settled</span>
+           ) : (
+             <span className="text-[10px] bg-[var(--color-brutal-red)] px-2 py-0.5 font-black uppercase text-white border border-black mt-1">Pending</span>
+           )}
+        </div>
+      </div>
+      
+      {expanded && (
+        <div className="p-4 border-t-2 border-dashed border-black bg-white">
+          <div className="flex justify-between mb-2">
+             <span className="text-sm font-bold text-gray-600">Total Earned</span>
+             <span className="text-sm font-black">₦{earn.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between mb-2">
+             <span className="text-sm font-bold text-[var(--color-brutal-red)]">Platform Fee (20%)</span>
+             <span className="text-sm font-black text-[var(--color-brutal-red)]">- ₦{platformFee.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between mb-6 pb-2 border-b-2 border-black">
+             <span className="text-base font-black">Your Take Home</span>
+             <span className="text-base font-black text-[var(--color-brutal-teal)]">₦{(earn - platformFee).toLocaleString()}</span>
+          </div>
+          
+          {!isSettled && platformFee > 0 && (
+             <button 
+               onClick={(e) => { e.stopPropagation(); onPayClick({ ...job, platformFee }); }}
+               className="w-full bg-[var(--color-brutal-blue)] text-black border-4 border-black py-3 font-black text-base uppercase hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all"
+             >
+               PAY COMMISSION (₦{platformFee.toLocaleString()})
+             </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EarningsPage() {
   const [loading, setLoading] = useState(true);
   const [weeklyEarnings, setWeeklyEarnings] = useState<WeeklyEarning[]>([]);
-  const [showPaymentModal, setShowPaymentModal] = useState<WeeklyEarning | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState<JobWithFee | null>(null);
   
   const router = useRouter();
   const { showAlert } = useAlert();
@@ -75,10 +137,11 @@ export default function EarningsPage() {
           }
           
           groups[weekKey].jobs.push(job);
-          const earn = job.offerAmount || 0;
+          const earn = job.counterOfferAmount || job.offerAmount || 0;
           groups[weekKey].totalEarnings += earn;
-          groups[weekKey].commissionOwed += earn * 0.35;
+          
           if (!(job as any).commissionPaid) {
+            groups[weekKey].commissionOwed += earn * 0.20;
             groups[weekKey].isPaid = false;
           }
         });
@@ -94,23 +157,14 @@ export default function EarningsPage() {
     };
 
     fetchJobs();
-  }, [showAlert]);
+  }, [showAlert, showPaymentModal]); // Refetch when a payment completes
 
   const handlePayCommission = async (method: "cash" | "paystack", reference?: string) => {
     if (!showPaymentModal || method !== "paystack") return;
     
     try {
       setLoading(true);
-      // Mark all jobs in this week as commission paid
-      const promises = showPaymentModal.jobs.map(job => 
-        updateDoc(doc(db, "jobRequests", job.requestId), { commissionPaid: true })
-      );
-      await Promise.all(promises);
-      
-      setWeeklyEarnings(prev => prev.map(w => 
-        w.weekKey === showPaymentModal.weekKey ? { ...w, isPaid: true } : w
-      ));
-      
+      await updateDoc(doc(db, "jobRequests", showPaymentModal.requestId), { commissionPaid: true });
       setShowPaymentModal(null);
       showAlert("Commission paid successfully! Thank you.", "success");
     } catch (err) {
@@ -163,7 +217,7 @@ export default function EarningsPage() {
                   </span>
                 ) : (
                   <span className="bg-[var(--color-brutal-red)] text-white px-3 py-1 text-xs font-black uppercase border-2 border-white -rotate-2">
-                    Pending
+                    Pending ({week.jobs.filter(j => !(j as any).commissionPaid).length})
                   </span>
                 )}
               </div>
@@ -175,34 +229,17 @@ export default function EarningsPage() {
                     <p className="text-4xl font-black text-[var(--color-brutal-teal)]">₦{week.totalEarnings.toLocaleString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-[var(--color-brutal-red)] uppercase mb-1">Platform Fee (35%)</p>
+                    <p className="text-sm font-bold text-[var(--color-brutal-red)] uppercase mb-1">Unpaid Platform Fee</p>
                     <p className="text-2xl font-black text-black">₦{week.commissionOwed.toLocaleString()}</p>
                   </div>
                 </div>
                 
-                <div className="space-y-3 mb-6">
-                  <p className="font-black uppercase text-sm border-b-2 border-black inline-block pb-1">Jobs Completed ({week.jobs.length})</p>
+                <div className="space-y-3">
+                  <p className="font-black uppercase text-sm border-b-2 border-black inline-block pb-1 mb-2">Jobs Completed ({week.jobs.length})</p>
                   {week.jobs.map(job => (
-                    <div key={job.requestId} className="flex justify-between items-center bg-gray-50 border-2 border-black p-3 hover:bg-[var(--color-brutal-yellow)] transition-colors cursor-default">
-                      <div>
-                        <p className="font-bold uppercase text-sm truncate max-w-[200px]">{job.subcategory}</p>
-                        <p className="text-xs font-bold text-gray-500">
-                          {new Date(job.completedAt || job.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span className="font-black">₦{job.offerAmount?.toLocaleString()}</span>
-                    </div>
+                    <JobEarningRow key={job.requestId} job={job} onPayClick={(j) => setShowPaymentModal(j)} />
                   ))}
                 </div>
-
-                {!week.isPaid && week.commissionOwed > 0 && (
-                  <button 
-                    onClick={() => setShowPaymentModal(week)}
-                    className="w-full bg-[var(--color-brutal-blue)] text-black border-4 border-black py-4 font-black text-xl uppercase brutal-shadow hover:-translate-y-1 hover:shadow-[6px_6px_0_0_#000] transition-all"
-                  >
-                    PAY COMMISSION (₦{week.commissionOwed.toLocaleString()})
-                  </button>
-                )}
               </div>
             </div>
           ))
@@ -211,7 +248,7 @@ export default function EarningsPage() {
 
       {showPaymentModal && (
         <PaymentModal 
-          amount={showPaymentModal.commissionOwed}
+          amount={showPaymentModal.platformFee}
           email={auth.currentUser?.email || ""}
           onSuccess={handlePayCommission}
           onClose={() => setShowPaymentModal(null)}

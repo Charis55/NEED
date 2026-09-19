@@ -107,7 +107,7 @@ export default function ArtisanDashboard() {
 
       if (newStatus === "countered" && counterAmt) {
         const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
-        const platformFeeRate = isPromoActive ? 0 : 0.35;
+        const platformFeeRate = isPromoActive ? 0 : 0.20;
         updatePayload.counterOfferAmount = counterAmt;
         updatePayload.platformFee = counterAmt * platformFeeRate;
         updatePayload.lastCounterBy = "artisan";
@@ -122,7 +122,7 @@ export default function ArtisanDashboard() {
       setRequests(prev => prev.map(req => {
         if (req.requestId === requestId) {
           const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
-          const platformFeeRate = isPromoActive ? 0 : 0.35;
+          const platformFeeRate = isPromoActive ? 0 : 0.20;
           return { 
             ...req, 
             status: newStatus, 
@@ -196,12 +196,10 @@ export default function ArtisanDashboard() {
         ) : (
           <div className="space-y-6">
             {requests.map((req) => {
-              const currentPrice = req.status === "countered" && req.counterOfferAmount 
-                ? req.counterOfferAmount 
-                : (req.offerAmount || 0);
+              const currentPrice = req.counterOfferAmount || req.offerAmount || 0;
               
               const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
-              const platformFeeRate = isPromoActive ? 0 : 0.35;
+              const platformFeeRate = isPromoActive ? 0 : 0.20;
               
               const platformFee = currentPrice * platformFeeRate;
               const artisanTakeHome = currentPrice - platformFee;
@@ -242,7 +240,7 @@ export default function ArtisanDashboard() {
                         <p className="text-4xl font-black text-black tracking-tighter mt-1">₦{currentPrice.toLocaleString()}</p>
                         <div className="mt-4 space-y-1 text-sm font-bold border-t-2 border-black pt-2">
                           <p className="text-[var(--color-brutal-red)] flex justify-between">
-                            <span>Platform Fee {isPromoActive ? "(0% PROMO)" : "(35%)"}</span> 
+                            <span>Platform Fee {isPromoActive ? "(0% PROMO)" : "(20%)"}</span> 
                             {isPromoActive ? (
                               <span className="text-[var(--color-brutal-teal)]">FREE</span>
                             ) : (
@@ -389,7 +387,7 @@ export default function ArtisanDashboard() {
               Welcome to Need! As a new artisan, you keep <span className="bg-[var(--color-brutal-teal)] border-2 border-black px-2 py-0.5 inline-block text-white">100% of your profits</span> for your first 30 days.
             </p>
             <p className="text-lg font-bold text-gray-700 mb-8 border-l-4 border-black pl-4">
-              We've waived our standard 35% platform fee. Any job you accept or counter-offer during this period will have absolutely zero fees taken out. Go make that money!
+              We've waived our standard 20% platform fee. Any job you accept or counter-offer during this period will have absolutely zero fees taken out. Go make that money!
             </p>
             <button 
               onClick={() => setShowPromoOverlay(false)}

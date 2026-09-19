@@ -164,7 +164,7 @@ fun ArtisanEarningsScreen(onNavigateBack: () -> Unit) {
                                     Text("₦${week.totalEarnings}", fontWeight = FontWeight.Black, fontSize = 32.sp, color = BrutalTeal)
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("PLATFORM FEE (35%)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = BrutalRed)
+                                    Text("PLATFORM FEE (20%)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = BrutalRed)
                                     Text("₦${week.commissionOwed}", fontWeight = FontWeight.Black, fontSize = 24.sp, color = Black)
                                 }
                             }

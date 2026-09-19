@@ -454,7 +454,7 @@ export default function ChatPage() {
         </button>
         
         <div className="w-12 h-12 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-4">
-          <UserAvatar name={chatPartnerName} className="w-full h-full text-xl font-black text-black" />
+          <UserAvatar photoURL={isCustomerViewing ? (artisanUser?.photoURL || artisan?.portfolioPhotoUrls?.[0]) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-xl font-black text-black" />
         </div>
         
         <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
@@ -467,9 +467,9 @@ export default function ChatPage() {
       
       {/* Liability Disclaimer */}
       {job?.status === "completed" && (
-        <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-4 text-center shrink-0 z-0 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_4px_0_0_#000]">
-          <p className="font-black text-black text-xs md:text-sm uppercase leading-tight text-left flex-1 whitespace-nowrap overflow-x-auto no-scrollbar">
-            ⚠️ Upload Proof of Payment (receipt/screenshot) after paying to avoid liability.
+        <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-2 md:p-3 text-center shrink-0 z-0 flex items-center justify-between shadow-[0_4px_0_0_#000]">
+          <p className="font-bold text-black text-[10px] md:text-xs uppercase leading-tight text-left flex-1 mr-2">
+            ⚠️ Upload Proof of Payment (receipt) to avoid liability.
           </p>
         
         {job?.proofOfPaymentUrl ? (
@@ -477,12 +477,12 @@ export default function ChatPage() {
             href={job.proofOfPaymentUrl} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-block bg-white text-black font-black uppercase text-xs border-2 border-black px-4 py-2 brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
+            className="shrink-0 inline-block bg-white text-black font-black uppercase text-[10px] border-2 border-black px-3 py-1.5 brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
           >
-            VIEW PROOF OF PAYMENT
+            VIEW PROOF
           </a>
         ) : (
-          <div>
+          <div className="shrink-0">
             <input 
               type="file" 
               accept="image/*" 
@@ -513,9 +513,9 @@ export default function ChatPage() {
             />
             <label 
               htmlFor="pop-upload"
-              className="inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-xs border-4 border-black px-4 py-2 cursor-pointer brutal-shadow hover:-translate-y-1 transition-transform whitespace-nowrap"
+              className="inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-[10px] border-2 border-black px-3 py-1.5 cursor-pointer brutal-shadow-sm hover:-translate-y-0.5 transition-transform whitespace-nowrap"
             >
-              UPLOAD PROOF OF PAYMENT
+              UPLOAD PROOF
             </label>
           </div>
         )}
@@ -526,14 +526,15 @@ export default function ChatPage() {
       {job?.status === "completed" && (
         <div className="bg-[var(--color-brutal-green)] border-b-4 border-black p-4 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
           <p className="font-black uppercase text-black mb-2">This job is completed!</p>
-          {!job.reviewed ? (
+          {isCustomerViewing && !job.reviewed && (
             <button 
               onClick={() => setShowReviewModal(true)}
               className="bg-white border-4 border-black px-6 py-2 font-black uppercase text-black brutal-shadow hover:-translate-y-1 transition-transform"
             >
               LEAVE A REVIEW
             </button>
-          ) : (
+          )}
+          {isCustomerViewing && job.reviewed && (
             <span className="bg-black text-white font-black px-4 py-1 uppercase text-sm border-2 border-black inline-block rotate-1 shadow-[2px_2px_0_0_#fff]">
               Review Submitted
             </span>

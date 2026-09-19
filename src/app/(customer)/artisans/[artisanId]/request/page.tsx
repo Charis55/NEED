@@ -107,7 +107,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         return;
       }
 
-      let platformFeeRate = 0.35;
+      let platformFeeRate = 0.20;
       if (artisan?.createdAt) {
         const createdAtMs = typeof artisan.createdAt === "number" 
           ? artisan.createdAt 

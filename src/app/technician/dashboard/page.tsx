@@ -53,7 +53,7 @@ export default function ArtisanDashboard() {
             const data = doc.data();
             if (data.status === "completed") {
               completed++;
-              // Calculate earnings based on promo logic or standard 35% cut
+              // Calculate earnings based on promo logic or standard 20% cut
               const price = data.counterOfferAmount || data.offerAmount || 0;
               const fee = data.platformFee || 0;
               earnings += (price - fee);
