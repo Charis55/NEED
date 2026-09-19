@@ -108,7 +108,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Section */}
       <div className="bg-[var(--color-brutal-green)] border-b-8 border-black px-6 pt-12 pb-10 mb-8">
-        <div className="flex justify-between items-center mb-8 relative">
+        <div className="flex justify-between items-center mb-8 relative z-[60]">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
               <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="w-full h-full text-2xl text-black font-black" />
