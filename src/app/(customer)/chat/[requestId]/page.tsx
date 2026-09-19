@@ -39,6 +39,7 @@ export default function ChatPage() {
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [showPhotoWarning, setShowPhotoWarning] = useState(true);
+  const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   
   const { showAlert } = useAlert();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -450,9 +451,9 @@ export default function ChatPage() {
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName}` : "Unknown Customer"));
 
   return (
-    <div className="fixed inset-0 bottom-[96px] flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-40">
+    <div className="fixed inset-0 bottom-[calc(env(safe-area-inset-bottom,0.5rem)+76px)] flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[60]">
       {/* Header */}
-      <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black pt-20 pb-4 px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
+      <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black pt-6 md:pt-10 pb-4 px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
           onClick={() => {
             if (isCustomerViewing) {
@@ -470,9 +471,9 @@ export default function ChatPage() {
           <UserAvatar name={chatPartnerName} className="w-full h-full text-xl font-black text-black" />
         </div>
         
-        <div className="flex-1 min-w-0">
-          <h2 className="font-black text-black text-xl uppercase truncate">{chatPartnerName}</h2>
-          <p className="text-black font-bold text-xs truncate bg-white border-2 border-black px-1 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000]">
+        <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
+          <h2 className="font-black text-black text-xl uppercase truncate w-full">{chatPartnerName}</h2>
+          <p className="text-black font-bold text-xs bg-white border-2 border-black px-1 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000] whitespace-normal break-words max-w-full leading-tight mt-1">
             {job?.subcategory}
           </p>
         </div>
@@ -592,7 +593,8 @@ export default function ChatPage() {
                     <img 
                       src={msg.imageUrl} 
                       alt="Chat photo" 
-                      className="w-full max-w-[250px] object-cover brutal-border mb-2"
+                      onClick={() => setEnlargedImage(msg.imageUrl!)}
+                      className="w-full max-w-[250px] object-cover brutal-border mb-2 cursor-pointer hover:opacity-90 transition-opacity"
                     />
                   )}
                   {msg.audioUrl && (
@@ -649,8 +651,8 @@ export default function ChatPage() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-            <label className={`cursor-pointer border-4 border-black p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black brutal-shadow hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
+          <form onSubmit={handleSendMessage} className="flex gap-2 items-center min-w-0 w-full">
+            <label className={`cursor-pointer border-4 border-black p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black brutal-shadow shrink-0 hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
               <ImageIcon className="w-6 h-6 stroke-[3]" />
               <input type="file" accept="image/*" onChange={handleChatPhotoSelect} className="hidden" disabled={sending} />
             </label>
@@ -658,7 +660,7 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={startRecording}
-              className={`border-4 border-black p-3 flex items-center justify-center transition-all text-black brutal-shadow bg-[var(--color-brutal-yellow)] hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`border-4 border-black p-3 flex items-center justify-center transition-all text-black brutal-shadow shrink-0 bg-[var(--color-brutal-yellow)] hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Mic className="w-6 h-6 stroke-[3]" />
             </button>
@@ -668,12 +670,12 @@ export default function ChatPage() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 bg-gray-50 border-4 border-black p-3 font-bold text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none"
+              className="flex-1 min-w-0 bg-gray-50 border-4 border-black p-3 font-bold text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none w-full"
             />
             <button 
               type="submit"
               disabled={!newMessage.trim() || sending}
-              className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center hover:-translate-y-1 brutal-shadow disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-[4px_4px_0_0_#000] transition-all"
+              className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center shrink-0 hover:-translate-y-1 brutal-shadow disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-[4px_4px_0_0_#000] transition-all"
             >
               <Send className="w-6 h-6 stroke-[3] text-black" />
             </button>
@@ -798,6 +800,31 @@ export default function ChatPage() {
                 {submittingReview ? "SUBMITTING..." : "SUBMIT REVIEW"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Image Modal */}
+      {enlargedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4 cursor-pointer"
+          onClick={() => setEnlargedImage(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <button 
+              className="absolute -top-4 -right-4 sm:-top-6 sm:-right-6 bg-[var(--color-brutal-red)] border-4 border-black w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-none z-10 brutal-shadow text-black hover:-translate-y-1 transition-transform"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEnlargedImage(null);
+              }}
+            >
+              <X className="w-6 h-6 sm:w-8 sm:h-8 stroke-[4]" />
+            </button>
+            <img 
+              src={enlargedImage} 
+              alt="Enlarged chat photo" 
+              className="max-w-full max-h-[85vh] object-contain brutal-border border-4 border-white"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}
