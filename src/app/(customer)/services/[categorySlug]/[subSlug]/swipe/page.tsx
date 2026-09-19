@@ -6,7 +6,7 @@ import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck, X, Check } fr
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, limit, where } from "firebase/firestore";
+import { collection, getDocs, query, limit, where, doc, getDoc } from "firebase/firestore";
 import { ArtisanProfile } from "@/types";
 import { useRouter } from "next/navigation";
 import { servicesData } from "@/data/services";
@@ -188,29 +188,49 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
                  artisan.subcategory?.toLowerCase() === decodedSub.toLowerCase();
         });
 
+        const populateNames = async (list: any[]) => {
+          for (let i = 0; i < list.length; i++) {
+            if (!list[i].name && !list[i].firstName) {
+              try {
+                const userDoc = await getDoc(doc(db, "users", list[i].artisanId || list[i].userId));
+                if (userDoc.exists()) {
+                  const ud = userDoc.data();
+                  list[i].firstName = ud.firstName;
+                  list[i].lastName = ud.lastName;
+                  list[i].name = ud.firstName ? `${ud.firstName} ${ud.lastName}`.trim() : ud.displayName;
+                }
+              } catch (e) {}
+            }
+          }
+          return list;
+        };
+
         // Geolocation and Sorting
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
               const { latitude, longitude } = position.coords;
               const mapped = data.map(a => ({
                 ...a,
                 distance: getDistance(latitude, longitude, a.lat || 0, a.lng || 0)
               }));
               mapped.sort((a, b) => a.distance - b.distance);
-              setArtisans(mapped.slice(0, 10));
+              const result = await populateNames(mapped.slice(0, 10));
+              setArtisans(result);
               setLoading(false);
             },
-            (error) => {
+            async (error) => {
               console.warn("Location declined or unavailable. Sorting by rating.", error);
               data.sort((a, b) => b.ratingAverage - a.ratingAverage);
-              setArtisans(data.slice(0, 10) as any[]);
+              const result = await populateNames(data.slice(0, 10));
+              setArtisans(result as any[]);
               setLoading(false);
             }
           );
         } else {
           data.sort((a, b) => b.ratingAverage - a.ratingAverage);
-          setArtisans(data.slice(0, 10) as any[]);
+          const result = await populateNames(data.slice(0, 10));
+          setArtisans(result as any[]);
           setLoading(false);
         }
       } catch (err) {

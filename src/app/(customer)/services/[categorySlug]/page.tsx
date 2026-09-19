@@ -147,7 +147,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
         </div>
         
         <div className="flex justify-between items-start gap-4">
-          <h1 className="text-5xl font-black text-black uppercase tracking-tighter break-words min-w-0 flex-1">
+          <h1 className="text-4xl sm:text-5xl font-black text-black uppercase tracking-tighter min-w-0 flex-1 leading-none">
             {title}
           </h1>
           <span className="text-[10px] font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1 shrink-0 mt-2">
