@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
@@ -8,8 +10,8 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import { ChevronLeft, Calendar, DollarSign, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAlert } from "@/components/AlertProvider";
-import dynamic from "next/dynamic";
-const PaymentModal = dynamic(() => import("@/components/PaymentModal"), { ssr: false });
+import dynamicImport from "next/dynamic";
+const PaymentModal = dynamicImport(() => import("@/components/PaymentModal"), { ssr: false });
 
 interface WeeklyEarning {
   weekKey: string;
