@@ -100,7 +100,7 @@ export default function ArtisanDashboard() {
         updatePayload.artisanId = user.uid;
       }
 
-      if (newStatus === "completed") {
+      if (newStatus === "completed" || newStatus === "payment_pending") {
         updatePayload.completedAt = Date.now();
       }
 
@@ -296,7 +296,7 @@ export default function ArtisanDashboard() {
                     {req.status === "accepted" && (
                       <div className="mt-6">
                         <button 
-                          onClick={() => handleUpdateStatus(req.requestId, "completed")}
+                          onClick={() => handleUpdateStatus(req.requestId, "payment_pending")}
                           className="w-full bg-[var(--color-brutal-blue)] py-5 text-xl brutal-btn"
                         >
                           MARK JOB AS COMPLETED

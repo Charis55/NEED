@@ -12,6 +12,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { ChevronLeft, Send, Image as ImageIcon, X, Mic } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
+import PaymentModal from "@/components/PaymentModal";
 
 interface Message {
   id: string;
@@ -45,6 +46,9 @@ export default function ChatPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -369,6 +373,24 @@ export default function ChatPage() {
     }
   };
 
+  const handlePaymentSuccess = async (method: "cash" | "paystack", reference?: string) => {
+    try {
+      const reqRef = doc(db, "jobRequests", requestId);
+      await updateDoc(reqRef, {
+        status: "completed",
+        paymentMethod: method,
+        completedAt: Date.now()
+      });
+      
+      setJob(prev => prev ? { ...prev, status: "completed", paymentMethod: method } : prev);
+      setShowPaymentModal(false);
+      showAlert("Payment confirmed successfully!", "success");
+    } catch (err) {
+      console.error("Payment confirmation failed:", err);
+      showAlert("Failed to confirm payment", "error");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center">
@@ -400,6 +422,19 @@ export default function ChatPage() {
         </div>
       </div>
       
+      {/* Payment Pending Notification */}
+      {job?.status === "payment_pending" && (
+        <div className="bg-[var(--color-brutal-yellow)] border-b-4 border-black p-4 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
+          <p className="font-black uppercase text-black mb-2">Technician marked job as finished!</p>
+          <button 
+            onClick={() => setShowPaymentModal(true)}
+            className="bg-[var(--color-brutal-green)] border-4 border-black px-6 py-2 font-black uppercase text-black brutal-shadow hover:-translate-y-1 transition-transform"
+          >
+            COMPLETE PAYMENT
+          </button>
+        </div>
+      )}
+
       {/* Completed Job Notification & Review Button */}
       {job?.status === "completed" && (
         <div className="bg-[var(--color-brutal-green)] border-b-4 border-black p-4 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
@@ -417,6 +452,16 @@ export default function ChatPage() {
             </span>
           )}
         </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && job && (
+        <PaymentModal 
+          amount={job.offerAmount || 0}
+          email={auth.currentUser?.email || ""}
+          onSuccess={handlePaymentSuccess}
+          onClose={() => setShowPaymentModal(false)}
+        />
       )}
 
       {/* Pinned Photo Retention Message */}
