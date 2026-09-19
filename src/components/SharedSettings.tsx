@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useAlert } from "@/components/AlertProvider";
 import ImageCropper from "@/components/ImageCropper";
 import UserAvatar from "@/components/UserAvatar";
-import { Camera, FileText } from "lucide-react";
+import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink } from "lucide-react";
 import { compressImage } from "@/utils/imageCompression";
 
 interface SharedSettingsProps {
@@ -22,7 +22,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
   const router = useRouter();
   const { showAlert } = useAlert();
   
-  const [activeTab, setActiveTab] = useState<"profile" | "account" | "notifications">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "account" | "notifications" | "about">("profile");
   
   const [authUser, setAuthUser] = useState<User | null>(null);
   
@@ -44,6 +44,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
   const [preferences, setPreferences] = useState({
     pushNotifications: true,
+    inAppNotifications: true,
     messagingNotifications: true,
     locationEnabled: true
   });
@@ -71,7 +72,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             setPhone(data.phone || "");
             
             if (data.preferences) {
-              setPreferences(data.preferences);
+              setPreferences({ inAppNotifications: true, ...data.preferences });
             }
           }
 
@@ -283,11 +284,19 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         </button>
         <button 
           onClick={() => setActiveTab("notifications")}
-          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg transition-colors ${
+          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg border-r-4 border-black transition-colors ${
             activeTab === "notifications" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
           }`}
         >
           Alerts
+        </button>
+        <button 
+          onClick={() => setActiveTab("about")}
+          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg transition-colors ${
+            activeTab === "about" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
+          }`}
+        >
+          About
         </button>
       </div>
 
@@ -445,6 +454,14 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             </label>
             
             <label className="flex items-center justify-between cursor-pointer group bg-white p-4 border-4 border-black hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all">
+              <span className="font-black uppercase text-black">In-App Notifications</span>
+              <div className={`w-14 h-8 border-4 border-black transition-colors relative ${preferences.inAppNotifications ? "bg-[var(--color-brutal-green)]" : "bg-white"}`}>
+                <div className={`absolute top-0.5 w-5 h-5 bg-black transition-transform ${preferences.inAppNotifications ? "translate-x-7" : "translate-x-1"}`}></div>
+              </div>
+              <input type="checkbox" className="sr-only" checked={preferences.inAppNotifications} onChange={() => handlePreferenceChange("inAppNotifications")} />
+            </label>
+            
+            <label className="flex items-center justify-between cursor-pointer group bg-white p-4 border-4 border-black hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all">
               <span className="font-black uppercase text-black">Messaging Alerts</span>
               <div className={`w-14 h-8 border-4 border-black transition-colors relative ${preferences.messagingNotifications ? "bg-[var(--color-brutal-green)]" : "bg-white"}`}>
                 <div className={`absolute top-0.5 w-5 h-5 bg-black transition-transform ${preferences.messagingNotifications ? "translate-x-7" : "translate-x-1"}`}></div>
@@ -459,6 +476,62 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               </div>
               <input type="checkbox" className="sr-only" checked={preferences.locationEnabled} onChange={() => handlePreferenceChange("locationEnabled")} />
             </label>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "about" && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-[var(--color-brutal-blue)] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform">
+            <div className="flex items-center gap-4 mb-4 border-b-4 border-black pb-4">
+              <div className="w-12 h-12 bg-white border-4 border-black flex items-center justify-center shrink-0">
+                <Info className="w-6 h-6 stroke-[3] text-black" />
+              </div>
+              <h2 className="text-2xl font-black uppercase text-black tracking-tighter">The NEED Vision</h2>
+            </div>
+            <p className="text-black font-bold text-lg leading-snug">
+              NEED is a premium service marketplace designed to bridge the gap between skilled technicians and customers. Whether you're booking a quick repair or a major project, NEED makes every interaction seamless.
+            </p>
+          </div>
+
+          <div className="bg-[var(--color-brutal-teal)] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform">
+            <div className="flex items-center gap-4 mb-4 border-b-4 border-black pb-4">
+              <div className="w-12 h-12 bg-white border-4 border-black flex items-center justify-center shrink-0">
+                <Building2 className="w-6 h-6 stroke-[3] text-black" />
+              </div>
+              <h2 className="text-2xl font-black uppercase text-black tracking-tighter">Developed by CharisCorp</h2>
+            </div>
+            <p className="text-black font-bold text-lg leading-snug">
+              CharisCorp is an elite software engineering collective dedicated to building high-fidelity digital products. We specialize in creating fluid, high-performance applications that redefine user experience standards.
+            </p>
+          </div>
+
+          <div className="bg-[var(--color-brutal-pink)] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform">
+            <div className="flex items-center gap-4 mb-4 border-b-4 border-black pb-4">
+              <div className="w-12 h-12 bg-white border-4 border-black flex items-center justify-center shrink-0">
+                <UserIcon className="w-6 h-6 stroke-[3] text-black" />
+              </div>
+              <h2 className="text-2xl font-black uppercase text-black tracking-tighter">The Visionary</h2>
+            </div>
+            <p className="text-black font-bold text-lg leading-snug mb-4">
+              <span className="uppercase text-xl font-black border-b-2 border-black mb-2 inline-block">Graduate Engr. Obunezi Chidugam Charis, B.Sc. (Software Engineering), GMCPN</span><br/>
+              <span className="font-black text-xl">CEO & Lead Architect</span><br/><br/>
+              A forward-thinking engineer with a passion for building software that isn't just functional, but inspiring. Under his leadership, CharisCorp continues to push the boundaries of what's possible in the digital ecosystem.
+            </p>
+            <a 
+              href="https://charis-portfolio-orpin.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-black text-white font-black uppercase py-3 px-6 border-4 border-white hover:bg-white hover:text-black hover:border-black transition-colors shadow-[4px_4px_0_0_#fff] hover:shadow-[4px_4px_0_0_#000]"
+            >
+              <ExternalLink className="w-5 h-5 stroke-[3]" />
+              View Portfolio
+            </a>
+          </div>
+
+          <div className="text-center pt-8 pb-4">
+            <p className="font-black text-black uppercase tracking-widest text-lg mb-1">NEED v1.0</p>
+            <p className="font-bold text-gray-500 uppercase text-xs">© 2026 CharisCorp. All rights reserved.</p>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { JobRequest } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
+import PayCommissionModal from "@/components/PayCommissionModal";
 
 export default function ArtisanDashboard() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
@@ -109,6 +110,11 @@ export default function ArtisanDashboard() {
         const platformFeeRate = isPromoActive ? 0 : 0.35;
         updatePayload.counterOfferAmount = counterAmt;
         updatePayload.platformFee = counterAmt * platformFeeRate;
+        updatePayload.lastCounterBy = "artisan";
+      }
+
+      if (newStatus === "declined") {
+        updatePayload.declinedBy = "artisan";
       }
 
       await updateDoc(reqRef, updatePayload);
@@ -120,7 +126,7 @@ export default function ArtisanDashboard() {
           return { 
             ...req, 
             status: newStatus, 
-            ...(newStatus === "countered" ? { counterOfferAmount: counterAmt, platformFee: counterAmt! * platformFeeRate } : {}) 
+            ...(newStatus === "countered" ? { counterOfferAmount: counterAmt, platformFee: counterAmt! * platformFeeRate, lastCounterBy: "artisan" } : {}) 
           };
         }
         return req;
@@ -138,11 +144,39 @@ export default function ArtisanDashboard() {
     }
   };
 
+  const unpaidJobs = requests.filter(job => job.proofOfPaymentUrl && !job.paidToPlatform);
+  const outstandingBalance = unpaidJobs.reduce((sum, job) => sum + (job.platformFee || 0), 0);
+  const oldestDebtAge = unpaidJobs.reduce((oldest, job) => {
+    const age = job.proofOfPaymentAt ? Date.now() - job.proofOfPaymentAt : 0;
+    return age > oldest ? age : oldest;
+  }, 0);
+  const isRestricted = oldestDebtAge > 7 * 24 * 60 * 60 * 1000;
+  
+  const [showPayModal, setShowPayModal] = useState(false);
+
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Job Requests</h1>
-        <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 mb-10 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming and active jobs.</p>
+        <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 mb-6 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming and active jobs.</p>
+
+        {outstandingBalance > 0 && (
+          <div className={`mb-10 p-6 brutal-border shadow-[4px_4px_0_0_#000] ${isRestricted ? 'bg-[var(--color-brutal-red)]' : 'bg-[var(--color-brutal-pink)]'}`}>
+            <h2 className="text-2xl font-black uppercase text-black mb-2">
+              {isRestricted ? '⚠️ ACCOUNT RESTRICTED' : 'OUTSTANDING BALANCE'}
+            </h2>
+            <p className="text-black font-bold mb-4 text-lg">
+              You owe the platform <span className="font-black text-2xl">₦{outstandingBalance.toLocaleString()}</span> in commission for completed jobs.
+              {isRestricted && " Your account has been restricted because your oldest unpaid commission is over 7 days late. Please pay to unlock new jobs."}
+            </p>
+            <button
+              onClick={() => setShowPayModal(true)}
+              className="bg-black text-white font-black uppercase py-3 px-6 brutal-btn border-4 border-white hover:bg-white hover:text-black transition-colors"
+            >
+              PAY COMMISSION NOW
+            </button>
+          </div>
+        )}
 
 
         <h2 className="text-3xl font-black text-black mb-6 uppercase tracking-tighter border-b-4 border-black pb-2 inline-block">Recent Job Requests</h2>
@@ -189,7 +223,7 @@ export default function ArtisanDashboard() {
                           ${req.status === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
                           ${req.status === 'declined' ? 'bg-[var(--color-brutal-red)] text-black' : ''}
                         `}>
-                          {req.status === 'countered' ? 'Awaiting Customer' : req.status}
+                          {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'ACTION REQUIRED' : 'AWAITING CUSTOMER') : req.status === 'declined' ? (req.declinedBy === 'artisan' ? 'TECHNICIAN DECLINED' : 'CUSTOMER DECLINED') : req.status}
                         </span>
                         <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
                           {req.isBroadcast && req.status === "pending" ? "Broadcast Request" : "Job Details"}
@@ -227,19 +261,21 @@ export default function ArtisanDashboard() {
                     </div>
 
                     {/* Pending Status Actions */}
-                    {req.status === "pending" && (
+                    {(req.status === "pending" || (req.status === "countered" && req.lastCounterBy === "customer")) && (
                       <div className="space-y-4">
                         {showCounterFor !== req.requestId ? (
                           <div className="flex flex-col sm:flex-row gap-4">
                             <button 
+                              disabled={isRestricted}
                               onClick={() => handleUpdateStatus(req.requestId, "accepted")}
-                              className="flex-1 bg-[var(--color-brutal-teal)] py-4 text-lg brutal-btn"
+                              className={`flex-1 py-4 text-lg brutal-btn ${isRestricted ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-[var(--color-brutal-teal)]'}`}
                             >
                               ACCEPT JOB
                             </button>
                             <button 
+                              disabled={isRestricted}
                               onClick={() => setShowCounterFor(req.requestId)}
-                              className="flex-1 bg-[var(--color-brutal-yellow)] py-4 text-lg brutal-btn"
+                              className={`flex-1 py-4 text-lg brutal-btn ${isRestricted ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-[var(--color-brutal-yellow)]'}`}
                             >
                               COUNTER OFFER
                             </button>
@@ -364,6 +400,21 @@ export default function ArtisanDashboard() {
           </div>
         </div>
       )}
+      
+      <PayCommissionModal
+        isOpen={showPayModal}
+        onClose={() => setShowPayModal(false)}
+        unpaidJobs={unpaidJobs}
+        totalOwed={outstandingBalance}
+        onSuccess={() => {
+          // Update local state immediately
+          setRequests(prev => prev.map(req => 
+            unpaidJobs.find(u => u.requestId === req.requestId) 
+              ? { ...req, paidToPlatform: true } 
+              : req
+          ));
+        }}
+      />
     </div>
   );
 }

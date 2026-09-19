@@ -9,6 +9,7 @@ export interface UserAccount {
   createdAt: number;
   preferences?: {
     pushNotifications: boolean;
+    inAppNotifications?: boolean;
     messagingNotifications: boolean;
     locationEnabled: boolean;
   };
@@ -66,10 +67,15 @@ export interface JobRequest {
   preferredTime: string;
   offerAmount: number;
   counterOfferAmount: number | null;
+  lastCounterBy?: "customer" | "artisan";
+  declinedBy?: "customer" | "artisan";
+  lastMessageText?: string;
   platformFee: number | null;
   status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered" | "payment_pending";
   paymentMethod?: "cash" | "transfer";
   proofOfPaymentUrl?: string;
+  proofOfPaymentAt?: number;
+  paidToPlatform?: boolean;
   createdAt: number;
   completedAt: number | null;
   reviewed?: boolean;

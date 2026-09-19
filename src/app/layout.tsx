@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   description: "Find trusted local professionals.",
 };
 
+import GlobalNotificationListener from "@/components/GlobalNotificationListener";
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -31,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <AlertProvider>
           <FCMProvider>{children}</FCMProvider>
+          <GlobalNotificationListener />
         </AlertProvider>
         <Analytics />
         <SpeedInsights />

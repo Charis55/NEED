@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Play, Square } from "lucide-react";
+import { Play, Pause } from "lucide-react";
 
 export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl: string; waveform?: number[] }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -23,7 +23,15 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      if (audio.duration === Infinity) {
+        audio.currentTime = 1e101;
+        setTimeout(() => {
+          audio.currentTime = 0;
+          setDuration(audio.duration);
+        }, 100);
+      } else {
+        setDuration(audio.duration);
+      }
     };
 
     const handleEnded = () => {
@@ -63,7 +71,7 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
   };
 
   const formatTime = (time: number) => {
-    if (!time || isNaN(time)) return "0:00";
+    if (!time || isNaN(time) || time === Infinity) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -78,7 +86,7 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
         className="w-10 h-10 bg-[var(--color-brutal-pink)] border-2 border-black flex items-center justify-center shrink-0 hover:scale-105 transition-transform"
       >
         {isPlaying ? (
-          <Square className="w-4 h-4 fill-black text-black" />
+          <Pause className="w-5 h-5 fill-black text-black" />
         ) : (
           <Play className="w-5 h-5 fill-black text-black ml-1" />
         )}

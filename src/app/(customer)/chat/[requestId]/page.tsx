@@ -30,10 +30,14 @@ export default function ChatPage() {
   
   const [job, setJob] = useState<JobRequest | null>(null);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
+  const [customer, setCustomer] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [showPhotoWarning, setShowPhotoWarning] = useState(true);
   
   const { showAlert } = useAlert();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -51,11 +55,13 @@ export default function ChatPage() {
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const waveformRef = useRef<number[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const maxDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const secondsIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const startRecording = async () => {
     try {
@@ -91,7 +97,12 @@ export default function ChatPage() {
       
       mediaRecorder.start(200);
       setIsRecording(true);
+      setRecordingSeconds(0);
       drawWaveform();
+      
+      secondsIntervalRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
       
       // Auto-stop after 1 minute (60,000ms)
       maxDurationTimerRef.current = setTimeout(() => {
@@ -104,19 +115,34 @@ export default function ChatPage() {
     }
   };
 
-  const stopRecording = () => {
-    if (maxDurationTimerRef.current) {
-      clearTimeout(maxDurationTimerRef.current);
-      maxDurationTimerRef.current = null;
+  const cancelRecording = () => {
+    if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+    if (secondsIntervalRef.current) clearInterval(secondsIntervalRef.current);
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.onstop = async () => {
+        setIsRecording(false);
+        setRecordingSeconds(0);
+        mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+        if (audioContextRef.current) await audioContextRef.current.close();
+      };
+      mediaRecorderRef.current.stop();
     }
+  };
+
+  const stopRecording = () => {
+    if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+    if (secondsIntervalRef.current) clearInterval(secondsIntervalRef.current);
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.onstop = async () => {
         setIsRecording(false);
+        setRecordingSeconds(0);
         mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
         if (audioContextRef.current) await audioContextRef.current.close();
         
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         if (audioBlob.size > 0 && waveformRef.current.length > 0) {
           sendVoiceNote(audioBlob, [...waveformRef.current]);
         }
@@ -149,6 +175,12 @@ export default function ChatPage() {
         senderId: user.uid,
         createdAt: Date.now()
       });
+
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        lastMessageText: "Voice note",
+        lastMessageSenderId: user.uid,
+        lastMessageAt: Date.now()
+      });
     } catch (err) {
       console.error(err);
       showAlert("Failed to send voice note", "error");
@@ -169,6 +201,13 @@ export default function ChatPage() {
             const artDoc = await getDoc(doc(db, "artisans", jobData.artisanId));
             if (artDoc.exists()) {
               setArtisan(artDoc.data() as ArtisanProfile);
+            }
+          }
+          
+          if (jobData.customerId) {
+            const custDoc = await getDoc(doc(db, "users", jobData.customerId));
+            if (custDoc.exists()) {
+              setCustomer(custDoc.data());
             }
           }
         }
@@ -219,6 +258,11 @@ export default function ChatPage() {
         senderId: user.uid,
         createdAt: Date.now()
       });
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        lastMessageText: newMessage,
+        lastMessageSenderId: user.uid,
+        lastMessageAt: Date.now()
+      });
       setNewMessage("");
     } catch (err) {
       console.error(err);
@@ -262,27 +306,42 @@ export default function ChatPage() {
   const handleChatPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingImage(file);
+    setPendingImagePreview(URL.createObjectURL(file));
+    e.target.value = '';
+  };
+
+  const handleSendPendingImage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!pendingImage) return;
 
     const user = auth.currentUser;
     if (!user) return;
 
     setSending(true);
     try {
-      const compressed = await compressImage(file, 4);
-      const url = await uploadFileToR2(compressed, file.name);
+      const compressed = await compressImage(pendingImage, 4);
+      const url = await uploadFileToR2(compressed, pendingImage.name);
 
       await addDoc(collection(db, "jobRequests", requestId, "messages"), {
-        text: "",
+        text: newMessage,
         imageUrl: url,
         senderId: user.uid,
         createdAt: Date.now()
       });
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        lastMessageText: newMessage || "Image attached",
+        lastMessageSenderId: user.uid,
+        lastMessageAt: Date.now()
+      });
+      setNewMessage("");
+      setPendingImage(null);
+      setPendingImagePreview(null);
     } catch (err) {
       console.error(err);
       showAlert("Failed to send photo", "error");
     } finally {
       setSending(false);
-      e.target.value = '';
     }
   };
 
@@ -380,23 +439,34 @@ export default function ChatPage() {
     );
   }
 
+  const isCustomerViewing = auth.currentUser?.uid === job?.customerId;
+  const chatPartnerName = isCustomerViewing 
+    ? (artisan?.name || "Unknown Technician") 
+    : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName}` : "Unknown Customer"));
+
   return (
-    <div className="flex flex-col h-screen bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="flex flex-col h-[calc(100dvh-96px)] -mb-8 bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Header */}
-      <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black p-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
+      <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black pt-20 pb-4 px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
-          onClick={() => router.push('/explore')}
+          onClick={() => {
+            if (isCustomerViewing) {
+              router.push("/inbox");
+            } else {
+              router.push("/technician/inbox");
+            }
+          }}
           className="w-10 h-10 bg-white border-4 border-black flex justify-center items-center mr-4 brutal-shadow hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-transform"
         >
           <ChevronLeft className="w-6 h-6 stroke-[3]" />
         </button>
         
         <div className="w-12 h-12 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-4">
-          <UserAvatar name={artisan?.name || "Artisan"} className="w-full h-full text-xl font-black text-black" />
+          <UserAvatar name={chatPartnerName} className="w-full h-full text-xl font-black text-black" />
         </div>
         
         <div className="flex-1 min-w-0">
-          <h2 className="font-black text-black text-xl uppercase truncate">{artisan?.name || "Unknown Technician"}</h2>
+          <h2 className="font-black text-black text-xl uppercase truncate">{chatPartnerName}</h2>
           <p className="text-black font-bold text-xs truncate bg-white border-2 border-black px-1 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000]">
             {job?.subcategory}
           </p>
@@ -404,10 +474,11 @@ export default function ChatPage() {
       </div>
       
       {/* Liability Disclaimer */}
-      <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-3 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
-        <p className="font-black text-black text-xs uppercase leading-tight mb-2">
-          Disclaimer: You must upload a Proof of Payment (receipt/screenshot) after paying the technician. If there is a dispute and no proof is provided, you may be held liable.
-        </p>
+      {job?.status === "completed" && (
+        <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-4 text-center shrink-0 z-0 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_4px_0_0_#000]">
+          <p className="font-black text-black text-xs md:text-sm uppercase leading-tight text-left flex-1 whitespace-nowrap overflow-x-auto no-scrollbar">
+            ⚠️ Upload Proof of Payment (receipt/screenshot) after paying to avoid liability.
+          </p>
         
         {job?.proofOfPaymentUrl ? (
           <a 
@@ -438,10 +509,11 @@ export default function ChatPage() {
                   const url = await getDownloadURL(popRef);
                   
                   await updateDoc(doc(db, "jobRequests", requestId), {
-                    proofOfPaymentUrl: url
+                    proofOfPaymentUrl: url,
+                    proofOfPaymentAt: Date.now()
                   });
                   
-                  setJob(prev => prev ? { ...prev, proofOfPaymentUrl: url } : prev);
+                  setJob(prev => prev ? { ...prev, proofOfPaymentUrl: url, proofOfPaymentAt: Date.now() } : prev);
                   showAlert("Proof of Payment uploaded successfully!", "success");
                 } catch (err) {
                   console.error(err);
@@ -451,13 +523,14 @@ export default function ChatPage() {
             />
             <label 
               htmlFor="pop-upload"
-              className="inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-xs border-2 border-black px-4 py-2 cursor-pointer brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
+              className="inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-xs border-4 border-black px-4 py-2 cursor-pointer brutal-shadow hover:-translate-y-1 transition-transform whitespace-nowrap"
             >
               UPLOAD PROOF OF PAYMENT
             </label>
           </div>
         )}
       </div>
+      )}
 
       {/* Completed Job Notification & Review Button */}
       {job?.status === "completed" && (
@@ -479,10 +552,13 @@ export default function ChatPage() {
       )}
 
       {/* Pinned Photo Retention Message */}
-      {messages.some(m => !!m.imageUrl) && (
-        <div className="bg-[var(--color-brutal-yellow)] border-b-4 border-black p-3 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0 flex items-center justify-center gap-2">
+      {showPhotoWarning && messages.some(m => !!m.imageUrl) && (
+        <div className="bg-[var(--color-brutal-yellow)] border-b-4 border-black p-3 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0 flex items-center justify-center gap-2 relative">
           <ImageIcon className="w-5 h-5 text-black stroke-[3]" />
           <p className="font-black uppercase text-black text-sm">Photos clear after 1 week</p>
+          <button onClick={() => setShowPhotoWarning(false)} className="absolute right-4 hover:scale-110 transition-transform">
+            <X className="w-5 h-5 stroke-[3] text-black" />
+          </button>
         </div>
       )}
 
@@ -541,38 +617,101 @@ export default function ChatPage() {
 
       {/* Input Area */}
       <div className="bg-white border-t-8 border-black p-4 shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
-        <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-          <label className={`cursor-pointer border-4 border-black p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black brutal-shadow hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
-            <ImageIcon className="w-6 h-6 stroke-[3]" />
-            <input type="file" accept="image/*" onChange={handleChatPhotoSelect} className="hidden" disabled={sending} />
-          </label>
-          
-          <button
-            type="button"
-            onPointerDown={startRecording}
-            onPointerUp={stopRecording}
-            onPointerLeave={stopRecording}
-            className={`border-4 border-black p-3 flex items-center justify-center transition-all text-black brutal-shadow ${isRecording ? 'bg-[var(--color-brutal-red)] animate-pulse' : 'bg-[var(--color-brutal-yellow)] hover:-translate-y-1'} ${sending ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Mic className="w-6 h-6 stroke-[3]" />
-          </button>
-          
-          <input 
-            type="text" 
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 bg-gray-50 border-4 border-black p-3 font-bold text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none"
-          />
-          <button 
-            type="submit"
-            disabled={!newMessage.trim() || sending}
-            className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center hover:-translate-y-1 brutal-shadow disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-[4px_4px_0_0_#000] transition-all"
-          >
-            <Send className="w-6 h-6 stroke-[3] text-black" />
-          </button>
-        </form>
+        {isRecording ? (
+          <div className="flex gap-2 items-center">
+            <button
+              type="button"
+              onClick={cancelRecording}
+              className="border-4 border-black p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-red)] text-white brutal-shadow hover:-translate-y-1"
+            >
+              <X className="w-6 h-6 stroke-[3]" />
+            </button>
+            
+            <div className="flex-1 bg-[var(--color-brutal-yellow)] border-4 border-black p-3 flex items-center justify-center gap-4 animate-pulse brutal-shadow">
+              <Mic className="w-6 h-6 stroke-[3] text-black" />
+              <span className="font-black text-black">
+                {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+            
+            <button
+              type="button"
+              onClick={stopRecording}
+              disabled={sending}
+              className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center hover:-translate-y-1 brutal-shadow disabled:opacity-50 transition-all"
+            >
+              <Send className="w-6 h-6 stroke-[3] text-black" />
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+            <label className={`cursor-pointer border-4 border-black p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black brutal-shadow hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
+              <ImageIcon className="w-6 h-6 stroke-[3]" />
+              <input type="file" accept="image/*" onChange={handleChatPhotoSelect} className="hidden" disabled={sending} />
+            </label>
+            
+            <button
+              type="button"
+              onClick={startRecording}
+              className={`border-4 border-black p-3 flex items-center justify-center transition-all text-black brutal-shadow bg-[var(--color-brutal-yellow)] hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <Mic className="w-6 h-6 stroke-[3]" />
+            </button>
+            
+            <input 
+              type="text" 
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 bg-gray-50 border-4 border-black p-3 font-bold text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none"
+            />
+            <button 
+              type="submit"
+              disabled={!newMessage.trim() || sending}
+              className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center hover:-translate-y-1 brutal-shadow disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-[4px_4px_0_0_#000] transition-all"
+            >
+              <Send className="w-6 h-6 stroke-[3] text-black" />
+            </button>
+          </form>
+        )}
       </div>
+
+      {/* Pending Image Preview Modal */}
+      {pendingImagePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <div className="bg-white border-8 border-black max-w-lg w-full brutal-shadow flex flex-col relative overflow-hidden">
+            <button 
+              onClick={() => {
+                setPendingImage(null);
+                setPendingImagePreview(null);
+                setNewMessage("");
+              }}
+              className="absolute top-4 right-4 z-10 w-10 h-10 bg-[var(--color-brutal-red)] border-4 border-black flex justify-center items-center text-black brutal-shadow hover:-translate-y-1 transition-transform"
+            >
+              <X className="w-6 h-6 stroke-[3]" />
+            </button>
+            <div className="flex-1 bg-gray-100 flex items-center justify-center p-4 min-h-[40vh] max-h-[60vh]">
+              <img src={pendingImagePreview} alt="Preview" className="max-w-full max-h-full object-contain brutal-border shadow-[4px_4px_0_0_#000]" />
+            </div>
+            <form onSubmit={handleSendPendingImage} className="bg-white border-t-8 border-black p-4 flex gap-2 items-center">
+              <input 
+                type="text" 
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Add a caption..."
+                className="flex-1 bg-gray-50 border-4 border-black p-3 font-bold text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none"
+              />
+              <button 
+                type="submit"
+                disabled={sending}
+                className="bg-[var(--color-brutal-teal)] border-4 border-black p-3 flex items-center justify-center hover:-translate-y-1 brutal-shadow disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-[4px_4px_0_0_#000] transition-all"
+              >
+                {sending ? <GlobalSpinner text="" /> : <Send className="w-6 h-6 stroke-[3] text-black" />}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Review Modal */}
       {showReviewModal && (

@@ -12,6 +12,7 @@ import { reverseGeocode } from "@/utils/location";
 export default function BroadcastJobPage({ params }: { params: Promise<{ categorySlug: string, subSlug: string }> }) {
   const unwrappedParams = use(params);
   const [description, setDescription] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
   const [offerAmount, setOfferAmount] = useState("");
   
@@ -94,7 +95,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
         subcategory: subcategory,
         description,
         neighborhood: locationData.name,
-        preferredTime,
+        preferredTime: `${preferredDate} at ${preferredTime}`,
         offerAmount: parsedAmount,
         counterOfferAmount: null,
         platformFee: parsedAmount * platformFeeRate,
@@ -166,19 +167,31 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
             {locationError && <p className="text-[var(--color-brutal-red)] text-xs font-bold mt-2">{locationError}</p>}
           </div>
 
-          <div className="bg-white brutal-card p-6">
-            <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-1">
-              <Clock className="w-5 h-5 stroke-[3]" /> Preferred Time *
-            </label>
-            <p className="text-xs font-bold text-gray-500 mb-3">When do you need this done?</p>
-            <input
-              type="text"
-              required
-              value={preferredTime}
-              onChange={(e) => setPreferredTime(e.target.value)}
-              placeholder="e.g. Today at 2 PM, Tomorrow morning"
-              className="w-full p-4 brutal-input text-lg font-bold border-4 border-black"
-            />
+          <div className="bg-white brutal-card p-6 flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-1">
+                <Clock className="w-5 h-5 stroke-[3]" /> Date *
+              </label>
+              <input
+                type="date"
+                required
+                value={preferredDate}
+                onChange={(e) => setPreferredDate(e.target.value)}
+                className="w-full p-4 brutal-input text-lg font-bold border-4 border-black"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-1">
+                <Clock className="w-5 h-5 stroke-[3]" /> Time *
+              </label>
+              <input
+                type="time"
+                required
+                value={preferredTime}
+                onChange={(e) => setPreferredTime(e.target.value)}
+                className="w-full p-4 brutal-input text-lg font-bold border-4 border-black"
+              />
+            </div>
           </div>
 
           <div className="bg-white brutal-card p-6">

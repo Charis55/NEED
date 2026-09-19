@@ -10,10 +10,12 @@ interface AlertMessage {
   id: string;
   type: AlertType;
   message: string;
+  action?: { label?: string; onClick: () => void };
+  avatarUrl?: string;
 }
 
 interface AlertContextType {
-  showAlert: (message: string, type: AlertType) => void;
+  showAlert: (message: string, type: AlertType, action?: { label?: string; onClick: () => void }, avatarUrl?: string) => void;
 }
 
 const AlertContext = createContext<AlertContextType | undefined>(undefined);
@@ -29,9 +31,9 @@ export function useAlert() {
 export function AlertProvider({ children }: { children: ReactNode }) {
   const [alerts, setAlerts] = useState<AlertMessage[]>([]);
 
-  const showAlert = (message: string, type: AlertType) => {
+  const showAlert = (message: string, type: AlertType, action?: { label?: string; onClick: () => void }, avatarUrl?: string) => {
     const id = Math.random().toString(36).substr(2, 9);
-    setAlerts((prev) => [...prev, { id, type, message }]);
+    setAlerts((prev) => [...prev, { id, type, message, action, avatarUrl }]);
 
     // Auto-remove after 4 seconds
     setTimeout(() => {
@@ -69,14 +71,19 @@ export function AlertProvider({ children }: { children: ReactNode }) {
                 initial={{ opacity: 0, x: 50, scale: 0.9 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 100, scale: 0.9 }}
-                className={`${bg} border-4 border-black p-4 brutal-shadow flex items-start justify-between pointer-events-auto`}
+                className={`${bg} border-4 border-black p-4 brutal-shadow flex items-start justify-between pointer-events-auto ${alert.action ? "cursor-pointer hover:scale-[1.02] transition-transform" : ""}`}
+                onClick={alert.action ? () => { alert.action?.onClick(); removeAlert(alert.id); } : undefined}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className="w-6 h-6 stroke-[3] text-black shrink-0" />
-                  <p className="font-black uppercase text-black text-sm">{alert.message}</p>
+                  {alert.avatarUrl ? (
+                    <img src={alert.avatarUrl} alt="Avatar" className="w-10 h-10 border-2 border-black object-cover bg-white shrink-0" />
+                  ) : (
+                    <Icon className="w-6 h-6 stroke-[3] text-black shrink-0" />
+                  )}
+                  <p className="font-black uppercase text-black text-sm leading-tight">{alert.message}</p>
                 </div>
                 <button
-                  onClick={() => removeAlert(alert.id)}
+                  onClick={(e) => { e.stopPropagation(); removeAlert(alert.id); }}
                   className="w-6 h-6 bg-white border-2 border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors shrink-0 ml-4"
                 >
                   <X className="w-4 h-4 stroke-[3]" />

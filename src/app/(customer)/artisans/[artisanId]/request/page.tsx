@@ -14,6 +14,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
   const [description, setDescription] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("");
   const [offerAmount, setOfferAmount] = useState("");
   
@@ -126,7 +127,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         subcategory: artisan.services?.[selectedServiceIndex]?.subcategory || artisan.subcategory || "Unknown",
         description,
         neighborhood: locationData.name,
-        preferredTime,
+        preferredTime: `${preferredDate} at ${preferredTime}`,
         offerAmount: parsedAmount,
         counterOfferAmount: null,
         platformFee: parsedAmount * platformFeeRate,
@@ -253,18 +254,31 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
             )}
           </div>
 
-          <div className="bg-[var(--color-brutal-teal)] brutal-card p-6">
-            <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
-              <Clock className="w-5 h-5 stroke-[3]" /> Timing
-            </label>
-            <input
-              type="text"
-              value={preferredTime}
-              onChange={(e) => setPreferredTime(e.target.value)}
-              required
-              placeholder="E.g., Today at 2 PM, ASAP"
-              className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-medium bg-white placeholder:text-gray-400"
-            />
+          <div className="bg-[var(--color-brutal-teal)] brutal-card p-6 flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
+                <Clock className="w-5 h-5 stroke-[3]" /> Date
+              </label>
+              <input
+                type="date"
+                value={preferredDate}
+                onChange={(e) => setPreferredDate(e.target.value)}
+                required
+                className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
+                <Clock className="w-5 h-5 stroke-[3]" /> Time
+              </label>
+              <input
+                type="time"
+                value={preferredTime}
+                onChange={(e) => setPreferredTime(e.target.value)}
+                required
+                className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white"
+              />
+            </div>
           </div>
 
           <div className="bg-[var(--color-brutal-pink)] brutal-card p-6">

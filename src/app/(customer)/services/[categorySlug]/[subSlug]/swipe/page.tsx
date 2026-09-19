@@ -267,8 +267,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
   };
 
   const handleAccept = (artisanId: string) => {
-    // Navigating automatically is disabled
-    // router.push(`/artisans/${artisanId}/request`);
+    router.push(`/artisan/${artisanId}`);
   };
 
   const category = servicesData[unwrappedParams.categorySlug];
