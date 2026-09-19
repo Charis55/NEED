@@ -30,6 +30,7 @@ export default function ChatPage() {
   
   const [job, setJob] = useState<JobRequest | null>(null);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
+  const [artisanUser, setArtisanUser] = useState<any>(null);
   const [customer, setCustomer] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -201,6 +202,10 @@ export default function ChatPage() {
             const artDoc = await getDoc(doc(db, "artisans", jobData.artisanId));
             if (artDoc.exists()) {
               setArtisan(artDoc.data() as ArtisanProfile);
+            }
+            const artUserDoc = await getDoc(doc(db, "users", jobData.artisanId));
+            if (artUserDoc.exists()) {
+              setArtisanUser(artUserDoc.data());
             }
           }
           
@@ -441,11 +446,11 @@ export default function ChatPage() {
 
   const isCustomerViewing = auth.currentUser?.uid === job?.customerId;
   const chatPartnerName = isCustomerViewing 
-    ? (artisan?.name || "Unknown Technician") 
+    ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName}` : "Unknown Technician")) 
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName}` : "Unknown Customer"));
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-96px)] -mb-8 bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="fixed inset-0 bottom-[96px] flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-40">
       {/* Header */}
       <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black pt-20 pb-4 px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 

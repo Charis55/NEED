@@ -13,6 +13,7 @@ import { MessageCircle } from "lucide-react";
 interface ChatListItem {
   job: JobRequest;
   artisan: ArtisanProfile | null;
+  artisanUser: any | null;
   unreadCount: number;
 }
 
@@ -46,16 +47,23 @@ export default function InboxPage() {
         
         for (const job of activeJobs) {
           let artisan: ArtisanProfile | null = null;
+          let artisanUser: any = null;
+          
           if (job.artisanId) {
             const artDoc = await getDoc(doc(db, "artisans", job.artisanId));
             if (artDoc.exists()) {
               artisan = artDoc.data() as ArtisanProfile;
+            }
+            const userDoc = await getDoc(doc(db, "users", job.artisanId));
+            if (userDoc.exists()) {
+              artisanUser = userDoc.data();
             }
           }
           
           listItems.push({
             job,
             artisan,
+            artisanUser,
             unreadCount: 0 // We will implement real unread counts later in the chat logic
           });
         }
@@ -96,8 +104,9 @@ export default function InboxPage() {
                 {/* Artisan Avatar */}
                 <div className="relative mr-4 shrink-0">
                   <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
-                    {/* We don't have photoURL in ArtisanProfile type currently, so we use a fallback */}
-                    <UserAvatar name={item.artisan?.name || "Artisan"} className="w-full h-full text-2xl text-black font-black" />
+                    <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 flex items-center justify-center">
+                      <UserAvatar name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName}` : "Artisan")} className="w-full h-full text-2xl text-black font-black" />
+                    </div>
                   </div>
                   {/* Unread Badge */}
                   {item.unreadCount > 0 && (
@@ -111,7 +120,7 @@ export default function InboxPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-black text-black text-lg truncate uppercase">
-                      {item.artisan?.name || "Unknown Artisan"}
+                      {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName}` : "Unknown Technician")}
                     </h3>
                     <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
                       {new Date(item.job.createdAt).toLocaleDateString()}
