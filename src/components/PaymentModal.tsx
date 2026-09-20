@@ -21,7 +21,7 @@ export default function PaymentModal({ amount, email, onSuccess, onClose }: Paym
     reference: (new Date()).getTime().toString(),
     email: email || "customer@example.com",
     amount: Math.round(amount * 100), // Paystack expects kobo/cents, must be integer
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "",
+    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_63d8908bfde0aa6dd46ce82d69a1ac301c7ee5a3",
   };
 
   const initializePayment = usePaystackPayment(config);

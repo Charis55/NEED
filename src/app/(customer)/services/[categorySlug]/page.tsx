@@ -207,6 +207,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
                         <Link 
                           href={`/services/${unwrappedParams.categorySlug}/${service.id}/swipe`}
                           className="flex items-center gap-3 bg-[var(--color-brutal-yellow)] px-4 py-3 brutal-btn w-full justify-center"
+                          prefetch={false}
                         >
                           <span className="text-sm font-black text-black">FIND A TECHNICIAN</span>
                           <ArrowRight className="w-5 h-5 stroke-[3] text-black" />

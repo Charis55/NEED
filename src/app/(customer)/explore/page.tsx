@@ -166,7 +166,7 @@ export default function Dashboard() {
             const hasImage = GENERATED_IMAGE_IDS.includes(category.id);
             
             return (
-              <Link key={category.id} href={`/services/${category.id}`} className="block">
+              <Link key={category.id} href={`/services/${category.id}`} className="block" prefetch={false}>
                 <div 
                   className={`${hasImage ? 'text-white' : style.bg + ' ' + style.text} relative p-3 md:p-4 border-4 ${hasImage ? 'border-black' : style.border} shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] min-h-[140px] md:h-40 flex flex-col justify-end hover:-translate-y-1 transition-transform overflow-hidden`}
                   style={hasImage ? { backgroundImage: `url(/categories/${category.id}.jpg)`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
