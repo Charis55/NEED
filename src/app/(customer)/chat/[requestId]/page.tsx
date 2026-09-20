@@ -12,6 +12,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { ChevronLeft, Send, Image as ImageIcon, X, Mic } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
+import AdUnit from "@/components/AdUnit";
 
 interface Message {
   id: string;
@@ -437,7 +438,7 @@ export default function ChatPage() {
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName}` : "Unknown Customer"));
 
   return (
-    <div className="fixed inset-0 bottom-[calc(env(safe-area-inset-bottom,0.5rem)+76px)] flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[60]">
+    <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">
       {/* Header */}
       <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black pt-6 md:pt-10 pb-4 px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
@@ -448,21 +449,35 @@ export default function ChatPage() {
               router.push("/technician/inbox");
             }
           }}
-          className="w-10 h-10 bg-white border-4 border-black flex justify-center items-center mr-4 brutal-shadow hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-transform"
+          className="w-12 h-12 bg-white border-4 border-black flex justify-center items-center mr-4 brutal-shadow hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-transform shrink-0"
         >
           <ChevronLeft className="w-6 h-6 stroke-[3]" />
         </button>
         
-        <div className="w-12 h-12 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-4">
-          <UserAvatar photoURL={isCustomerViewing ? (artisanUser?.photoURL || artisan?.portfolioPhotoUrls?.[0]) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-xl font-black text-black" />
+        <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-4">
+          <UserAvatar photoURL={isCustomerViewing ? (artisanUser?.photoURL || artisan?.portfolioPhotoUrls?.[0]) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-2xl font-black text-black" />
         </div>
         
         <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
-          <h2 className="font-black text-black text-xl uppercase truncate w-full">{chatPartnerName}</h2>
-          <p className="text-black font-bold text-xs bg-white border-2 border-black px-1 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000] whitespace-normal break-words max-w-full leading-tight mt-1">
+          <div className="flex items-center gap-2 w-full">
+            <h2 className="font-black text-black text-xl md:text-2xl uppercase truncate">{chatPartnerName}</h2>
+            {job?.status === "completed" && (
+              <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-xs px-3 py-1 uppercase font-black rotate-2 shrink-0 shadow-[2px_2px_0_0_#000]">Completed</span>
+            )}
+          </div>
+          <p className="text-black font-bold text-xs md:text-sm bg-white border-2 border-black px-1.5 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000] whitespace-normal break-words max-w-full leading-tight mt-1">
             {job?.subcategory}
           </p>
         </div>
+
+        {job?.status === "completed" && isCustomerViewing && !job.reviewed && (
+          <button 
+            onClick={() => setShowReviewModal(true)}
+            className="ml-2 bg-[var(--color-brutal-yellow)] border-2 border-black px-3 py-1.5 font-black uppercase text-black text-xs md:text-sm brutal-shadow hover:-translate-y-0.5 transition-transform shrink-0"
+          >
+            REVIEW
+          </button>
+        )}
       </div>
       
       {/* Liability Disclaimer */}
@@ -477,9 +492,10 @@ export default function ChatPage() {
             href={job.proofOfPaymentUrl} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="shrink-0 inline-block bg-white text-black font-black uppercase text-[10px] border-2 border-black px-3 py-1.5 brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
+            download={`Receipt_${job.requestId}.jpg`}
+            className="shrink-0 inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-[10px] border-2 border-black px-3 py-1.5 brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
           >
-            VIEW PROOF
+            DOWNLOAD PROOF
           </a>
         ) : (
           <div className="shrink-0">
@@ -522,27 +538,7 @@ export default function ChatPage() {
       </div>
       )}
 
-      {/* Completed Job Notification & Review Button */}
-      {job?.status === "completed" && (
-        <div className="bg-[var(--color-brutal-green)] border-b-4 border-black p-4 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0">
-          <p className="font-black uppercase text-black mb-2">This job is completed!</p>
-          {isCustomerViewing && !job.reviewed && (
-            <button 
-              onClick={() => setShowReviewModal(true)}
-              className="bg-white border-4 border-black px-6 py-2 font-black uppercase text-black brutal-shadow hover:-translate-y-1 transition-transform"
-            >
-              LEAVE A REVIEW
-            </button>
-          )}
-          {isCustomerViewing && job.reviewed && (
-            <span className="bg-black text-white font-black px-4 py-1 uppercase text-sm border-2 border-black inline-block rotate-1 shadow-[2px_2px_0_0_#fff]">
-              Review Submitted
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Pinned Photo Retention Message */}
+      {/* Liability Disclaimer */}
       {showPhotoWarning && messages.some(m => !!m.imageUrl) && (
         <div className="bg-[var(--color-brutal-yellow)] border-b-4 border-black p-3 text-center shrink-0 shadow-[0_4px_0_0_#000] z-0 flex items-center justify-center gap-2 relative">
           <ImageIcon className="w-5 h-5 text-black stroke-[3]" />
@@ -608,7 +604,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t-8 border-black p-4 shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
+      <div className="bg-white border-t-8 border-black p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
         {isRecording ? (
           <div className="flex gap-2 items-center">
             <button
@@ -666,6 +662,10 @@ export default function ChatPage() {
             </button>
           </form>
         )}
+      </div>
+
+      <div className="bg-white shrink-0">
+        <AdUnit adSlot="3608382521" className="border-t-0" />
       </div>
 
       {/* Pending Image Preview Modal */}

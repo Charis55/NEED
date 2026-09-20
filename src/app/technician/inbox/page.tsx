@@ -109,7 +109,7 @@ export default function InboxPage() {
                         {customer?.displayName || "Customer"}
                       </h3>
                       <span className="text-xs font-black px-2 py-0.5 bg-[var(--color-brutal-bg)] border-2 border-black -rotate-2 whitespace-nowrap ml-2">
-                        {new Date(job.createdAt).toLocaleDateString()}
+                        {new Date(job.createdAt).toLocaleDateString('en-GB')}
                       </span>
                     </div>
                     

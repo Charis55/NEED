@@ -24,7 +24,8 @@ const GENERATED_IMAGE_IDS = [
   "generator-repair-and-maintenance", "carpentry-and-woodwork", "masonry-tiling-and-building-finishing",
   "painting-and-decoration", "welding-and-metal-fabrication", "roofing",
   "glazing-and-window-or-door-fitting", "locksmith-services", "gas-technician-services",
-  "home-appliance-repair"
+  "home-appliance-repair", "security-and-smart-home-installation", 
+  "cleaning-fumigation-and-pest-control", "gardening-and-landscaping"
 ];
 
 type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";

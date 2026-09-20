@@ -123,7 +123,7 @@ export default function InboxPage() {
                       {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName}` : "Unknown Technician")}
                     </h3>
                     <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
-                      {new Date(item.job.createdAt).toLocaleDateString()}
+                      {new Date(item.job.createdAt).toLocaleDateString('en-GB')}
                     </span>
                   </div>
                   

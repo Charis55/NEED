@@ -24,7 +24,7 @@ export default function PayCommissionModal({ isOpen, onClose, unpaidJobs, totalO
   const config = {
     reference: (new Date()).getTime().toString(),
     email: user?.email || "technician@need.com",
-    amount: totalOwed * 100, // Amount is in kobo
+    amount: Math.round(totalOwed * 100), // Amount is in kobo, must be integer
     publicKey: "pk_test_63d8908bfde0aa6dd46ce82d69a1ac301c7ee5a3",
   };
 
@@ -57,12 +57,18 @@ export default function PayCommissionModal({ isOpen, onClose, unpaidJobs, totalO
   };
 
   const startPayment = () => {
-    setLoading(true);
+    if (totalOwed <= 0) return;
     setError("");
-    initializePayment({
-      onSuccess: handlePaystackSuccessAction,
-      onClose: handlePaystackCloseAction,
-    } as any);
+    
+    try {
+      initializePayment({
+        onSuccess: handlePaystackSuccessAction,
+        onClose: handlePaystackCloseAction,
+      } as any);
+    } catch (err) {
+      console.error("Paystack initialization failed:", err);
+      setError("Failed to open payment gateway. Please ensure you have a stable connection and no adblockers.");
+    }
   };
 
   if (!isOpen) return null;

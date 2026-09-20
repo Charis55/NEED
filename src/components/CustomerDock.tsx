@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, ClipboardList, Inbox, Settings } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import AdBanner from "./AdBanner";
-
+import AdUnit from "./AdUnit";
 const navItems = [
   { href: "/explore", icon: Home, label: "Home" },
   { href: "/jobs", icon: ClipboardList, label: "Bookings" },
@@ -42,7 +41,7 @@ export default function CustomerDock() {
           );
         })}
       </nav>
-      <AdBanner />
+      <AdUnit adSlot="3608382521" className="mt-2" />
     </div>
   );
 }

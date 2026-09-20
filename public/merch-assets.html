@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NEED Merch Assets</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;900&display=swap');
+    
+    :root {
+      --color-brutal-bg: #fdfbf7;
+      --color-brutal-yellow: #fde047;
+      --color-brutal-blue: #60a5fa;
+      --color-brutal-pink: #f472b6;
+      --color-brutal-green: #4ade80;
+      --color-brutal-red: #f87171;
+      --color-brutal-teal: #2dd4bf;
+    }
+    
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background-color: #f3f4f6;
+    }
+
+    .brutal-border {
+      border: 6px solid #000;
+    }
+    
+    .brutal-shadow {
+      box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+    }
+  </style>
+</head>
+<body class="p-12 flex flex-col gap-24 items-center">
+
+  <div class="text-center w-full max-w-4xl">
+    <h2 class="text-xl font-bold text-gray-500 mb-8 border-b-2 border-gray-300 pb-2">1. Logo (Front Chest)</h2>
+    
+    <!-- Option A: The Floating "N" Button from the Navigation Dock -->
+    <div class="bg-white p-16 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-8 mb-8">
+      <p class="text-sm font-bold text-gray-400">Option A: The Floating 'N' Dock Button</p>
+      
+      <!-- Capture Container (transparent background) -->
+      <div id="design-a" class="p-8 bg-transparent inline-flex justify-center items-center">
+        <div id="box-a" class="w-32 h-32 bg-[var(--color-brutal-pink)] border-8 border-black brutal-shadow flex items-center justify-center font-black text-black transition-colors">
+          <img src="LOGO.png" alt="N" class="h-24 w-auto" />
+        </div>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row items-center gap-4 mt-4">
+        <label class="flex items-center gap-2 font-bold text-sm text-gray-700 bg-gray-100 px-4 py-2 rounded-lg border-2 border-gray-300">
+          Background Color: 
+          <input type="color" value="#f472b6" oninput="document.getElementById('box-a').style.backgroundColor = this.value" class="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer" />
+        </label>
+        <button onclick="downloadDesign('design-a', 'need_logo_a.png')" class="bg-black text-white px-6 py-3 font-bold rounded-lg hover:bg-gray-800">
+          ⬇ Download Transparent PNG
+        </button>
+      </div>
+    </div>
+
+    <!-- Option B: The "NEED" Text Logo Block -->
+    <div class="bg-white p-16 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-8">
+      <p class="text-sm font-bold text-gray-400">Option B: The Pink 'NEED' Tag</p>
+      
+      <!-- Capture Container (transparent background) -->
+      <div id="design-b" class="p-8 bg-transparent inline-flex justify-center items-center">
+        <div id="box-b" class="bg-[var(--color-brutal-pink)] px-8 py-2 inline-block border-8 border-black brutal-shadow -rotate-2 transition-colors">
+          <span class="font-black text-7xl tracking-tighter text-black uppercase flex items-center">
+            <img src="LOGO.png" alt="N" class="h-[1em] w-auto -mr-2" />EED
+          </span>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-center gap-4 mt-4">
+        <label class="flex items-center gap-2 font-bold text-sm text-gray-700 bg-gray-100 px-4 py-2 rounded-lg border-2 border-gray-300">
+          Background Color: 
+          <input type="color" value="#f472b6" oninput="document.getElementById('box-b').style.backgroundColor = this.value" class="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer" />
+        </label>
+        <button onclick="downloadDesign('design-b', 'need_logo_b.png')" class="bg-black text-white px-6 py-3 font-bold rounded-lg hover:bg-gray-800">
+          ⬇ Download Transparent PNG
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center w-full max-w-5xl">
+    <h2 class="text-xl font-bold text-gray-500 mb-8 border-b-2 border-gray-300 pb-2">2. Slogan (Back of Shirt)</h2>
+    
+    <div class="bg-white p-16 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center gap-8">
+      <!-- Capture Container (transparent background) -->
+      <div id="design-c" class="p-8 bg-transparent inline-flex justify-center items-center">
+        <h1 id="text-c" class="text-6xl md:text-8xl font-black text-black uppercase tracking-tighter text-center leading-[1.1] transition-colors">
+          The Raw Way To Hire <br/>
+          <span id="box-c" class="bg-[var(--color-brutal-teal)] px-4 py-2 inline-block -rotate-2 mt-4 border-8 border-black brutal-shadow transition-colors">
+            Trusted Technicians.
+          </span>
+        </h1>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row items-center gap-4 mt-4 flex-wrap justify-center">
+        <div class="flex items-center gap-2">
+          <button onclick="document.getElementById('text-c').classList.remove('text-white'); document.getElementById('text-c').classList.add('text-black');" class="bg-gray-200 text-black px-4 py-2 font-bold rounded-lg border-2 border-gray-400 hover:bg-gray-300">
+            Black Text
+          </button>
+          <button onclick="document.getElementById('text-c').classList.remove('text-black'); document.getElementById('text-c').classList.add('text-white');" class="bg-gray-800 text-white px-4 py-2 font-bold rounded-lg border-2 border-gray-900 hover:bg-gray-900">
+            White Text
+          </button>
+        </div>
+        <label class="flex items-center gap-2 font-bold text-sm text-gray-700 bg-gray-100 px-4 py-2 rounded-lg border-2 border-gray-300">
+          Highlight Color: 
+          <input type="color" value="#2dd4bf" oninput="document.getElementById('box-c').style.backgroundColor = this.value" class="w-10 h-10 p-0 border-0 bg-transparent cursor-pointer" />
+        </label>
+        <button onclick="downloadDesign('design-c', 'need_slogan.png')" class="bg-black text-white px-6 py-3 font-bold rounded-lg hover:bg-gray-800">
+          ⬇ Download Transparent PNG
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function downloadDesign(elementId, filename) {
+      const node = document.getElementById(elementId);
+      
+      // Temporarily remove any transforms or extra paddings if needed for a clean capture
+      htmlToImage.toPng(node, { 
+        backgroundColor: null, // Ensures transparent background
+        pixelRatio: 4, // 4x resolution for super high quality print
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
+      })
+      .then(function (dataUrl) {
+        var link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch(function (error) {
+        console.error('oops, something went wrong!', error);
+        alert('Failed to download image. See console for details.');
+      });
+    }
+  </script>
+</body>
+</html>
