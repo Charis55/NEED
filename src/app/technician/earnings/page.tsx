@@ -25,7 +25,7 @@ interface WeeklyEarning {
 
 type JobWithFee = JobRequest & { platformFee: number };
 
-const JobEarningRow = ({ job, onPayClick }: { job: JobRequest, onPayClick: (j: JobWithFee) => void }) => {
+const JobEarningRow = ({ job }: { job: JobRequest }) => {
   const [expanded, setExpanded] = useState(false);
   const earn = job.counterOfferAmount || job.offerAmount || 0;
   const platformFee = earn * 0.20;
@@ -278,7 +278,7 @@ Date: ${new Date().toLocaleDateString()}
                 <div className="space-y-3">
                   <p className="font-black uppercase text-sm border-b-2 border-black inline-block pb-1 mb-2">Jobs Completed ({week.jobs.length})</p>
                   {week.jobs.map(job => (
-                    <JobEarningRow key={job.requestId} job={job} onPayClick={(j) => setShowPaymentModal(j)} />
+                    <JobEarningRow key={job.requestId} job={job} />
                   ))}
                 </div>
               </div>
