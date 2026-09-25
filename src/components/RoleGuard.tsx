@@ -47,7 +47,10 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
             }
           }
         } else {
-          setAuthorized(true);
+          // If a Firebase user exists but NO userDoc exists,
+          // they haven't completed the signup flow (missing name, phone, etc).
+          // Force them back to the auth page to finish it.
+          router.push(`/auth/login?role=${requiredRole}`);
         }
       } catch (err) {
         console.error("RoleGuard error:", err);
