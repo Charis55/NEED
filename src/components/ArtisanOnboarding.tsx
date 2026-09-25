@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { ArtisanProfile } from "@/types";
 import ngeohash from "ngeohash";
@@ -61,9 +62,83 @@ export default function ArtisanOnboarding() {
   const [consentDataCollection, setConsentDataCollection] = useState(false);
   const [consentDocumentRetention, setConsentDocumentRetention] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start loading while we fetch progress
   const [error, setError] = useState("");
   const router = useRouter();
+
+  // --- Load Progress on Mount ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const artisanDocRef = doc(db, "artisans", user.uid);
+          const artisanDoc = await getDoc(artisanDocRef);
+          
+          if (artisanDoc.exists()) {
+            const data = artisanDoc.data();
+            
+            // If they completely finished, kick them out to dashboard
+            if (data.onboardingStep === 6) {
+              router.push("/technician/dashboard");
+              return;
+            }
+
+            // Restore step (take them to the step they are currently on, not the one they completed)
+            // If they completed step 3, data.onboardingStep is 3, so they should now be on step 4.
+            if (data.onboardingStep) {
+              setStep(data.onboardingStep + 1);
+            }
+
+            // Restore KYC Data
+            if (data.identityVerificationStatus === "verified" || data.identityVerificationStatus === "pending") {
+              setIdentityVerified(true);
+              setKycFlowCompleted(true);
+              setIdentityVerifiedName(data.identityVerifiedName || null);
+              setIdentityVerifiedDOB(data.identityVerifiedDOB || null);
+              setIdentityReferenceId(data.identityVerificationReference || null);
+            }
+
+            // Restore Location
+            if (data.neighborhood && data.lat && data.lng) {
+              setLocationData({
+                name: data.neighborhood,
+                lat: data.lat,
+                lng: data.lng
+              });
+            }
+
+            // Restore Services
+            if (data.trade && data.subcategory) {
+              // We only stored the first service during partial save, but we can restore it
+              const tradeId = Object.keys(servicesData).find(key => servicesData[key].title === data.trade) || tradeCategories[0].id;
+              setServices([{
+                tradeCategory: tradeId,
+                subcategory: data.subcategory,
+                hasCertification: false,
+                certificateFile: null
+              }]);
+            }
+
+            // Restore Skill
+            if (data.yearsOfExperience) setYearsOfExperience(data.yearsOfExperience);
+            if (data.skillLevel) setSkillLevel(data.skillLevel);
+
+            // Restore Bio
+            if (data.bio) setBio(data.bio);
+          }
+        } catch (err) {
+          console.error("Failed to restore onboarding progress:", err);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Not logged in
+        router.push("/auth/login?role=artisan");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   // --- KYC Verification Handler (Didit SDK) ---
   const handleStartKYC = async () => {
@@ -429,6 +504,14 @@ export default function ArtisanOnboarding() {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="w-full max-w-2xl mx-auto flex items-center justify-center p-12">
+        <Loader2 className="w-12 h-12 text-black animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto brutal-card bg-white p-8 md:p-12 relative">

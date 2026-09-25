@@ -128,7 +128,11 @@ export default function AuthForm() {
       if (userData.role === "artisan") {
         const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
         if (artisanDoc.exists()) {
-          router.push("/technician/dashboard");
+          if (artisanDoc.data()?.onboardingStep !== 6) {
+            router.push("/onboarding");
+          } else {
+            router.push("/technician/dashboard");
+          }
         } else {
           setStep("role");
         }
@@ -191,7 +195,11 @@ export default function AuthForm() {
         if (userData.role === "artisan") {
           const artisanDoc = await getDoc(doc(db, "artisans", result.user.uid));
           if (artisanDoc.exists()) {
-            router.push("/technician/dashboard");
+            if (artisanDoc.data()?.onboardingStep !== 6) {
+              router.push("/onboarding");
+            } else {
+              router.push("/technician/dashboard");
+            }
           } else {
             setStep("role");
           }
