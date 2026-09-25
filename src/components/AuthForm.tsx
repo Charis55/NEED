@@ -280,6 +280,12 @@ export default function AuthForm() {
       return;
     }
 
+    if (!profileFile) {
+      setError("Please upload a profile picture.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("No user authenticated");
@@ -352,7 +358,7 @@ export default function AuthForm() {
             {error && <div className="bg-[var(--color-brutal-red)] text-black font-bold p-4 brutal-border brutal-shadow-sm mb-6 uppercase text-sm">{error}</div>}
 
             <div className="mb-6">
-              <label className="block text-lg font-black text-black mb-2 uppercase">Profile Picture (Optional)</label>
+              <label className="block text-lg font-black text-black mb-2 uppercase">Profile Picture</label>
               <div className="flex items-center gap-4">
                 <div 
                   className="w-20 h-20 bg-gray-200 brutal-border brutal-shadow-sm flex items-center justify-center cursor-pointer relative overflow-hidden"
@@ -558,7 +564,7 @@ export default function AuthForm() {
               )}
 
               <div className="mb-6 mt-4">
-                <label className="block text-lg font-black text-black mb-2 uppercase">Profile Picture (Optional)</label>
+                <label className="block text-lg font-black text-black mb-2 uppercase">Profile Picture</label>
                 <div className="flex items-center gap-4">
                   <div 
                     className="w-20 h-20 bg-gray-200 brutal-border brutal-shadow-sm flex items-center justify-center cursor-pointer relative overflow-hidden"
