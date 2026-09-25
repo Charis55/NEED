@@ -1,20 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { auth, db, storage } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { ArtisanProfile } from "@/types";
 import ngeohash from "ngeohash";
-import { verifyCertificateAction } from "@/actions/verifyCertificate";
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 import { reverseGeocode } from "@/utils/location";
+import { ShieldCheck, AlertTriangle, CheckCircle, Loader2, Camera, ExternalLink } from "lucide-react";
 
 const tradeCategories = Object.values(servicesData);
 
+const TOTAL_STEPS = 6;
+
 export default function ArtisanOnboarding() {
   const [step, setStep] = useState(1);
+
+  // --- Step 1: KYC Verification (Didit SDK) ---
+  const [identityVerifying, setIdentityVerifying] = useState(false);
+  const [identityVerified, setIdentityVerified] = useState(false);
+  const [kycSessionId, setKycSessionId] = useState<string | null>(null);
+  const [kycFlowCompleted, setKycFlowCompleted] = useState(false);
+  const [identityError, setIdentityError] = useState("");
+  // These will be populated by the webhook; stored for the profile submission
+  const [identityVerifiedName, setIdentityVerifiedName] = useState<string | null>(null);
+  const [identityVerifiedDOB, setIdentityVerifiedDOB] = useState<string | null>(null);
+  const [identityReferenceId, setIdentityReferenceId] = useState<string | null>(null);
+
+  // --- Step 2: Services & Location ---
   const [services, setServices] = useState<{
     tradeCategory: string;
     subcategory: string;
@@ -26,32 +41,152 @@ export default function ArtisanOnboarding() {
     hasCertification: false,
     certificateFile: null
   }]);
-  
-  // Location
   const [locationData, setLocationData] = useState<{lat: number, lng: number, name: string} | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
-  
-  // Survey fields
+
+  // --- Step 3: Skill Assessment ---
   const [yearsOfExperience, setYearsOfExperience] = useState("< 1 year");
   const [skillLevel, setSkillLevel] = useState("Intermediate");
-  const [policeClearanceFile, setPoliceClearanceFile] = useState<File | null>(null);
 
+  // --- Step 4: Bio ---
   const [bio, setBio] = useState("");
+
+  // --- Step 5: Documents & Portfolio ---
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [policeClearanceFile, setPoliceClearanceFile] = useState<File | null>(null);
   const [files, setFiles] = useState<FileList | null>(null);
+
+  // --- Step 6: Consent ---
+  const [consentDataCollection, setConsentDataCollection] = useState(false);
+  const [consentDocumentRetention, setConsentDocumentRetention] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleNext = () => {
-    if (step === 1 && !locationData) {
+  // --- KYC Verification Handler (Didit SDK) ---
+  const handleStartKYC = async () => {
+    setIdentityVerifying(true);
+    setIdentityError("");
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+
+      // 1. Create a verification session on our backend
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.uid }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        setIdentityError(
+          data.error || data.detail || "Failed to create verification session. Please try again."
+        );
+        setIdentityVerifying(false);
+        return;
+      }
+
+      setKycSessionId(data.session_id);
+
+      // 2. Open the Didit SDK modal
+      const { DiditSdk } = await import("@didit-protocol/sdk-web");
+
+      DiditSdk.shared.onComplete = (result: any) => {
+        // This is a UI hint only — the webhook is the source of truth.
+        // result.type: "completed" | "cancelled" | "failed"
+        if (result.type === "completed" || result.type === "cancelled") {
+          setKycFlowCompleted(true);
+          setIdentityVerified(true); // Allow proceeding — webhook will confirm
+          setIdentityVerifying(false);
+        } else {
+          setIdentityError("Verification was not completed. Please try again.");
+          setIdentityVerifying(false);
+        }
+      };
+
+      DiditSdk.shared.startVerification({ url: data.url });
+    } catch (err: any) {
+      setIdentityError(err.message || "Failed to start verification. Please try again.");
+      setIdentityVerifying(false);
+    }
+  };
+
+  // --- Navigation ---
+  const handleNext = async () => {
+    setError(""); // Clear any previous errors
+
+    if (step === 1 && !identityVerified) {
+      setIdentityError("You must complete KYC verification before proceeding.");
+      return;
+    }
+    if (step === 2 && !locationData) {
       setLocationError("Location permission is strictly required to proceed.");
       return;
     }
+    if (step === 5 && !profilePictureFile) {
+      setError("A Profile Picture is strictly required to proceed.");
+      return;
+    }
+    if (step === 5 && !policeClearanceFile) {
+      setError("A Police Clearance Certificate is strictly required to proceed.");
+      return;
+    }
+
+    // Save progress to Firestore so partial applicants appear in admin
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        const progressData: Record<string, any> = {
+          artisanId: user.uid,
+          userId: user.uid,
+          onboardingStep: step,
+          name: user.displayName || identityVerifiedName || "Applicant",
+        };
+
+        if (step >= 1) {
+          progressData.identityVerificationStatus = identityVerified ? "verified" : "pending";
+          progressData.identityVerifiedName = identityVerifiedName;
+          progressData.identityVerifiedDOB = identityVerifiedDOB;
+          progressData.identityVerificationReference = identityReferenceId;
+          progressData.identityVerificationProvider = "didit";
+        }
+        if (step >= 2 && locationData) {
+          progressData.neighborhood = locationData.name;
+          progressData.lat = locationData.lat;
+          progressData.lng = locationData.lng;
+          const firstSvc = services[0];
+          if (firstSvc) {
+            const tradeTitle = (await import("@/data/services")).servicesData[firstSvc.tradeCategory]?.title || firstSvc.tradeCategory;
+            progressData.trade = tradeTitle;
+            progressData.subcategory = firstSvc.subcategory;
+          }
+        }
+        if (step >= 3) {
+          progressData.yearsOfExperience = yearsOfExperience;
+          progressData.skillLevel = skillLevel;
+        }
+        if (step >= 4) {
+          progressData.bio = bio;
+        }
+
+        // Use merge:true so this never overwrites the full submitted profile
+        await setDoc(doc(db, "artisans", user.uid), progressData, { merge: true });
+      } catch (err) {
+        // Non-blocking — don't stop the user from continuing
+        console.warn("Could not save onboarding progress:", err);
+      }
+    }
+
     setStep((s) => s + 1);
   };
   const handleBack = () => setStep((s) => s - 1);
 
+  // --- Location Detection ---
   const detectLocation = () => {
     setIsLocating(true);
     setLocationError("");
@@ -80,6 +215,7 @@ export default function ArtisanOnboarding() {
     );
   };
 
+  // --- Service Management ---
   const handleAddService = () => {
     const uniqueCategories = new Set(services.map(s => s.tradeCategory));
     let defaultCategory = tradeCategories[0].id;
@@ -111,8 +247,15 @@ export default function ArtisanOnboarding() {
     setServices(newServices);
   };
 
+  // --- Submit Handler ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!consentDataCollection || !consentDocumentRetention) {
+      setError("You must accept both consent checkboxes to proceed.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -120,22 +263,17 @@ export default function ArtisanOnboarding() {
       const user = auth.currentUser;
       if (!user) throw new Error("Not authenticated");
 
-      // Helper function to upload to R2
+      // Upload helper
       const uploadFileToR2 = async (file: File) => {
         const formData = new FormData();
         formData.append("file", file);
-
-        const res = await fetch('/api/upload-direct', {
-          method: 'POST',
-          body: formData
-        });
-        
+        const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
         if (!res.ok) throw new Error("Failed to upload file");
         const { publicUrl } = await res.json();
         return publicUrl;
       };
 
-      // Upload photos
+      // Upload portfolio photos
       const photoUrls: string[] = [];
       if (files) {
         for (let i = 0; i < files.length; i++) {
@@ -148,31 +286,27 @@ export default function ArtisanOnboarding() {
         }
       }
 
-      // Upload certificates for all services
+      // Upload certificates for services
       const finalServices = [];
       const serviceKeys = [];
       for (const svc of services) {
         let certificateUrl: string | null = null;
-        let isCertificateVerified = false;
-        
+
         if (svc.hasCertification && svc.certificateFile) {
           let fileToUpload = svc.certificateFile;
           if (svc.certificateFile.type.startsWith('image/')) {
             fileToUpload = await compressImage(svc.certificateFile, 4);
           }
           certificateUrl = await uploadFileToR2(fileToUpload);
-          if (certificateUrl) {
-            isCertificateVerified = await verifyCertificateAction(certificateUrl);
-          }
         }
-        
+
         const tradeTitle = servicesData[svc.tradeCategory].title;
         finalServices.push({
           trade: tradeTitle,
           subcategory: svc.subcategory,
           hasCertification: svc.hasCertification,
           certificateUrl,
-          isCertificateVerified
+          isCertificateVerified: false, // Pipeline will verify
         });
         serviceKeys.push(`${svc.tradeCategory}:${svc.subcategory}`);
       }
@@ -186,7 +320,16 @@ export default function ArtisanOnboarding() {
         }
         policeClearanceUrl = await uploadFileToR2(fileToUpload);
       }
-      // For testing, we do not throw an error if police clearance is missing
+
+      // Upload profile picture
+      let profilePictureUrl: string | null = null;
+      if (profilePictureFile) {
+        let fileToUpload = profilePictureFile;
+        if (profilePictureFile.type.startsWith('image/')) {
+          fileToUpload = await compressImage(profilePictureFile, 4);
+        }
+        profilePictureUrl = await uploadFileToR2(fileToUpload);
+      }
 
       // Calculate geohash
       if (!locationData) throw new Error("Location data is missing.");
@@ -195,19 +338,19 @@ export default function ArtisanOnboarding() {
       const profile: ArtisanProfile = {
         artisanId: user.uid,
         userId: user.uid,
-        name: user.displayName || "New User",
-        
+        name: user.displayName || identityVerifiedName || "New User",
+
         // Single fields for backwards compatibility
         trade: finalServices[0].trade,
         subcategory: finalServices[0].subcategory,
         hasCertification: finalServices[0].hasCertification,
         certificateUrl: finalServices[0].certificateUrl,
-        isCertificateVerified: finalServices[0].isCertificateVerified,
-        
-        // New array fields
+        isCertificateVerified: false,
+
+        // Multi-service fields
         services: finalServices,
         serviceKeys: serviceKeys,
-        
+
         yearsOfExperience,
         skillLevel,
         bio,
@@ -215,17 +358,69 @@ export default function ArtisanOnboarding() {
         geohash,
         lat: locationData.lat,
         lng: locationData.lng,
+        profilePictureUrl: profilePictureUrl || undefined,
         portfolioPhotoUrls: photoUrls,
         hasPoliceClearance: !!policeClearanceUrl,
         policeClearanceUrl,
-        verified: true, // FOR TESTING: Auto-verify
+
+        // Verification Pipeline — NOT auto-verified
+        verified: false,
         ratingAverage: 0,
         ratingCount: 0,
-        available: true,
-        createdAt: Date.now()
+        available: false, // Cannot accept jobs until verified
+
+        // Identity verification data — populated by Didit webhook
+        identityVerificationStatus: kycFlowCompleted ? "pending" : "not_started",
+        identityVerificationProvider: "didit",
+        identityVerificationReference: identityReferenceId,
+        identityVerifiedName: identityVerifiedName,
+        identityVerifiedDOB: identityVerifiedDOB,
+        kycSessionId: kycSessionId,
+
+        // Document verification — starts as pending, Cloud Functions will process
+        certificateVerificationStatus: "pending",
+        certificateExtractedData: null,
+        policeClearanceStatus: policeClearanceUrl ? "pending" : "rejected",
+        policeClearanceExtractedData: null,
+        policeClearanceExpiryDate: null,
+
+        // Manual review — pipeline will determine
+        manualReviewRequired: true, // All new profiles start in the queue
+        manualReviewReasons: ["new_profile_awaiting_document_verification"],
+        verificationDecisionLog: [],
+
+        onboardingStep: 6, // Completed all steps
+
+        createdAt: Date.now(),
       };
 
       await setDoc(doc(db, "artisans", user.uid), profile);
+
+      // Also add to the review queue
+      await setDoc(doc(db, "verificationReviewQueue", user.uid), {
+        artisanId: user.uid,
+        artisanName: user.displayName || identityVerifiedName || "Unknown",
+        flaggedChecks: ["new_profile_awaiting_document_verification"],
+        extractedData: {
+          certificate: null,
+          policeClearance: null,
+          identityVerifiedName: identityVerifiedName,
+        },
+        certificateUrl: finalServices[0]?.certificateUrl || null,
+        policeClearanceUrl: policeClearanceUrl,
+        status: "pending",
+        reviewedBy: null,
+        reviewedAt: null,
+        createdAt: Date.now(),
+      });
+
+      // Trigger Welcome Technician Email
+      fetch('/api/emails/welcome-technician', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artisanId: user.uid }),
+      }).catch(e => console.error("Failed to send welcome email:", e));
+
       router.push("/technician/dashboard");
     } catch (err: any) {
       console.error(err);
@@ -238,7 +433,7 @@ export default function ArtisanOnboarding() {
   return (
     <div className="w-full max-w-2xl mx-auto brutal-card bg-white p-8 md:p-12 relative">
       <h2 className="text-4xl font-black text-black mb-2 uppercase tracking-tighter">Create your Profile</h2>
-      <p className="bg-[var(--color-brutal-blue)] inline-block px-2 text-black mb-8 font-black tracking-widest border-2 border-black rotate-1">STEP {step} OF 4</p>
+      <p className="bg-[var(--color-brutal-blue)] inline-block px-2 text-black mb-8 font-black tracking-widest border-2 border-black rotate-1">STEP {step} OF {TOTAL_STEPS}</p>
 
       {error && (
         <div className="bg-[var(--color-brutal-red)] border-4 border-black text-black p-4 brutal-shadow-sm mb-6 font-bold uppercase text-sm">
@@ -246,9 +441,86 @@ export default function ArtisanOnboarding() {
         </div>
       )}
 
-      <form onSubmit={step === 4 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
+      <form onSubmit={step === TOTAL_STEPS ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
         
+        {/* ==================== STEP 1: KYC VERIFICATION (DIDIT) ==================== */}
         {step === 1 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <ShieldCheck className="w-8 h-8 text-black" />
+              <h3 className="text-2xl font-black text-black uppercase border-b-4 border-black pb-2 flex-1">Identity Verification</h3>
+            </div>
+
+            {/* Consent & disclosure — shown before verification starts */}
+            <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 space-y-3">
+              <p className="text-sm font-bold text-black border-l-4 border-black pl-3">
+                To ensure the safety and trust of everyone on NEED, we require identity verification.
+                This is a <span className="font-black">one-time check</span> powered by{" "}
+                <a href="https://didit.me" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">
+                  Didit <ExternalLink className="w-3 h-3" />
+                </a>, a trusted KYC provider.
+              </p>
+              <div className="bg-white brutal-border p-3 text-xs font-bold text-black space-y-1">
+                <p>📸 You will be asked to scan a valid government-issued ID document</p>
+                <p>🤳 A quick selfie will verify it&apos;s really you (liveness check)</p>
+                <p>🔒 Your data is encrypted and processed securely by Didit</p>
+                <p>⏱️ The entire process takes about 2 minutes</p>
+              </div>
+            </div>
+
+            {!identityVerified ? (
+              <>
+                {identityError && (
+                  <div className="flex items-start gap-2 p-3 bg-[var(--color-brutal-red)] border-2 border-black">
+                    <AlertTriangle className="w-5 h-5 text-black flex-shrink-0 mt-0.5" />
+                    <p className="text-sm font-bold text-black">{identityError}</p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleStartKYC}
+                  disabled={identityVerifying}
+                  className="w-full py-4 bg-[var(--color-brutal-teal)] brutal-btn text-black font-black uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                >
+                  {identityVerifying ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      LAUNCHING VERIFICATION...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-5 h-5" />
+                      START KYC VERIFICATION
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <div className="p-6 bg-[var(--color-brutal-teal)] brutal-border brutal-shadow space-y-3">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-8 h-8 text-black" />
+                  <h4 className="text-xl font-black text-black uppercase">Verification Submitted</h4>
+                </div>
+                <div className="bg-white brutal-border p-4 space-y-2">
+                  <p className="font-black text-black text-sm">
+                    Your identity verification has been submitted and is being processed.
+                  </p>
+                  <p className="text-xs font-bold text-black opacity-70">
+                    Session ID: <span className="font-mono">{kycSessionId?.substring(0, 12)}...</span>
+                  </p>
+                </div>
+                <p className="text-xs font-bold text-black opacity-70">
+                  ✓ You can proceed with the rest of your profile while we verify your identity.
+                  You&apos;ll be notified once the review is complete.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== STEP 2: SERVICES & LOCATION ==================== */}
+        {step === 2 && (
           <div className="space-y-6">
             <h3 className="text-2xl font-black text-black mb-4 uppercase border-b-4 border-black pb-2">Your Services</h3>
             {services.map((svc, index) => (
@@ -358,7 +630,8 @@ export default function ArtisanOnboarding() {
           </div>
         )}
 
-        {step === 2 && (
+        {/* ==================== STEP 3: SKILL ASSESSMENT ==================== */}
+        {step === 3 && (
           <div className="space-y-6">
             <h3 className="text-2xl font-black text-black mb-4 uppercase">Skill Assessment</h3>
             
@@ -389,11 +662,11 @@ export default function ArtisanOnboarding() {
                 <option value="Expert">Expert (Master of the trade)</option>
               </select>
             </div>
-
           </div>
         )}
 
-        {step === 3 && (
+        {/* ==================== STEP 4: BIO ==================== */}
+        {step === 4 && (
           <div className="space-y-6">
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Bio / Experience</label>
@@ -409,8 +682,23 @@ export default function ArtisanOnboarding() {
           </div>
         )}
 
-        {step === 4 && (
+        {/* ==================== STEP 5: DOCUMENTS & PORTFOLIO ==================== */}
+        {step === 5 && (
           <div className="space-y-6">
+            <div>
+              <label className="block text-lg font-black text-black mb-2 uppercase text-[var(--color-brutal-red)]">Profile Picture *</label>
+              <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">A clear, professional photo of your face is strictly required.</p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => e.target.files && setProfilePictureFile(e.target.files[0])}
+                className="w-full p-6 bg-[var(--color-brutal-teal)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-yellow)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors mb-6"
+              />
+              {profilePictureFile && (
+                <p className="text-sm font-black text-black mt-2 inline-block px-2 border-2 border-black rotate-1 bg-white mb-6">Selected: {profilePictureFile.name}</p>
+              )}
+            </div>
+
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Portfolio Photos</label>
               <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">Upload photos of your past work to build trust with customers.</p>
@@ -442,6 +730,65 @@ export default function ArtisanOnboarding() {
           </div>
         )}
 
+        {/* ==================== STEP 6: CONSENT & SUBMIT ==================== */}
+        {step === 6 && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-black text-black mb-4 uppercase border-b-4 border-black pb-2">Consent & Data Privacy</h3>
+            <p className="text-sm font-bold text-black border-l-4 border-[var(--color-brutal-red)] pl-3 mb-6">
+              Before submitting your profile, please review and accept the following data collection and retention policies.
+              Your personal data is protected under Nigeria&apos;s data protection framework.
+            </p>
+
+            <div className="space-y-4">
+              <label className="flex items-start gap-3 p-4 bg-[var(--color-brutal-bg)] brutal-border cursor-pointer hover:-translate-y-0.5 transition-transform">
+                <input
+                  type="checkbox"
+                  checked={consentDataCollection}
+                  onChange={(e) => setConsentDataCollection(e.target.checked)}
+                  className="w-6 h-6 border-2 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-0.5 flex-shrink-0"
+                />
+                <div>
+                  <span className="text-sm font-black text-black uppercase block mb-1">Data Collection Consent</span>
+                  <span className="text-xs font-bold text-gray-700 leading-relaxed block">
+                    I consent to NEED collecting and processing my National Identification Number (NIN) or Bank Verification Number (BVN), 
+                    trade certificates, Police Clearance Certificate, portfolio photos, and location data for the purpose of 
+                    identity verification, trust and safety, and connecting me with customers. This data will only be accessible 
+                    to me and authorized NEED administrators.
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-4 bg-[var(--color-brutal-bg)] brutal-border cursor-pointer hover:-translate-y-0.5 transition-transform">
+                <input
+                  type="checkbox"
+                  checked={consentDocumentRetention}
+                  onChange={(e) => setConsentDocumentRetention(e.target.checked)}
+                  className="w-6 h-6 border-2 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-0.5 flex-shrink-0"
+                />
+                <div>
+                  <span className="text-sm font-black text-black uppercase block mb-1">Document Retention Policy</span>
+                  <span className="text-xs font-bold text-gray-700 leading-relaxed block">
+                    I understand that my uploaded documents (certificates, police clearance) will be retained for the duration 
+                    of my active account. If my application is rejected, my documents will be automatically deleted after 90 days. 
+                    I can request early deletion by contacting NEED support. My police clearance will need to be re-uploaded 
+                    when it expires (approximately every 6 months).
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div className="p-4 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm mt-4">
+              <p className="text-xs font-black text-black uppercase mb-1">What happens next?</p>
+              <p className="text-xs font-bold text-black leading-relaxed">
+                After submission, your documents will be automatically scanned and cross-checked against your verified identity. 
+                Most profiles are reviewed within 24-48 hours. You&apos;ll be notified once your profile is approved and you can start 
+                accepting jobs.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== NAVIGATION BUTTONS ==================== */}
         <div className="mt-12 flex justify-between gap-4">
           {step > 1 && (
             <button
@@ -455,10 +802,10 @@ export default function ArtisanOnboarding() {
           
           <button
             type="submit"
-            disabled={loading}
-            className={`px-8 py-4 bg-[var(--color-brutal-teal)] brutal-btn flex-1 ${step === 1 ? 'w-full' : ''}`}
+            disabled={loading || (step === 1 && !identityVerified) || (step === 6 && (!consentDataCollection || !consentDocumentRetention))}
+            className={`px-8 py-4 bg-[var(--color-brutal-teal)] brutal-btn flex-1 ${step === 1 ? 'w-full' : ''} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {loading ? "SAVING..." : step === 4 ? "COMPLETE PROFILE" : "NEXT STEP"}
+            {loading ? "SAVING..." : step === TOTAL_STEPS ? "COMPLETE PROFILE" : "NEXT STEP"}
           </button>
         </div>
       </form>

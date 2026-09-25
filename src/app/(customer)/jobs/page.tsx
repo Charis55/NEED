@@ -142,7 +142,7 @@ export default function CustomerJobsPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pt-16 px-4 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="w-full pt-16 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] mt-4">
         MY BOOKINGS
       </h1>
@@ -160,16 +160,16 @@ export default function CustomerJobsPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {requests.map((req) => {
             const currentPrice = req.status === "countered" && req.counterOfferAmount 
               ? req.counterOfferAmount 
               : (req.offerAmount || 0);
 
             return (
-              <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform mb-6">
-                <div className="p-6 md:p-8">
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6 border-b-4 border-black pb-6">
+              <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
+                <div className="p-6 md:p-8 flex flex-col flex-grow">
+                  <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-6 border-b-4 border-black pb-6 flex-grow">
                     <div>
                       <span className={`inline-block px-4 py-2 text-xs font-black uppercase tracking-widest mb-3 brutal-border
                         ${req.status === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}

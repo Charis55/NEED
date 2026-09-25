@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import Link from "next/link";
-import { ClipboardList, Star, TrendingUp, CheckCircle } from "lucide-react";
+import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 
 export default function ArtisanDashboard() {
   const [loading, setLoading] = useState(true);
   const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
+  const [isRevoked, setIsRevoked] = useState(false);
   
   const [stats, setStats] = useState({
     totalEarnings: 0,
@@ -30,6 +31,11 @@ export default function ArtisanDashboard() {
           const artisanSnapshot = await getDocs(query(collection(db, "artisans"), where("artisanId", "==", user.uid)));
           if (!artisanSnapshot.empty) {
             const artisanData = artisanSnapshot.docs[0].data();
+            
+            if (artisanData.certificateVerificationStatus === "rejected") {
+              setIsRevoked(true);
+            }
+
             if (artisanData.createdAt) {
               const createdAtMs = typeof artisanData.createdAt === "number" 
                 ? artisanData.createdAt 
@@ -93,7 +99,7 @@ export default function ArtisanDashboard() {
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Banner */}
       <div className="bg-[var(--color-brutal-blue)] pt-16 pb-24 px-6 md:px-12 border-b-4 border-black brutal-shadow-sm">
-        <div className="max-w-4xl mx-auto flex justify-between items-end">
+        <div className="max-w-7xl mx-auto flex justify-between items-end">
           <div>
             <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">DASHBOARD</h1>
             <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-white inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Welcome back to work.</p>
@@ -101,7 +107,22 @@ export default function ArtisanDashboard() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 md:px-12 -mt-12">
+      <div className="max-w-7xl mx-auto px-4 md:px-12 -mt-12">
+        {/* Revoked Banner */}
+        {isRevoked && (
+          <div className="bg-[#FF4D4D] border-4 border-black p-8 shadow-[8px_8px_0_0_#000] mb-8 relative rotate-1 z-10 animate-pulse">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="bg-white border-2 border-black p-2 rounded-full">
+                <AlertTriangle className="w-8 h-8 text-black" />
+              </div>
+              <h2 className="text-3xl font-black text-white tracking-tighter uppercase">ACCESS REVOKED INDEFINITELY</h2>
+            </div>
+            <p className="font-bold text-white text-lg mt-2 bg-black/20 p-2 border-l-4 border-black">
+              Your technician profile has been suspended by the administration. You can no longer receive or accept new jobs. 
+              Please contact support if you believe this is a mistake.
+            </p>
+          </div>
+        )}
         {/* Promo Banner */}
         {promoDaysLeft !== null && promoDaysLeft > 0 && (
           <div className="bg-[var(--color-brutal-pink)] border-4 border-black p-4 shadow-[4px_4px_0_0_#000] mb-8 flex flex-col md:flex-row items-start md:items-center justify-between rotate-1 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_#000] transition-all">

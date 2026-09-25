@@ -82,7 +82,7 @@ export default function InboxPage() {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto pt-12 px-4 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="w-full pt-12 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)]">
         MESSAGES
       </h1>
@@ -96,7 +96,7 @@ export default function InboxPage() {
           <p className="text-gray-600 font-bold mt-2">When a technician accepts your job, you can chat with them here.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {chatList.map((item) => (
             <Link key={item.job.requestId} href={`/chat/${item.job.requestId}`}>
               <div className="bg-white border-4 border-black p-4 brutal-shadow flex items-center hover:-translate-y-1 transition-transform group cursor-pointer">

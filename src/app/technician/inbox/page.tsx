@@ -74,7 +74,7 @@ export default function InboxPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Inbox</h1>
         <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-teal)] inline-block pr-3 mb-10 -rotate-1 shadow-[2px_2px_0_0_#000]">Chat with your customers.</p>
         
@@ -87,7 +87,7 @@ export default function InboxPage() {
             <p className="text-black font-bold">When you accept jobs, you can chat with customers here.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {chatList.map(({ job, customer, unreadCount }) => (
               <Link 
                 key={job.requestId} 

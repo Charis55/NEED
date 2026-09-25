@@ -42,7 +42,7 @@ export default async function MapPage() {
   const technicians = await getTechnicians();
 
   return (
-    <div className="max-w-7xl mx-auto h-[calc(100vh-140px)] min-h-[600px] flex flex-col px-6 bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black pt-6">
+    <div className="w-full h-[calc(100vh-140px)] min-h-[600px] flex flex-col px-6 md:px-12 bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black pt-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div className="flex items-center gap-6">
           <Link 

@@ -119,6 +119,20 @@ export default function ArtisanDashboard() {
 
       await updateDoc(reqRef, updatePayload);
       
+      // Trigger Job Completed (Receipt) Email if marked as completed
+      if ((newStatus === "completed" || newStatus === "payment_pending") && req && user) {
+        fetch('/api/emails/job-completed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerId: req.customerId,
+            technicianName: user.displayName || "A technician",
+            trade: req.trade,
+            amount: req.counterOfferAmount || req.offerAmount
+          }),
+        }).catch(e => console.error("Failed to send job completed email:", e));
+      }
+
       setRequests(prev => prev.map(req => {
         if (req.requestId === requestId) {
           const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
@@ -156,9 +170,11 @@ export default function ArtisanDashboard() {
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Job Requests</h1>
-        <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 mb-6 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming and active jobs.</p>
+        <div className="mb-12 w-full block">
+          <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming and active jobs.</p>
+        </div>
 
         {outstandingBalance > 0 && (
           <div className={`mb-10 p-6 brutal-border shadow-[4px_4px_0_0_#000] ${isRestricted ? 'bg-[var(--color-brutal-red)]' : 'bg-[var(--color-brutal-pink)]'}`}>
@@ -194,7 +210,7 @@ export default function ArtisanDashboard() {
             <p className="text-black font-bold">When customers request your services, they will appear here.</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {requests.map((req) => {
               const currentPrice = req.counterOfferAmount || req.offerAmount || 0;
               
@@ -210,9 +226,9 @@ export default function ArtisanDashboard() {
               const dynamicTakeHome = typingVal - dynamicFee;
 
               return (
-                <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform mb-6">
-                  <div className="p-6 md:p-8">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6 border-b-4 border-black pb-6">
+                <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
+                  <div className="p-6 md:p-8 flex flex-col flex-grow">
+                    <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-6 border-b-4 border-black pb-6 flex-grow">
                       <div>
                         <span className={`inline-block px-4 py-2 text-xs font-black uppercase tracking-widest mb-3 brutal-border
                           ${req.status === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}

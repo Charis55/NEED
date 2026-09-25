@@ -77,7 +77,7 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 md:pb-8">
+    <div className="w-full px-6 md:px-12 pb-24 md:pb-8">
       <div className="bg-white md:rounded-2xl shadow-sm border-b md:border border-gray-100 overflow-hidden mb-8">
         <div className="p-5 md:p-8">
           <div className="flex flex-col md:flex-row justify-between items-start gap-6">

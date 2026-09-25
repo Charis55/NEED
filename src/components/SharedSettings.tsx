@@ -177,9 +177,11 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       const compressed = await compressImage(croppedFile, 3);
       
-      const storageRef = ref(storage, `profile_pictures/${user.uid}_${Date.now()}.jpg`);
-      await uploadBytes(storageRef, compressed, { contentType: croppedFile.type });
-      const publicUrl = await getDownloadURL(storageRef);
+      const formData = new FormData();
+      formData.append("file", compressed, `${user.uid}_${Date.now()}.jpg`);
+      const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error("Failed to upload profile picture");
+      const { publicUrl } = await res.json();
 
       const oldPhotoURL = user.photoURL;
 
@@ -212,9 +214,11 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       const user = auth.currentUser || authUser;
       if (!user) throw new Error("Not authenticated");
 
-      const certRef = ref(storage, `certificates/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(certRef, file, { contentType: file.type });
-      const publicUrl = await getDownloadURL(certRef);
+      const formData = new FormData();
+      formData.append("file", file, `${user.uid}_cert_${Date.now()}_${file.name}`);
+      const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error("Failed to upload certificate");
+      const { publicUrl } = await res.json();
 
       const newCerts = [...certificates, publicUrl];
       await updateDoc(doc(db, "artisans", user.uid), { certificates: newCerts });
@@ -239,12 +243,22 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     try {
       if (!authUser) return;
       
-      await deleteDoc(doc(db, "users", authUser.uid));
-      if (isArtisan) {
-        await deleteDoc(doc(db, "artisans", authUser.uid));
+      const idToken = await authUser.getIdToken();
+      
+      const res = await fetch("/api/delete-account", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        }
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete account");
       }
       
-      await deleteUser(authUser);
+      await auth.signOut();
       router.push("/");
     } catch (err: any) {
       if (err.code === "auth/requires-recent-login") {
@@ -259,7 +273,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
   };
 
   return (
-    <div className="max-w-xl mx-auto pt-16 px-6 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="w-full pt-16 px-6 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)]">
         SETTINGS
       </h1>
@@ -300,6 +314,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         </button>
       </div>
 
+      <div className="max-w-4xl mx-auto">
       {activeTab === "profile" && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
           {/* Profile Picture Change Section */}
@@ -543,6 +558,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
           onCancel={() => setCropperSrc(null)}
         />
       )}
+      </div>
     </div>
   );
 }

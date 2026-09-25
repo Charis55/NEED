@@ -23,6 +23,53 @@ export interface ArtisanService {
   isCertificateVerified?: boolean;
 }
 
+// --- Verification Pipeline Types ---
+
+export interface CertificateExtraction {
+  applicantNameOnDocument: string;
+  certificateNumber: string;
+  issuingBody: string;
+  issueDate: string | null;
+  documentHash: string;
+  tamperScore: number;
+}
+
+export interface PoliceClearanceExtraction {
+  applicantNameOnDocument: string;
+  identificationNumberOnDocument: string;
+  possapReferenceNumber: string | null;
+  issueDate: string | null;
+  documentHash: string;
+  tamperScore: number;
+}
+
+export interface VerificationDecisionLogEntry {
+  action: "approved" | "rejected" | "flagged" | "expired" | "re_verified";
+  adminId: string;
+  adminEmail: string;
+  timestamp: number;
+  reason?: string;
+}
+
+export interface VerificationReviewItem {
+  artisanId: string;
+  artisanName: string;
+  flaggedChecks: string[];
+  extractedData: {
+    certificate?: CertificateExtraction | null;
+    policeClearance?: PoliceClearanceExtraction | null;
+    identityVerifiedName?: string | null;
+  };
+  certificateUrl: string | null;
+  policeClearanceUrl: string | null;
+  status: "pending" | "approved" | "rejected";
+  reviewedBy: string | null;
+  reviewedAt: number | null;
+  createdAt: number;
+}
+
+// --- End Verification Pipeline Types ---
+
 export interface ArtisanProfile {
   artisanId: string;
   userId: string;
@@ -40,6 +87,7 @@ export interface ArtisanProfile {
   geohash: string;
   lat: number;
   lng: number;
+  profilePictureUrl?: string;
   portfolioPhotoUrls: string[];
   yearsOfExperience: string;
   skillLevel: string;
@@ -53,6 +101,28 @@ export interface ArtisanProfile {
   ratingCount: number;
   available: boolean;
   createdAt: number;
+
+  // --- Verification Pipeline Fields ---
+  identityVerificationStatus?: "not_started" | "pending" | "in_progress" | "pending_review" | "verified" | "failed" | "abandoned" | "expired" | "kyc_expired" | "resubmitted";
+  identityVerificationProvider?: string | null;
+  identityVerificationReference?: string | null;
+  identityVerifiedName?: string | null;
+  identityVerifiedDOB?: string | null;
+  kycSessionId?: string | null;
+
+  certificateVerificationStatus?: "pending" | "auto_verified" | "flagged" | "manually_verified" | "rejected";
+  certificateExtractedData?: CertificateExtraction | null;
+
+  policeClearanceStatus?: "pending" | "flagged" | "manually_verified" | "rejected" | "expired";
+  policeClearanceExtractedData?: PoliceClearanceExtraction | null;
+  policeClearanceExpiryDate?: number | null;
+
+  manualReviewRequired?: boolean;
+  manualReviewReasons?: string[];
+  verificationDecisionLog?: VerificationDecisionLogEntry[];
+
+  // Onboarding progress tracking (1–6, set after final submit)
+  onboardingStep?: number;
 }
 
 export interface JobRequest {

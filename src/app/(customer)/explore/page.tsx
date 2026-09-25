@@ -25,7 +25,10 @@ const GENERATED_IMAGE_IDS = [
   "painting-and-decoration", "welding-and-metal-fabrication", "roofing",
   "glazing-and-window-or-door-fitting", "locksmith-services", "gas-technician-services",
   "home-appliance-repair", "security-and-smart-home-installation", 
-  "cleaning-fumigation-and-pest-control", "gardening-and-landscaping"
+  "cleaning-fumigation-and-pest-control", "gardening-and-landscaping",
+  "tailoring-and-fashion", "hairdressing-and-barbing", "laundry-and-dry-cleaning",
+  "automobile-services", "phone-and-electronics-repair", "shoe-and-leather-repair",
+  "event-and-catering-services", "construction-adjacent-trades"
 ];
 
 type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
@@ -108,8 +111,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Section */}
-      <div className="bg-[var(--color-brutal-green)] border-b-8 border-black px-6 pt-12 pb-10 mb-8">
-        <div className="flex justify-between items-center mb-8 relative z-[60]">
+      <div className="bg-[var(--color-brutal-green)] border-b-8 border-black pt-12 pb-10 mb-8">
+        <div className="w-full px-6 md:px-12 relative z-[60]">
+          <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
               <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="w-full h-full text-2xl text-black font-black" />
@@ -148,19 +152,20 @@ export default function Dashboard() {
         </h1>
 
         <div className="relative mt-2">
-          <GlobalSearch variant="brutalist" />
+            <GlobalSearch variant="brutalist" />
+          </div>
         </div>
       </div>
 
       {/* Categories Section */}
-      <div className="px-6 mt-10">
+      <div className="w-full px-6 md:px-12 mt-10">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-black uppercase">Services</h2>
           <span className="text-xs font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1">
             {sortBy === "Most Available" ? "By Availability" : sortBy === "Most Specific Services" ? "By Specificity" : sortBy}
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-6 md:gap-10">
           {sortedCategories.map((category, index) => {
             const style = BRUTAL_CARD_STYLES[index % BRUTAL_CARD_STYLES.length];
             const hasImage = GENERATED_IMAGE_IDS.includes(category.id);

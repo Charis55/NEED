@@ -138,6 +138,19 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
 
       await setDoc(requestRef, newRequest);
       
+      // Trigger New Job Request Email
+      fetch('/api/emails/new-job-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artisanId: unwrappedParams.artisanId,
+          customerName: user.displayName || "A customer",
+          trade: newRequest.trade,
+          neighborhood: newRequest.neighborhood,
+          preferredTime: newRequest.preferredTime
+        }),
+      }).catch(e => console.error("Failed to send job request email:", e));
+
       router.push("/?requested=true");
     } catch (err: any) {
       console.error(err);
@@ -167,7 +180,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         </h1>
       </div>
 
-      <div className="px-6 py-8 pb-24 max-w-md mx-auto w-full">
+      <div className="px-6 py-8 pb-24 max-w-3xl mx-auto w-full">
         {artisan && (
           <div className="mb-8 bg-white brutal-card p-4 flex gap-4 items-center">
             <div className="w-16 h-16 bg-gray-200 border-2 border-black flex-shrink-0 shadow-[2px_2px_0_0_#000]">

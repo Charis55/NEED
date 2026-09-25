@@ -83,3 +83,29 @@ export const onReviewCreated = functions.firestore
     
     return null;
   });
+
+// --- Verification Pipeline Functions ---
+export { onArtisanProfileCreated } from "./verification/onDocumentUploaded";
+export { checkPoliceClearanceExpiry } from "./verification/checkExpiry";
+export { retentionCleanup } from "./verification/retentionCleanup";
+
+// Temporary function to grant admin access to the owner
+export const grantAdmin = functions.https.onRequest(async (req, res) => {
+  try {
+    const emailToElevate = "obunezicharis@gmail.com";
+    const userRecord = await admin.auth().getUserByEmail(emailToElevate);
+    
+    if (userRecord) {
+      await db.collection("users").doc(userRecord.uid).update({
+        isAdmin: true
+      });
+      res.status(200).send(`Successfully granted admin access to ${emailToElevate}`);
+    } else {
+      res.status(404).send("User not found");
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error granting admin access.");
+  }
+});
+

@@ -135,7 +135,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
         </p>
       </div>
 
-      <div className="flex-1 p-6 flex flex-col max-w-lg mx-auto w-full">
+      <div className="flex-1 p-6 flex flex-col max-w-3xl mx-auto w-full">
         {error && (
           <div className="bg-[var(--color-brutal-red)] text-white p-4 font-black uppercase tracking-widest border-4 border-black shadow-[4px_4px_0_0_#000] mb-6 transform -rotate-1">
             {error}

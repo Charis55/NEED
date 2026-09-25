@@ -170,6 +170,13 @@ export default function AuthForm() {
           if (role === "artisan") {
             router.push("/onboarding");
           } else {
+            // Trigger Welcome Customer Email
+            fetch('/api/emails/welcome-customer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: result.user.uid }),
+            }).catch(e => console.error("Failed to send welcome email:", e));
+
             router.push("/explore");
           }
           return;

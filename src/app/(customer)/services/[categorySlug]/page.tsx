@@ -109,7 +109,8 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Header */}
-      <div className="px-6 pt-12 pb-6 flex-shrink-0 bg-[var(--color-brutal-blue)] border-b-4 border-black brutal-shadow-sm transition-all">
+      <div className="pt-12 pb-6 flex-shrink-0 bg-[var(--color-brutal-blue)] border-b-4 border-black brutal-shadow-sm transition-all">
+        <div className="w-full px-6 md:px-12">
         <div className="flex justify-between items-center mb-6 relative">
           <BackButton href="/explore" className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0" />
           
@@ -165,11 +166,12 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
             className="w-full bg-white text-black font-bold p-4 brutal-border placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-yellow)]"
           />
         </div>
+        </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 bg-[var(--color-brutal-bg)] px-6 pt-10 pb-20 overflow-y-auto">
-        <div className="flex flex-col gap-6">
+        <div className="w-full px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-10">
           {subServices.length === 0 ? (
             <div className="text-center p-8 bg-white brutal-border brutal-shadow">
               <p className="font-black text-xl text-black">NO RESULTS FOUND</p>

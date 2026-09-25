@@ -12,7 +12,7 @@ export default function CustomerLayout({ children }: { children: ReactNode }) {
         <img src="/LOGO.png" alt="N Logo" className="h-6 w-auto" />
         <span className="text-xl font-black text-black leading-none tracking-tighter -ml-0.5 mt-0.5">EED</span>
       </Link>
-      <main className="max-w-7xl mx-auto pb-8">
+      <main className="w-full pb-8">
         {children}
       </main>
       <CustomerDock />

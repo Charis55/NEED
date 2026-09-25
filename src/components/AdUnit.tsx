@@ -11,6 +11,7 @@ export default function AdUnit({ adSlot, className = "" }: AdUnitProps) {
   const publisherId = "ca-pub-4445454590724783";
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
     try {
       // @ts-ignore
       (window.adsbygoogle = window.adsbygoogle || []).push({});

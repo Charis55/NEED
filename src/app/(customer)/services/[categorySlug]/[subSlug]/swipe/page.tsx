@@ -313,7 +313,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
       </div>
 
       {/* Card Stack Area */}
-      <div className="flex-1 relative px-6 max-w-md mx-auto w-full">
+      <div className="flex-1 relative px-6 md:px-12 w-full">
         <div className="relative w-full h-[500px]">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow">
@@ -364,7 +364,7 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
 
       {/* Global Job Board Fallback */}
       {!loading && artisans.length > 0 && (
-        <div className="px-6 mt-4 mb-8 max-w-md mx-auto w-full">
+        <div className="px-6 md:px-12 mt-4 mb-8 w-full">
           <button 
             onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
             className="bg-[var(--color-brutal-yellow)] px-6 py-4 brutal-btn w-full text-sm sm:text-base font-black border-4 border-black shadow-[4px_4px_0_0_#000] uppercase tracking-tighter"

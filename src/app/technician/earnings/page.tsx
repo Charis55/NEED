@@ -217,7 +217,7 @@ Date: ${new Date().toLocaleDateString()}
         </div>
       </div>
 
-      <div className="p-4 md:p-8 flex-1 overflow-y-auto space-y-8 max-w-3xl mx-auto w-full">
+      <div className="p-4 md:p-8 flex-1 overflow-y-auto space-y-8 max-w-6xl mx-auto w-full">
         {weeklyEarnings.length === 0 ? (
           <div className="bg-white border-4 border-black p-8 text-center brutal-shadow rotate-1">
             <p className="font-black text-2xl uppercase mb-2">No earnings yet</p>
