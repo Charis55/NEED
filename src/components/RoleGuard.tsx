@@ -29,7 +29,12 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
           
           if (requiredRole === "artisan") {
             if (role === "artisan") {
-              setAuthorized(true);
+              const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
+              if (!artisanDoc.exists() || artisanDoc.data()?.onboardingStep !== 6) {
+                router.push("/onboarding");
+              } else {
+                setAuthorized(true);
+              }
             } else {
               router.push("/explore");
             }
