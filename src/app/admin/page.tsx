@@ -307,8 +307,8 @@ export default function AdminDashboard() {
                 <TrendingUp className="w-10 h-10 text-black" />
                 <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">NGN</span>
               </div>
-              <div className="text-5xl font-black mb-1 truncate" title={jobs.filter(j => j.status === "completed" && j.price).reduce((acc, curr) => acc + (curr.price || 0), 0).toLocaleString()}>
-                ₦{jobs.filter(j => j.status === "completed" && j.price).reduce((acc, curr) => acc + (curr.price || 0), 0).toLocaleString()}
+              <div className="text-5xl font-black mb-1 truncate" title={jobs.filter(j => j.status === "completed" && j.offerAmount).reduce((acc, curr) => acc + (curr.offerAmount || 0), 0).toLocaleString()}>
+                ₦{jobs.filter(j => j.status === "completed" && j.offerAmount).reduce((acc, curr) => acc + (curr.offerAmount || 0), 0).toLocaleString()}
               </div>
               <div className="font-bold uppercase tracking-widest text-sm text-gray-800">Transaction Volume</div>
             </div>
