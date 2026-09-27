@@ -8,6 +8,7 @@ import { servicesData } from "@/data/services";
 import { notFound } from "next/navigation";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import GuestCTA from "@/components/GuestCTA";
 
 import { use } from "react";
 
@@ -170,7 +171,10 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-[var(--color-brutal-bg)] px-6 pt-10 pb-20 overflow-y-auto">
+      <div className="flex-1 bg-[var(--color-brutal-bg)] px-6 pt-6 pb-20 overflow-y-auto">
+        <div className="w-full px-4 md:px-8 mb-6">
+          <GuestCTA />
+        </div>
         <div className="w-full px-4 md:px-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-10">
           {subServices.length === 0 ? (
             <div className="text-center p-8 bg-white brutal-border brutal-shadow">

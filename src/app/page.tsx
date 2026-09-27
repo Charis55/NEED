@@ -116,16 +116,16 @@ export default function LandingPage() {
           
           <div className="flex flex-col sm:flex-row items-start justify-start gap-6">
             <Link 
-              href="/login?mode=signup&role=customer" 
+              href="/explore" 
               className="bg-[var(--color-brutal-red)] text-2xl px-10 py-5 brutal-btn w-full sm:w-auto"
             >
               Start Exploring <ArrowRight className="w-8 h-8 ml-3" />
             </Link>
             <Link 
-              href="/login?mode=signup&role=artisan" 
+              href="/login?mode=signup" 
               className="bg-white text-xl px-10 py-5 brutal-btn w-full sm:w-auto"
             >
-              Become a Technician
+              Sign up for NEED
             </Link>
           </div>
         </div>

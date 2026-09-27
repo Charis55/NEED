@@ -10,6 +10,7 @@ import { collection, getDocs, query, limit, where, doc, getDoc } from "firebase/
 import { ArtisanProfile } from "@/types";
 import { useRouter } from "next/navigation";
 import { servicesData } from "@/data/services";
+import FavoriteButton from "@/components/FavoriteButton";
 
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3; // metres
@@ -81,7 +82,7 @@ function SwipeCard({
           onClick={() => {
             // Prevent navigating if they are just interacting with the buttons
             const router = require('next/navigation').useRouter; // Hook cannot be called here, need to pass router or use window
-            window.location.href = `/artisan/${artisan.artisanId}`;
+            window.location.href = `/artisans/${artisan.artisanId}`;
           }}
         >
           <div className="flex items-start gap-4 mb-6 border-b-4 border-black pb-4">
@@ -99,7 +100,7 @@ function SwipeCard({
                 draggable="false"
               />
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{((artisan as any).firstName && (artisan as any).lastName) ? `${(artisan as any).firstName} ${(artisan as any).lastName}` : (artisan.name || "Technician")}</h2>
               <p className="text-black font-bold text-sm mb-2 uppercase">{artisan.yearsOfExperience || "3-5 years"} exp</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -114,6 +115,9 @@ function SwipeCard({
                   </div>
                 )}
               </div>
+            </div>
+            <div onClick={(e) => e.stopPropagation()}>
+              <FavoriteButton artisanId={artisan.artisanId} />
             </div>
           </div>
 
@@ -153,13 +157,25 @@ function SwipeCard({
   );
 }
 
-export default function SwipePage({ params }: { params: Promise<{ categorySlug: string, subSlug: string }> }) {
+import dynamic from "next/dynamic";
+
+const TechnicianMap = dynamic(
+  () => import("@/components/TechnicianMap"),
+  { 
+    ssr: false, 
+    loading: () => (
+      <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-brutal-bg)] border-4 border-black brutal-shadow">
+        <GlobalSpinner text="LOADING MAP" />
+      </div>
+    ) 
+  }
+);
+
+export default function FindTechnicianMapPage({ params }: { params: Promise<{ categorySlug: string, subSlug: string }> }) {
   const unwrappedParams = use(params);
   const [artisans, setArtisans] = useState<(ArtisanProfile & { distance?: number })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [showSortModal, setShowSortModal] = useState(false);
-  const [sortBy, setSortBy] = useState<"recommended" | "distance" | "rating">("recommended");
+  const [selectedArtisan, setSelectedArtisan] = useState<ArtisanProfile | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -176,8 +192,10 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
         const decodedCategory = decodeURIComponent(unwrappedParams.categorySlug).replace(/-/g, ' ');
         const decodedSub = decodeURIComponent(unwrappedParams.subSlug).replace(/-/g, ' ');
 
-        // Filter in-memory by subcategory to ensure we only show relevant pros
         const data = allData.filter(artisan => {
+          // Do not show artisans who haven't completed setup
+          if (artisan.onboardingStep !== undefined && artisan.onboardingStep < 6) return false;
+
           if (artisan.services && artisan.services.length > 0) {
             return artisan.services.some(svc => 
               svc.trade.toLowerCase() === decodedCategory.toLowerCase() && 
@@ -205,34 +223,9 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
           return list;
         };
 
-        // Geolocation and Sorting
-        if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const { latitude, longitude } = position.coords;
-              const mapped = data.map(a => ({
-                ...a,
-                distance: getDistance(latitude, longitude, a.lat || 0, a.lng || 0)
-              }));
-              mapped.sort((a, b) => a.distance - b.distance);
-              const result = await populateNames(mapped.slice(0, 10));
-              setArtisans(result);
-              setLoading(false);
-            },
-            async (error) => {
-              console.warn("Location declined or unavailable. Sorting by rating.", error);
-              data.sort((a, b) => b.ratingAverage - a.ratingAverage);
-              const result = await populateNames(data.slice(0, 10));
-              setArtisans(result as any[]);
-              setLoading(false);
-            }
-          );
-        } else {
-          data.sort((a, b) => b.ratingAverage - a.ratingAverage);
-          const result = await populateNames(data.slice(0, 10));
-          setArtisans(result as any[]);
-          setLoading(false);
-        }
+        const result = await populateNames(data);
+        setArtisans(result as any[]);
+        setLoading(false);
       } catch (err) {
         console.error("Failed to fetch artisans", err);
         setLoading(false);
@@ -241,198 +234,102 @@ export default function SwipePage({ params }: { params: Promise<{ categorySlug: 
     fetchArtisans();
   }, [unwrappedParams.categorySlug, unwrappedParams.subSlug]);
 
-  const handleSort = (type: "recommended" | "distance" | "rating") => {
-    setSortBy(type);
-    setShowSortModal(false);
-    
-    const sorted = [...artisans];
-    if (type === "rating") {
-      sorted.sort((a, b) => b.ratingAverage - a.ratingAverage);
-    } else if (type === "distance") {
-      // Push items without distance to the end
-      sorted.sort((a, b) => {
-        if (a.distance === undefined) return 1;
-        if (b.distance === undefined) return -1;
-        return a.distance - b.distance;
-      });
-    } else {
-      // Recommended: simple mix
-      sorted.sort(() => Math.random() - 0.5);
-    }
-    setArtisans(sorted);
-  };
-
-  const removeCard = (id: string, swipe: "left" | "right") => {
-    setArtisans(prev => prev.filter(a => a.artisanId !== id));
-  };
-
   const handleAccept = (artisanId: string) => {
     router.push(`/artisan/${artisanId}`);
   };
 
-  const category = servicesData[unwrappedParams.categorySlug];
-  const tags = category 
-    ? category.subServices.slice(0, 10).map(sub => `#${sub.title.replace(/\s+/g, '').toLowerCase()}`)
-    : ["#service", "#professional", "#expert", "#technician"];
-
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans overflow-hidden selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Header */}
-      <div className="px-6 pt-12 pb-4">
-        <div className="flex justify-between items-center mb-6">
+      <div className="px-6 pt-12 pb-4 shrink-0 z-10 bg-[var(--color-brutal-bg)]">
+        <div className="flex justify-between items-center mb-4">
           <Link href={`/services/${unwrappedParams.categorySlug}`} className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none">
             <ChevronLeft className="w-6 h-6 text-black stroke-[3]" />
           </Link>
-          <button 
-            onClick={() => setShowSortModal(true)}
-            className="w-12 h-12 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none"
-          >
-            <SlidersHorizontal className="w-5 h-5 text-black stroke-[3]" />
-          </button>
         </div>
         
-        <h1 className="text-4xl font-black text-black mb-6 uppercase tracking-tighter leading-none max-w-[200px] border-l-8 border-black pl-4">
-          CHOOSE A TECHNICIAN
+        <h1 className="text-3xl font-black text-black uppercase tracking-tighter leading-none max-w-sm border-l-8 border-black pl-4">
+          FIND A TECHNICIAN
         </h1>
+        <p className="font-bold text-sm bg-[var(--color-brutal-yellow)] px-2 py-1 brutal-border inline-block mt-3 -rotate-1">
+          TAP MARKER TO SELECT TECHNICIAN
+        </p>
       </div>
 
-      {/* Horizontal Scroll Tags */}
-      <div className="px-6 mb-8 overflow-x-auto no-scrollbar whitespace-nowrap pb-4">
-        <div className="flex gap-4">
-          {tags.map((tag, i) => (
-            <div 
-              key={tag} 
-              className={`px-4 py-2 brutal-border font-black uppercase text-sm brutal-shadow-sm ${
-                i % 2 === 0 ? 'bg-[var(--color-brutal-pink)] text-black rotate-1' : 'bg-white text-black -rotate-1'
-              }`}
-            >
-              {tag}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Card Stack Area */}
-      <div className="flex-1 relative px-6 md:px-12 w-full">
-        <div className="relative w-full h-[500px]">
+      {/* Map Area */}
+      <div className="flex-1 flex flex-col relative w-full px-6 md:px-12 pb-6">
+        <div className="relative w-full flex-1 min-h-[500px] border-4 border-black brutal-shadow overflow-hidden bg-white">
           {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow">
-              <GlobalSpinner text="FINDING A TECHNICIAN" />
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <GlobalSpinner text="LOADING MAP" />
             </div>
           ) : artisans.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-white brutal-border brutal-shadow text-center p-8">
-              <div>
-                <p className="text-black font-black text-xl uppercase mb-6">No more technicians found here.</p>
-                <div className="space-y-4">
-                  <button 
-                    onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
-                    className="bg-[var(--color-brutal-pink)] px-6 py-4 brutal-btn w-full text-sm sm:text-base whitespace-nowrap"
-                  >
-                    POST TO GLOBAL JOB BOARD (UP FOR GRABS)
-                  </button>
-                  <button 
-                    onClick={() => router.push(`/services/${unwrappedParams.categorySlug}`)}
-                    className="bg-[var(--color-brutal-blue)] px-6 py-4 brutal-btn w-full"
-                  >
-                    GO BACK
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <AnimatePresence>
-              {artisans.map((artisan, index) => {
-                // Only render the top 2 cards for performance and visual stacking effect
-                if (index > 1) return null;
-                const isFront = index === 0;
-
-                return (
-                  <SwipeCard 
-                    key={artisan.artisanId} 
-                    artisan={artisan} 
-                    removeCard={removeCard} 
-                    onAccept={handleAccept}
-                    onImageClick={(url) => setFullscreenImage(url)}
-                    isFront={isFront} 
-                  />
-                );
-              }).reverse()}
-            </AnimatePresence>
-          )}
-        </div>
-      </div>
-
-      {/* Global Job Board Fallback */}
-      {!loading && artisans.length > 0 && (
-        <div className="px-6 md:px-12 mt-4 mb-8 w-full">
-          <button 
-            onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
-            className="bg-[var(--color-brutal-yellow)] px-6 py-4 brutal-btn w-full text-sm sm:text-base font-black border-4 border-black shadow-[4px_4px_0_0_#000] uppercase tracking-tighter"
-          >
-            CAN'T FIND ANYONE? POST TO GLOBAL JOB BOARD
-          </button>
-        </div>
-      )}
-
-
-      {/* Fullscreen Image Lightbox */}
-      {fullscreenImage && (
-        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setFullscreenImage(null)}>
-          <button 
-            onClick={() => setFullscreenImage(null)}
-            className="absolute top-6 right-6 w-12 h-12 bg-white border-4 border-black flex items-center justify-center hover:bg-[var(--color-brutal-red)] hover:text-white transition-colors brutal-shadow-sm z-10"
-          >
-            <X className="w-8 h-8 stroke-[3]" />
-          </button>
-          
-          <img 
-            src={fullscreenImage} 
-            alt="Fullscreen View" 
-            className="max-w-full max-h-[90vh] object-contain border-4 border-black brutal-shadow bg-white"
-            onClick={(e) => e.stopPropagation()} 
-          />
-        </div>
-      )}
-
-      {/* Sort Modal */}
-      {showSortModal && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-end justify-center p-4 backdrop-blur-sm" onClick={() => setShowSortModal(false)}>
-          <motion.div 
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white border-4 border-black brutal-shadow mb-4 p-6"
-          >
-            <div className="flex justify-between items-center mb-6 border-b-4 border-black pb-4">
-              <h2 className="text-2xl font-black text-black uppercase">Sort Technicians</h2>
-              <button onClick={() => setShowSortModal(false)}>
-                <X className="w-6 h-6 stroke-[3]" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10">
+              <p className="text-black font-black text-xl uppercase mb-6">No technicians active in this area.</p>
+              <button 
+                onClick={() => router.push(`/services/${unwrappedParams.categorySlug}/${unwrappedParams.subSlug}/broadcast`)}
+                className="bg-[var(--color-brutal-pink)] px-4 py-4 brutal-btn w-full max-w-xs md:max-w-md text-xs md:text-sm font-black whitespace-normal break-words"
+              >
+                POST TO GLOBAL JOB BOARD
               </button>
             </div>
-            
-            <div className="space-y-4">
-              {[
-                { id: "recommended", label: "Recommended (Default)", color: "bg-[var(--color-brutal-yellow)]" },
-                { id: "distance", label: "Nearest to me", color: "bg-[var(--color-brutal-teal)]" },
-                { id: "rating", label: "Highest Rated", color: "bg-[var(--color-brutal-pink)]" }
-              ].map(option => (
-                <button
-                  key={option.id}
-                  onClick={() => handleSort(option.id as any)}
-                  className={`w-full p-4 border-4 border-black font-black uppercase flex justify-between items-center transition-transform hover:-translate-y-1 ${
-                    sortBy === option.id ? option.color + " shadow-[4px_4px_0_0_#000]" : "bg-white hover:bg-gray-50"
-                  }`}
-                >
-                  <span>{option.label}</span>
-                  {sortBy === option.id && <Check className="w-6 h-6 stroke-[3]" />}
-                </button>
-              ))}
-            </div>
-          </motion.div>
+          ) : (
+            <TechnicianMap 
+              technicians={artisans} 
+              onMarkerClick={(tech) => setSelectedArtisan(tech)}
+            />
+          )}
+
+          {/* Overlay Card */}
+          <AnimatePresence>
+            {selectedArtisan && (
+              <motion.div 
+                initial={{ y: 200, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 200, opacity: 0 }}
+                className="absolute bottom-4 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[400px] bg-white border-4 border-black shadow-[8px_8px_0_0_#000] z-[1000] flex flex-col overflow-hidden"
+              >
+                <div className="p-4 border-b-4 border-black flex gap-4 bg-[var(--color-brutal-teal)]">
+                  <div className="w-16 h-16 bg-white border-2 border-black flex-shrink-0">
+                    <img 
+                      src={selectedArtisan.profilePictureUrl || selectedArtisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedArtisan.name || 'Artisan')}&background=random&size=150`} 
+                      alt={selectedArtisan.name} 
+                      className="w-full h-full object-cover grayscale contrast-125"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    <h2 className="text-xl font-black text-black uppercase tracking-tighter truncate leading-tight">
+                      {((selectedArtisan as any).firstName && (selectedArtisan as any).lastName) ? `${(selectedArtisan as any).firstName} ${(selectedArtisan as any).lastName}` : (selectedArtisan.name || "Technician")}
+                    </h2>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="inline-flex items-center gap-1 bg-white text-black border-2 border-black px-1.5 py-0.5 font-black text-[10px]">
+                        <Star className="w-3 h-3 fill-[var(--color-brutal-yellow)]" />
+                        <span>{selectedArtisan.ratingAverage > 0 ? selectedArtisan.ratingAverage.toFixed(1) : "NEW"}</span>
+                      </div>
+                      <span className="text-xs font-bold uppercase truncate">{selectedArtisan.neighborhood}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex bg-white">
+                  <button 
+                    className="flex-1 py-4 text-center font-black text-black uppercase border-r-4 border-black hover:bg-[var(--color-brutal-red)] hover:text-white transition-colors"
+                    onClick={() => setSelectedArtisan(null)}
+                  >
+                    BACK
+                  </button>
+                  <button 
+                    className="flex-[2] py-4 text-center font-black text-black uppercase bg-[var(--color-brutal-yellow)] hover:bg-black hover:text-white transition-colors"
+                    onClick={() => handleAccept(selectedArtisan.artisanId)}
+                  >
+                    SELECT
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      )}
+      </div>
     </div>
   );
 }

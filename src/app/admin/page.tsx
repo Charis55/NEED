@@ -191,13 +191,22 @@ export default function AdminDashboard() {
             Manage users, oversee technician verifications, and monitor platform health.
           </p>
         </div>
-        <Link
-          href="/admin/verification"
-          className="flex items-center gap-3 bg-[#FF4D4D] hover:bg-[#ff3333] text-white px-6 py-4 border-4 border-black font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none"
-        >
-          <ShieldCheck className="w-6 h-6" />
-          Review Queue ({pendingVerification})
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Link
+            href="/admin/disputes"
+            className="flex items-center gap-3 bg-[var(--color-brutal-yellow)] hover:bg-yellow-400 text-black px-6 py-4 border-4 border-black font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none"
+          >
+            <AlertTriangle className="w-6 h-6" />
+            Disputes
+          </Link>
+          <Link
+            href="/admin/verification"
+            className="flex items-center gap-3 bg-[#FF4D4D] hover:bg-[#ff3333] text-white px-6 py-4 border-4 border-black font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none"
+          >
+            <ShieldCheck className="w-6 h-6" />
+            Review Queue ({pendingVerification})
+          </Link>
+        </div>
       </div>
 
       {/* Tabs */}

@@ -6,14 +6,53 @@ import { collection, query, where, getDocs, doc, updateDoc } from "firebase/fire
 import { JobRequest } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
+import Link from "next/link";
+import ReportModal from "@/components/ReportModal";
+import { AlertTriangle } from "lucide-react";
 
 export default function ArtisanDashboard() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportingJob, setReportingJob] = useState<JobRequest | null>(null);
   const [counterInputs, setCounterInputs] = useState<Record<string, string>>({});
   const [showCounterFor, setShowCounterFor] = useState<string | null>(null);
   const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
   const [showPromoOverlay, setShowPromoOverlay] = useState(false);
+
+  // Live Location Tracking
+  useEffect(() => {
+    const hasEnRouteJobs = requests.some(r => r.status === "en_route");
+    let watchId: number;
+
+    if (hasEnRouteJobs && navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          
+          // Update location for all en_route jobs
+          requests.forEach(async (req) => {
+            if (req.status === "en_route") {
+              const reqRef = doc(db, "jobRequests", req.requestId);
+              await updateDoc(reqRef, {
+                technicianLocation: {
+                  lat,
+                  lng,
+                  updatedAt: Date.now()
+                }
+              }).catch(e => console.error("Failed to update location", e));
+            }
+          });
+        },
+        (error) => console.error("Geolocation error:", error),
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+      );
+    }
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [requests]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -117,6 +156,10 @@ export default function ArtisanDashboard() {
         updatePayload.declinedBy = "artisan";
       }
 
+      if (newStatus === "cancelled") {
+        updatePayload.cancelledBy = "artisan";
+      }
+
       await updateDoc(reqRef, updatePayload);
       
       // Trigger Job Completed (Receipt) Email if marked as completed
@@ -148,6 +191,52 @@ export default function ArtisanDashboard() {
       setShowCounterFor(null);
     } catch (error) {
       console.error("Failed to update status", error);
+    }
+  };
+
+  const [reschedulingJob, setReschedulingJob] = useState<string | null>(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+
+  const handleRequestReschedule = async (requestId: string) => {
+    if (!newDate || !newTime) {
+      alert("Please select a new date and time");
+      return;
+    }
+    
+    try {
+      const reqRef = doc(db, "jobRequests", requestId);
+      const updatePayload: Partial<JobRequest> = {
+        rescheduledAt: Date.now(),
+        newPreferredTime: `${newDate} at ${newTime}`,
+        rescheduleRequestedBy: "artisan",
+        rescheduleStatus: "pending"
+      };
+      await updateDoc(reqRef, updatePayload as any);
+      setRequests(prev => prev.map(req => req.requestId === requestId ? { ...req, ...updatePayload } : req));
+      setReschedulingJob(null);
+      alert("Reschedule request sent!");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send reschedule request");
+    }
+  };
+
+  const handleRespondReschedule = async (requestId: string, response: "accepted" | "declined", newPreferredTime: string) => {
+    try {
+      const reqRef = doc(db, "jobRequests", requestId);
+      const updatePayload: any = {
+        rescheduleStatus: response
+      };
+      if (response === "accepted") {
+        updatePayload.preferredTime = newPreferredTime;
+      }
+      await updateDoc(reqRef, updatePayload);
+      setRequests(prev => prev.map(req => req.requestId === requestId ? { ...req, ...updatePayload } : req));
+      alert(`Reschedule ${response}`);
+    } catch (err) {
+      console.error(err);
+      alert("Error responding to reschedule");
     }
   };
 
@@ -234,10 +323,13 @@ export default function ArtisanDashboard() {
                           ${req.status === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
                           ${req.status === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
                           ${req.status === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
+                          ${req.status === 'en_route' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
+                          ${req.status === 'in_progress' ? 'bg-[var(--color-brutal-blue)] text-white bg-black' : ''}
+                          ${req.status === 'payment_pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
                           ${req.status === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
                           ${req.status === 'declined' ? 'bg-[var(--color-brutal-red)] text-black' : ''}
                         `}>
-                          {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'ACTION REQUIRED' : 'AWAITING CUSTOMER') : req.status === 'declined' ? (req.declinedBy === 'artisan' ? 'TECHNICIAN DECLINED' : 'CUSTOMER DECLINED') : req.status}
+                          {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'ACTION REQUIRED' : 'AWAITING CUSTOMER') : req.status === 'declined' ? (req.declinedBy === 'artisan' ? 'TECHNICIAN DECLINED' : 'CUSTOMER DECLINED') : req.status.replace('_', ' ')}
                         </span>
                         <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
                           {req.isBroadcast && req.status === "pending" ? "Broadcast Request" : "Job Details"}
@@ -346,10 +438,109 @@ export default function ArtisanDashboard() {
                     {req.status === "accepted" && (
                       <div className="mt-6">
                         <button 
-                          onClick={() => handleUpdateStatus(req.requestId, "payment_pending")}
+                          onClick={() => handleUpdateStatus(req.requestId, "en_route")}
                           className="w-full bg-[var(--color-brutal-blue)] py-5 text-xl brutal-btn"
                         >
+                          I'M ON MY WAY
+                        </button>
+                      </div>
+                    )}
+
+                    {req.status === "en_route" && (
+                      <div className="mt-6">
+                        <button 
+                          onClick={() => handleUpdateStatus(req.requestId, "in_progress")}
+                          className="w-full bg-[var(--color-brutal-teal)] py-5 text-xl brutal-btn"
+                        >
+                          START JOB
+                        </button>
+                      </div>
+                    )}
+
+                    {req.status === "in_progress" && (
+                      <div className="mt-6">
+                        <button 
+                          onClick={() => handleUpdateStatus(req.requestId, "payment_pending")}
+                          className="w-full bg-[var(--color-brutal-yellow)] py-5 text-xl brutal-btn"
+                        >
                           MARK JOB AS FINISHED
+                        </button>
+                      </div>
+                    )}
+
+                    {["accepted", "en_route", "in_progress", "payment_pending"].includes(req.status) && (
+                      <div className="mt-4 flex flex-col gap-4">
+                        {req.status === "en_route" && (
+                          <a 
+                            href={`https://maps.google.com/?q=${encodeURIComponent(req.neighborhood)}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="w-full bg-black text-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-white hover:text-black transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                          >
+                            🗺️ NAVIGATE TO CUSTOMER
+                          </a>
+                        )}
+                        <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
+                          💬 CHAT WITH CUSTOMER
+                        </Link>
+                      </div>
+                    )}
+
+                    {["accepted", "en_route"].includes(req.status) && (
+                      <div className="mt-4 flex flex-col gap-4">
+                        {req.rescheduleStatus === "pending" ? (
+                          req.rescheduleRequestedBy === "customer" ? (
+                            <div className="bg-[var(--color-brutal-yellow)] p-4 border-4 border-black">
+                              <p className="font-black text-black uppercase mb-2">Customer requested to reschedule to: <br/>{req.newPreferredTime}</p>
+                              <div className="flex gap-2">
+                                <button onClick={() => handleRespondReschedule(req.requestId, "accepted", req.newPreferredTime!)} className="flex-1 bg-[var(--color-brutal-teal)] text-black border-2 border-black font-black uppercase py-2">Accept</button>
+                                <button onClick={() => handleRespondReschedule(req.requestId, "declined", "")} className="flex-1 bg-[var(--color-brutal-red)] text-white border-2 border-black font-black uppercase py-2">Decline</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-white p-4 border-4 border-black text-center font-black uppercase text-sm">
+                              Waiting for customer to accept reschedule
+                            </div>
+                          )
+                        ) : (
+                          reschedulingJob === req.requestId ? (
+                            <div className="bg-[var(--color-brutal-pink)] p-4 border-4 border-black flex flex-col gap-2">
+                              <label className="font-black uppercase text-sm">New Date</label>
+                              <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="p-2 border-2 border-black font-bold" />
+                              <label className="font-black uppercase text-sm">New Time</label>
+                              <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="p-2 border-2 border-black font-bold" />
+                              <div className="flex gap-2 mt-2">
+                                <button onClick={() => handleRequestReschedule(req.requestId)} className="flex-1 bg-black text-white border-2 border-black font-black uppercase py-2">Submit</button>
+                                <button onClick={() => setReschedulingJob(null)} className="flex-1 bg-white text-black border-2 border-black font-black uppercase py-2">Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => {
+                                setReschedulingJob(req.requestId);
+                                setNewDate("");
+                                setNewTime("");
+                              }}
+                              className="w-full bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
+                            >
+                              📅 REQUEST RESCHEDULE
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {["pending", "accepted"].includes(req.status) && (
+                      <div className="mt-4">
+                        <button 
+                          onClick={() => {
+                            if (confirm("Are you sure you want to cancel this job?")) {
+                              handleUpdateStatus(req.requestId, "cancelled");
+                            }
+                          }}
+                          className="w-full bg-[var(--color-brutal-red)] text-white border-4 border-black font-black uppercase text-center py-4 hover:bg-black transition-colors brutal-shadow-sm"
+                        >
+                          ❌ CANCEL JOB
                         </button>
                       </div>
                     )}
@@ -378,6 +569,16 @@ export default function ArtisanDashboard() {
                         </button>
                       </div>
                     )}
+                  {["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(req.status) && (
+                    <div className="mt-6 pt-4 border-t-2 border-black/10 text-center">
+                      <button 
+                        onClick={() => setReportingJob(req)}
+                        className="text-xs font-black uppercase text-gray-500 hover:text-[var(--color-brutal-red)] transition-colors flex items-center justify-center gap-1 mx-auto"
+                      >
+                        <AlertTriangle className="w-3 h-3 stroke-[3]" /> REPORT AN ISSUE
+                      </button>
+                    </div>
+                  )}
                   </div>
                 </div>
               );
@@ -385,6 +586,16 @@ export default function ArtisanDashboard() {
           </div>
         )}
       </div>
+
+      {reportingJob && auth.currentUser && (
+        <ReportModal 
+          jobId={reportingJob.requestId}
+          reportedUserId={reportingJob.customerId}
+          reporterUserId={auth.currentUser.uid}
+          reporterRole="artisan"
+          onClose={() => setReportingJob(null)}
+        />
+      )}
 
       {/* Promo Overlay Modal */}
       {showPromoOverlay && (

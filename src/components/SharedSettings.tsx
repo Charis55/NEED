@@ -8,10 +8,11 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import SignOutButton from "@/components/SignOutButton";
 import { UserAccount } from "@/types";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAlert } from "@/components/AlertProvider";
 import ImageCropper from "@/components/ImageCropper";
 import UserAvatar from "@/components/UserAvatar";
-import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink } from "lucide-react";
+import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle } from "lucide-react";
 import { compressImage } from "@/utils/imageCompression";
 
 interface SharedSettingsProps {
@@ -497,6 +498,21 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       {activeTab === "about" && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <Link 
+            href={isArtisan ? "/technician/help" : "/help"}
+            className="block bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[var(--color-brutal-yellow)] border-4 border-black flex items-center justify-center shrink-0 group-hover:bg-black group-hover:text-[var(--color-brutal-yellow)] transition-colors">
+                <HelpCircle className="w-6 h-6 stroke-[3]" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black uppercase text-black tracking-tighter">Help Center & Support</h2>
+                <p className="font-bold text-gray-600">Get help, read FAQs, and contact support.</p>
+              </div>
+            </div>
+          </Link>
+
           <div className="bg-[var(--color-brutal-blue)] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform">
             <div className="flex items-center gap-4 mb-4 border-b-4 border-black pb-4">
               <div className="w-12 h-12 bg-white border-4 border-black flex items-center justify-center shrink-0">

@@ -203,6 +203,13 @@ export default function ArtisanOnboarding() {
       setLocationError("Location permission is strictly required to proceed.");
       return;
     }
+    if (step === 2) {
+      const serviceSet = new Set(services.map(s => `${s.tradeCategory}:${s.subcategory}`));
+      if (serviceSet.size !== services.length) {
+        setLocationError("You have selected duplicate services. Please remove or change them before proceeding.");
+        return;
+      }
+    }
     if (step === 5 && !profilePictureFile) {
       setError("A Profile Picture is strictly required to proceed.");
       return;

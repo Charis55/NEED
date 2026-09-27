@@ -8,17 +8,22 @@ import { JobRequest, ArtisanProfile } from "@/types";
 import BackButton from "@/components/BackButton";
 import { ArrowRight, MapPin, Clock, Info } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
+import { useLocalDraft } from "@/hooks/useLocalDraft";
 
 export default function RequestArtisanPage({ params }: { params: Promise<{ artisanId: string }> }) {
   const unwrappedParams = use(params);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
-  const [description, setDescription] = useState("");
-  const [preferredDate, setPreferredDate] = useState("");
-  const [preferredTime, setPreferredTime] = useState("");
-  const [offerAmount, setOfferAmount] = useState("");
   
-  // Location
+  // Draft persistence — survives page refreshes and dropped connections
+  const [draft, setDraft, clearDraft] = useLocalDraft(`request-${unwrappedParams.artisanId}`, {
+    description: "",
+    preferredDate: "",
+    preferredTime: "",
+    offerAmount: "",
+  });
+  
+  // Location (not persisted — requires fresh geolocation permission)
   const [locationData, setLocationData] = useState<{lat: number, lng: number, name: string} | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
@@ -34,7 +39,26 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         const docRef = doc(db, "artisans", unwrappedParams.artisanId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setArtisan(docSnap.data() as ArtisanProfile);
+          const artisanData = docSnap.data() as ArtisanProfile;
+          setArtisan(artisanData);
+          
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Pre-fill service selection
+            const tradeParam = urlParams.get('trade');
+            const subParam = urlParams.get('subcategory');
+            if (tradeParam && subParam && artisanData.services) {
+               const idx = artisanData.services.findIndex(s => s.trade === tradeParam && s.subcategory === subParam);
+               if (idx !== -1) setSelectedServiceIndex(idx);
+            }
+
+            // Pre-fill description if empty
+            const descParam = urlParams.get('desc');
+            if (descParam && !draft.description) {
+              setDraft({ description: descParam });
+            }
+          }
         } else {
           setError("Artisan not found.");
         }
@@ -100,7 +124,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         return;
       }
 
-      const parsedAmount = parseInt(offerAmount.replace(/,/g, ''), 10);
+      const parsedAmount = parseInt(draft.offerAmount.replace(/,/g, ''), 10);
       if (isNaN(parsedAmount) || parsedAmount <= 0) {
         setError("Please enter a valid offer amount.");
         setLoading(false);
@@ -125,9 +149,9 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         artisanId: unwrappedParams.artisanId,
         trade: artisan.services?.[selectedServiceIndex]?.trade || artisan.trade || "Unknown",
         subcategory: artisan.services?.[selectedServiceIndex]?.subcategory || artisan.subcategory || "Unknown",
-        description,
+        description: draft.description,
         neighborhood: locationData.name,
-        preferredTime: `${preferredDate} at ${preferredTime}`,
+        preferredTime: `${draft.preferredDate} at ${draft.preferredTime}`,
         offerAmount: parsedAmount,
         counterOfferAmount: null,
         platformFee: parsedAmount * platformFeeRate,
@@ -151,6 +175,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         }),
       }).catch(e => console.error("Failed to send job request email:", e));
 
+      clearDraft(); // Clear the saved draft on successful submission
       router.push("/?requested=true");
     } catch (err: any) {
       console.error(err);
@@ -225,8 +250,8 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               Job Description
             </label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={draft.description}
+              onChange={(e) => setDraft({ description: e.target.value })}
               required
               rows={4}
               placeholder="E.g., My kitchen sink is leaking heavily from the bottom pipe..."
@@ -274,8 +299,8 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               </label>
               <input
                 type="date"
-                value={preferredDate}
-                onChange={(e) => setPreferredDate(e.target.value)}
+                value={draft.preferredDate}
+                onChange={(e) => setDraft({ preferredDate: e.target.value })}
                 required
                 className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white"
               />
@@ -286,8 +311,8 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               </label>
               <input
                 type="time"
-                value={preferredTime}
-                onChange={(e) => setPreferredTime(e.target.value)}
+                value={draft.preferredTime}
+                onChange={(e) => setDraft({ preferredTime: e.target.value })}
                 required
                 className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white"
               />
@@ -305,8 +330,8 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black font-black text-xl">₦</span>
               <input
                 type="number"
-                value={offerAmount}
-                onChange={(e) => setOfferAmount(e.target.value)}
+                value={draft.offerAmount}
+                onChange={(e) => setDraft({ offerAmount: e.target.value })}
                 required
                 min="500"
                 placeholder="5000"

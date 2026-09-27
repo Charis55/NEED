@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 import { FCMProvider } from "@/hooks/useFCM";
 import { AlertProvider } from "@/components/AlertProvider";
 import Script from "next/script";
@@ -21,6 +22,23 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "NEED",
   description: "Find trusted local professionals.",
+  manifest: "/manifest.json",
+  themeColor: "#FFD700",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "NEED",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: "cover",
+  },
+  icons: {
+    apple: "/icons/icon-192.png",
+  },
 };
 
 import GlobalNotificationListener from "@/components/GlobalNotificationListener";
@@ -32,6 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossOrigin="" />
         <Script
           id="google-adsense"
           async

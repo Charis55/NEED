@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArtisanProfile } from '@/types';
 import { BadgeCheck } from 'lucide-react';
 import BackButton from '@/components/BackButton';
+import FavoriteButton from '@/components/FavoriteButton';
 
 // Fetch artisan data using Firestore REST API for Server-Side Rendering
 async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
@@ -77,89 +78,119 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="w-full px-6 md:px-12 pb-24 md:pb-8">
-      <div className="bg-white md:rounded-2xl shadow-sm border-b md:border border-gray-100 overflow-hidden mb-8">
-        <div className="p-5 md:p-8">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-6">
-            <div className="w-full">
-              <div className="flex items-center gap-4 mb-4">
-                <BackButton />
-                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">{artisan.trade}</h1>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+    <div className="w-full min-h-screen bg-[var(--color-brutal-bg)] pb-24 font-sans selection:bg-[var(--color-brutal-pink)] selection:text-black">
+      {/* Header Bar */}
+      <div className="px-6 pt-12 pb-6 flex items-center gap-4 bg-[var(--color-brutal-teal)] border-b-4 border-black brutal-shadow-sm sticky top-0 z-40">
+        <BackButton className="bg-white text-black brutal-border brutal-shadow-sm hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-10 h-10 flex items-center justify-center p-0 shrink-0" />
+        <h1 className="text-2xl font-black text-black uppercase tracking-tighter leading-none truncate flex-1">
+          {artisan.name || "Technician"}
+        </h1>
+        <FavoriteButton artisanId={artisan.artisanId} />
+      </div>
+
+      <div className="px-6 md:px-12 py-8 max-w-4xl mx-auto">
+        <div className="bg-white brutal-card p-6 md:p-8 mb-8 relative overflow-hidden">
+          {/* Decorative element */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-[var(--color-brutal-yellow)] rounded-full border-4 border-black z-0 opacity-50"></div>
+          
+          <div className="relative z-10 flex flex-col md:flex-row gap-6 md:gap-10 items-start">
+            <div className="w-24 h-24 md:w-32 md:h-32 bg-gray-200 border-4 border-black brutal-shadow-sm shrink-0 overflow-hidden">
+              <img 
+                src={artisan.profilePictureUrl || artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
+                alt={artisan.name} 
+                className="w-full h-full object-cover grayscale contrast-125"
+              />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap gap-2 mb-3">
+                <span className="text-xs font-black uppercase bg-[var(--color-brutal-blue)] px-2 py-1 border-2 border-black rotate-1">
+                  {artisan.trade}
+                </span>
                 {artisan.verified && (
-                  <span className="bg-blue-50 text-blue-600 border border-blue-200 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap flex items-center gap-1 shadow-sm">
-                    <BadgeCheck className="w-4 h-4" />
-                    Verified ID
+                  <span className="text-xs font-black uppercase bg-white px-2 py-1 border-2 border-black -rotate-1 flex items-center gap-1">
+                    <BadgeCheck className="w-3 h-3 stroke-[3]" /> Verified ID
                   </span>
                 )}
                 {artisan.isCertificateVerified && (
-                  <span className="bg-amber-50 text-amber-600 border border-amber-200 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap flex items-center gap-1 shadow-sm">
-                    <BadgeCheck className="w-4 h-4" />
-                    Certified Pro
+                  <span className="text-xs font-black uppercase bg-[var(--color-brutal-yellow)] px-2 py-1 border-2 border-black rotate-2 flex items-center gap-1">
+                    <BadgeCheck className="w-3 h-3 stroke-[3]" /> Certified Pro
                   </span>
                 )}
               </div>
               
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-gray-600 mb-6 text-sm md:text-base">
-                <span className="flex items-center gap-1">📍 {artisan.neighborhood}</span>
-                <span className="flex items-center gap-1 text-amber-500 font-medium">
-                  ★ {artisan.ratingAverage.toFixed(1)} <span className="text-gray-400">({artisan.ratingCount} reviews)</span>
-                </span>
+              <h2 className="text-4xl md:text-5xl font-black text-black uppercase tracking-tighter leading-none mb-4 break-words">
+                {artisan.name}
+              </h2>
+              
+              <div className="grid grid-cols-2 md:flex md:flex-row gap-3 mb-6">
+                <div className="bg-[var(--color-brutal-bg)] p-2 brutal-border">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Location</p>
+                  <p className="font-black text-sm uppercase truncate">📍 {artisan.neighborhood}</p>
+                </div>
+                <div className="bg-[var(--color-brutal-bg)] p-2 brutal-border">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Rating</p>
+                  <p className="font-black text-sm uppercase">⭐ {artisan.ratingAverage.toFixed(1)} <span className="text-xs text-gray-400">({artisan.ratingCount})</span></p>
+                </div>
+                <div className="bg-[var(--color-brutal-bg)] p-2 brutal-border col-span-2 md:col-span-1">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Responds In</p>
+                  <p className="font-black text-sm uppercase text-black">⚡ {artisan.typicalResponseTime || "1-3 hours"}</p>
+                </div>
               </div>
               
-              <div className="prose text-gray-700 max-w-none text-sm md:text-base">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">About</h3>
-                <p className="whitespace-pre-wrap">{artisan.bio}</p>
+              <div className="mb-6 border-l-4 border-black pl-4">
+                <p className="text-black font-bold whitespace-pre-wrap">{artisan.bio}</p>
               </div>
             </div>
             
-            <div className="hidden md:block w-full md:w-64 flex-shrink-0">
+            <div className="w-full md:w-64 flex-shrink-0 flex flex-col gap-4">
               <Link 
                 href={`/artisans/${artisan.artisanId}/request`}
-                className="block w-full text-center bg-blue-600 text-white font-bold text-lg py-4 px-6 rounded-xl hover:bg-blue-700 transition shadow-md hover:shadow-lg"
+                className="w-full text-center bg-black text-white font-black text-xl py-5 px-6 brutal-btn hover:-translate-y-1 hover:shadow-[4px_4px_0_0_rgba(106,13,173,1)] transition-all uppercase block"
               >
-                Request This Technician
+                BOOK NOW
               </Link>
-              <p className="text-center text-sm text-gray-500 mt-3">
-                {artisan.available ? '🟢 Available for work' : '🔴 Currently busy'}
-              </p>
+              <div className={`p-3 text-center border-2 border-black font-black uppercase text-sm ${artisan.available ? 'bg-[#bbf7d0] text-black' : 'bg-[var(--color-brutal-red)] text-white'}`}>
+                {artisan.available ? '🟢 AVAILABLE' : '🔴 BUSY'}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="mb-12 px-5 md:px-0">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">Portfolio</h2>
-        {artisan.portfolioPhotoUrls.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-            {artisan.portfolioPhotoUrls.map((url, i) => (
-              <div key={i} className="aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`Portfolio item ${i+1}`} className="w-full h-full object-cover" />
-              </div>
-            ))}
+        <div className="mb-12">
+          <h2 className="text-2xl font-black text-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-2 inline-block">Portfolio</h2>
+          {artisan.portfolioPhotoUrls && artisan.portfolioPhotoUrls.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {artisan.portfolioPhotoUrls.map((url, i) => (
+                <div key={i} className="aspect-square bg-gray-200 brutal-border brutal-shadow-sm overflow-hidden hover:-translate-y-1 transition-transform">
+                  <img src={url} alt={`Portfolio item ${i+1}`} className="w-full h-full object-cover grayscale contrast-125 transition-all duration-300" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white p-8 brutal-border text-center">
+              <p className="font-black text-gray-400 uppercase">NO PORTFOLIO PHOTOS YET</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Reviews Section Placeholder */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-black text-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-2 inline-block">Reviews</h2>
+          <div className="bg-[var(--color-brutal-yellow)] p-8 brutal-border text-center">
+            <p className="font-black text-black uppercase text-lg mb-2">No Reviews Yet</p>
+            <p className="text-black font-bold text-sm">Be the first to hire and review {artisan.name || "this technician"}!</p>
           </div>
-        ) : (
-          <p className="text-gray-500 italic text-sm md:text-base">No portfolio photos available.</p>
-        )}
-      </div>
-      
-      {/* Reviews Section Placeholder - Phase 8 */}
-      <div className="px-5 md:px-0 mb-12 md:mb-0">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">Reviews</h2>
-        <div className="bg-gray-50 p-6 md:p-8 rounded-2xl text-center border border-dashed border-gray-300">
-          <p className="text-gray-500 text-sm md:text-base">Reviews will appear here once jobs are completed.</p>
         </div>
       </div>
-
+      
       {/* Sticky Bottom Action Bar for Mobile */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t-4 border-black p-4 z-50">
         <Link 
           href={`/artisans/${artisan.artisanId}/request`}
-          className="block w-full text-center bg-blue-600 text-white font-bold text-lg py-4 px-6 rounded-xl hover:bg-blue-700 transition"
+          className="w-full text-center bg-black text-white font-black text-lg py-4 px-6 brutal-btn block"
         >
-          Request This Technician
+          BOOK NOW
         </Link>
       </div>
     </div>

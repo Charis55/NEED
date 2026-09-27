@@ -4,13 +4,15 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import Link from "next/link";
-import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle } from "lucide-react";
+import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, PowerOff, Navigation, ArrowRight } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 
 export default function ArtisanDashboard() {
   const [loading, setLoading] = useState(true);
   const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
   const [isRevoked, setIsRevoked] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
+  const [activeJobs, setActiveJobs] = useState<any[]>([]);
   
   const [stats, setStats] = useState({
     totalEarnings: 0,
@@ -66,6 +68,14 @@ export default function ArtisanDashboard() {
             } else if (data.status === "pending" || data.status === "countered") {
               pending++;
             }
+            
+            if (["accepted", "en_route", "in_progress", "payment_pending"].includes(data.status)) {
+              setActiveJobs(prev => {
+                if (prev.some(job => job.id === doc.id)) return prev;
+                return [...prev, { id: doc.id, ...data }];
+              });
+            }
+
           });
 
           setStats(prev => ({
@@ -83,9 +93,22 @@ export default function ArtisanDashboard() {
 
       fetchDashboardData();
     });
-
     return () => unsubscribe();
   }, []);
+
+  const toggleAvailability = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const newAvailable = !isAvailable;
+      setIsAvailable(newAvailable);
+      const { doc: firestoreDoc, updateDoc } = await import("firebase/firestore");
+      await updateDoc(firestoreDoc(db, "artisans", user.uid), { available: newAvailable });
+    } catch (e) {
+      console.error("Failed to toggle availability", e);
+      setIsAvailable(isAvailable);
+    }
+  };
 
   if (loading) {
     return (
@@ -99,11 +122,23 @@ export default function ArtisanDashboard() {
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Banner */}
       <div className="bg-[var(--color-brutal-blue)] pt-16 pb-24 px-6 md:px-12 border-b-4 border-black brutal-shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-end">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
             <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">DASHBOARD</h1>
             <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-white inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Welcome back to work.</p>
           </div>
+          
+          {/* Availability Toggle */}
+          <button 
+            onClick={toggleAvailability}
+            className={`flex items-center gap-3 px-6 py-4 border-4 border-black brutal-shadow transition-all ${isAvailable ? 'bg-[var(--color-brutal-green)] text-black' : 'bg-[var(--color-brutal-red)] text-white'} hover:-translate-y-1`}
+          >
+            {isAvailable ? <Power className="w-8 h-8 stroke-[3]" /> : <PowerOff className="w-8 h-8 stroke-[3]" />}
+            <div className="text-left">
+              <p className="text-sm font-black uppercase tracking-widest leading-none mb-1">Status</p>
+              <p className="text-2xl font-black leading-none uppercase">{isAvailable ? 'Available' : 'Offline'}</p>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -140,6 +175,41 @@ export default function ArtisanDashboard() {
           </div>
         )}
 
+        {/* Active Jobs Screen Section */}
+        {activeJobs.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-3xl font-black uppercase mb-4 tracking-tighter flex items-center gap-2">
+              <span className="bg-[var(--color-brutal-yellow)] border-2 border-black w-4 h-4 rounded-full animate-pulse"></span>
+              Active Jobs ({activeJobs.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {activeJobs.map(job => (
+                <div key={job.id} className="bg-white border-4 border-black p-6 shadow-[6px_6px_0_0_#000]">
+                  <div className="flex justify-between items-start mb-4 border-b-4 border-black pb-4">
+                    <div>
+                      <span className="bg-[var(--color-brutal-teal)] text-black text-xs font-black uppercase px-2 py-1 border-2 border-black mb-2 inline-block">
+                        {job.status.replace("_", " ")}
+                      </span>
+                      <h3 className="text-2xl font-black uppercase">{job.trade}</h3>
+                      <p className="font-bold text-sm">📍 {job.neighborhood}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-3xl font-black">₦{((job.counterOfferAmount || job.offerAmount || 0) * (promoDaysLeft && promoDaysLeft > 0 ? 1 : 0.8)).toLocaleString()}</p>
+                      <p className="text-xs font-bold uppercase text-[var(--color-brutal-teal)]">Net Earnings</p>
+                    </div>
+                  </div>
+                  <Link 
+                    href="/technician/jobs" 
+                    className="flex items-center justify-center gap-2 w-full bg-black text-white font-black uppercase py-4 border-2 border-transparent hover:bg-white hover:text-black hover:border-black transition-colors"
+                  >
+                    Manage Job <Navigation className="w-5 h-5 stroke-[3]" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Balance Card */}
         <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-8 shadow-[6px_6px_0_0_#000] mb-8 -rotate-1 relative overflow-hidden">
           <div className="absolute top-4 right-4 bg-white border-4 border-black w-12 h-12 flex items-center justify-center rotate-12 shadow-[2px_2px_0_0_#000]">
@@ -166,11 +236,13 @@ export default function ArtisanDashboard() {
             <p className="text-sm font-black uppercase tracking-widest text-gray-600 border-t-2 border-black pt-2">New Requests</p>
           </div>
           
-          <div className="bg-white border-4 border-black p-6 shadow-[4px_4px_0_0_#000] hover:-translate-y-1 transition-transform group">
+          <Link href="/technician/performance" className="bg-white border-4 border-black p-6 shadow-[4px_4px_0_0_#000] hover:-translate-y-1 transition-transform group block cursor-pointer">
             <Star className="w-8 h-8 mb-4 stroke-[3] group-hover:scale-110 transition-transform text-[var(--color-brutal-yellow)]" />
             <p className="text-4xl font-black text-black leading-none mb-1">{stats.rating}</p>
-            <p className="text-sm font-black uppercase tracking-widest text-gray-600 border-t-2 border-black pt-2">Avg Rating</p>
-          </div>
+            <p className="text-sm font-black uppercase tracking-widest text-gray-600 border-t-2 border-black pt-2 flex items-center justify-between">
+              Avg Rating <ArrowRight className="w-4 h-4" />
+            </p>
+          </Link>
         </div>
 
       </div>

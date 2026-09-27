@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Play, Pause } from "lucide-react";
 
 export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl: string; waveform?: number[] }) {
@@ -10,7 +10,9 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Create a default waveform if none is provided
-  const visualWaveform = waveform.length > 0 ? waveform : Array.from({ length: 30 }, () => Math.random() * 0.5 + 0.1);
+  const [visualWaveform] = useState(() => {
+    return waveform.length > 0 ? waveform : Array.from({ length: 30 }, () => Math.random() * 0.5 + 0.1);
+  });
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -110,7 +112,7 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
         </div>
         
         <div className="flex justify-between items-center text-[10px] font-black uppercase text-black">
-          <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
+          <span>{formatTime(progress * duration)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>

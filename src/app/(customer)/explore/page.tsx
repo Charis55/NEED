@@ -9,6 +9,7 @@ import { collection, getDocs, query } from "firebase/firestore";
 import UserAvatar from "@/components/UserAvatar";
 import GlobalSearch from "@/components/GlobalSearch";
 import { servicesData } from "@/data/services";
+import GuestCTA from "@/components/GuestCTA";
 
 const BRUTAL_CARD_STYLES = [
   { bg: "bg-[var(--color-brutal-blue)]", text: "text-black", border: "border-black" },
@@ -156,9 +157,13 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      
+      <div className="w-full px-6 md:px-12 mt-6">
+        <GuestCTA />
+      </div>
 
       {/* Categories Section */}
-      <div className="w-full px-6 md:px-12 mt-10">
+      <div className="w-full px-6 md:px-12 mt-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-black uppercase">Services</h2>
           <span className="text-xs font-bold uppercase bg-[var(--color-brutal-pink)] px-2 py-1 border-2 border-black rotate-1">

@@ -1,6 +1,7 @@
 export interface UserAccount {
   userId: string;
   phone: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
   displayName: string;
@@ -100,6 +101,7 @@ export interface ArtisanProfile {
   ratingAverage: number;
   ratingCount: number;
   available: boolean;
+  typicalResponseTime?: "Under 1 hour" | "1-3 hours" | "Same day" | "Next day";
   createdAt: number;
 
   // --- Verification Pipeline Fields ---
@@ -141,7 +143,18 @@ export interface JobRequest {
   declinedBy?: "customer" | "artisan";
   lastMessageText?: string;
   platformFee: number | null;
-  status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered" | "payment_pending";
+  cancellationFee?: number;
+  cancelledBy?: "customer" | "artisan";
+  rescheduledAt?: number;
+  newPreferredTime?: string;
+  rescheduleRequestedBy?: "customer" | "artisan";
+  rescheduleStatus?: "pending" | "accepted" | "declined";
+  status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered" | "payment_pending" | "en_route" | "in_progress";
+  technicianLocation?: {
+    lat: number;
+    lng: number;
+    updatedAt: number;
+  };
   paymentMethod?: "cash" | "transfer";
   proofOfPaymentUrl?: string;
   proofOfPaymentAt?: number;
@@ -161,4 +174,6 @@ export interface Review {
   comment: string;
   photos: string[];
   createdAt: number;
+  artisanResponse?: string;
+  respondedAt?: number;
 }

@@ -6,11 +6,24 @@ import { collection, query, where, getDocs, doc, setDoc, updateDoc, runTransacti
 import { JobRequest, ArtisanProfile } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
+import AuthGate from "@/components/AuthGate";
+import Link from "next/link";
+import ReportModal from "@/components/ReportModal";
+import { AlertTriangle } from "lucide-react";
 
 export default function CustomerJobsPage() {
+  return (
+    <AuthGate title="Sign in to view bookings" description="Create a free account to track and manage your bookings.">
+      <JobsContent />
+    </AuthGate>
+  );
+}
+
+function JobsContent() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewingJob, setReviewingJob] = useState<string | null>(null);
+  const [reportingJob, setReportingJob] = useState<JobRequest | null>(null);
   const [counterInputs, setCounterInputs] = useState<Record<string, string>>({});
   const [showCounterFor, setShowCounterFor] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
@@ -67,6 +80,10 @@ export default function CustomerJobsPage() {
         updatePayload.declinedBy = "customer";
       }
 
+      if (newStatus === "cancelled") {
+        updatePayload.cancelledBy = "customer";
+      }
+
       await updateDoc(reqRef, updatePayload);
       
       setRequests(prev => prev.map(req => 
@@ -80,6 +97,52 @@ export default function CustomerJobsPage() {
     } catch (error) {
       console.error("Failed to update status", error);
       showAlert("Error updating status", "error");
+    }
+  };
+
+  const [reschedulingJob, setReschedulingJob] = useState<string | null>(null);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+
+  const handleRequestReschedule = async (requestId: string) => {
+    if (!newDate || !newTime) {
+      showAlert("Please select a new date and time", "error");
+      return;
+    }
+    
+    try {
+      const reqRef = doc(db, "jobRequests", requestId);
+      const updatePayload: Partial<JobRequest> = {
+        rescheduledAt: Date.now(),
+        newPreferredTime: `${newDate} at ${newTime}`,
+        rescheduleRequestedBy: "customer",
+        rescheduleStatus: "pending"
+      };
+      await updateDoc(reqRef, updatePayload);
+      setRequests(prev => prev.map(req => req.requestId === requestId ? { ...req, ...updatePayload } : req));
+      setReschedulingJob(null);
+      showAlert("Reschedule request sent!", "success");
+    } catch (err) {
+      console.error(err);
+      showAlert("Failed to send reschedule request", "error");
+    }
+  };
+
+  const handleRespondReschedule = async (requestId: string, response: "accepted" | "declined", newPreferredTime: string) => {
+    try {
+      const reqRef = doc(db, "jobRequests", requestId);
+      const updatePayload: any = {
+        rescheduleStatus: response
+      };
+      if (response === "accepted") {
+        updatePayload.preferredTime = newPreferredTime;
+      }
+      await updateDoc(reqRef, updatePayload);
+      setRequests(prev => prev.map(req => req.requestId === requestId ? { ...req, ...updatePayload } : req));
+      showAlert(`Reschedule ${response}`, "success");
+    } catch (err) {
+      console.error(err);
+      showAlert("Error responding to reschedule", "error");
     }
   };
 
@@ -175,10 +238,13 @@ export default function CustomerJobsPage() {
                         ${req.status === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
                         ${req.status === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
                         ${req.status === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
-                        ${req.status === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
-                        ${req.status === 'declined' ? 'bg-[var(--color-brutal-red)] text-black' : ''}
+                        ${req.status === 'en_route' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
+                        ${req.status === 'in_progress' ? 'bg-[#bbf7d0] text-black' : ''}
+                        ${req.status === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black border-dashed' : ''}
+                        ${req.status === 'declined' ? 'bg-[var(--color-brutal-red)] text-white' : ''}
+                        ${req.status === 'cancelled' ? 'bg-gray-800 text-white' : ''}
                       `}>
-                        {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'AWAITING TECHNICIAN' : 'ACTION REQUIRED') : req.status === 'declined' ? (req.declinedBy === 'customer' ? 'CUSTOMER DECLINED' : 'TECHNICIAN DECLINED') : req.status}
+                        {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'AWAITING TECHNICIAN' : 'ACTION REQUIRED') : req.status === 'declined' ? (req.declinedBy === 'customer' ? 'CUSTOMER DECLINED' : 'TECHNICIAN DECLINED') : req.status.replace('_', ' ')}
                       </span>
                       <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
                         {req.trade} - {req.subcategory}
@@ -264,18 +330,102 @@ export default function CustomerJobsPage() {
                     </div>
                   )}
 
-                  {req.status === "completed" && !req.reviewed && reviewingJob !== req.requestId && (
-                    <button 
-                      onClick={() => setReviewingJob(req.requestId)}
-                      className="bg-[var(--color-brutal-blue)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
-                    >
-                      ★ LEAVE A REVIEW
-                    </button>
+                  {["accepted", "en_route", "in_progress", "payment_pending"].includes(req.status) && (
+                    <div className="mt-4 flex flex-col gap-4">
+                      <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
+                        💬 CHAT WITH TECHNICIAN
+                      </Link>
+                    </div>
                   )}
 
-                  {req.status === "completed" && req.reviewed && (
-                    <div className="bg-white border-4 border-black text-black px-4 py-2 inline-block text-sm font-black uppercase shadow-[4px_4px_0_0_#000] -rotate-2">
-                      ✓ REVIEWED
+                  {["accepted", "en_route"].includes(req.status) && (
+                    <div className="mt-4 flex flex-col gap-4">
+                      {req.rescheduleStatus === "pending" ? (
+                        req.rescheduleRequestedBy === "artisan" ? (
+                          <div className="bg-[var(--color-brutal-yellow)] p-4 border-4 border-black">
+                            <p className="font-black text-black uppercase mb-2">Technician requested to reschedule to: <br/>{req.newPreferredTime}</p>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleRespondReschedule(req.requestId, "accepted", req.newPreferredTime!)} className="flex-1 bg-[var(--color-brutal-teal)] text-black border-2 border-black font-black uppercase py-2">Accept</button>
+                              <button onClick={() => handleRespondReschedule(req.requestId, "declined", "")} className="flex-1 bg-[var(--color-brutal-red)] text-white border-2 border-black font-black uppercase py-2">Decline</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-white p-4 border-4 border-black text-center font-black uppercase text-sm">
+                            Waiting for technician to accept reschedule
+                          </div>
+                        )
+                      ) : (
+                        reschedulingJob === req.requestId ? (
+                          <div className="bg-[var(--color-brutal-pink)] p-4 border-4 border-black flex flex-col gap-2">
+                            <label className="font-black uppercase text-sm">New Date</label>
+                            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="p-2 border-2 border-black font-bold" />
+                            <label className="font-black uppercase text-sm">New Time</label>
+                            <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="p-2 border-2 border-black font-bold" />
+                            <div className="flex gap-2 mt-2">
+                              <button onClick={() => handleRequestReschedule(req.requestId)} className="flex-1 bg-black text-white border-2 border-black font-black uppercase py-2">Submit</button>
+                              <button onClick={() => setReschedulingJob(null)} className="flex-1 bg-white text-black border-2 border-black font-black uppercase py-2">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              setReschedulingJob(req.requestId);
+                              setNewDate("");
+                              setNewTime("");
+                            }}
+                            className="w-full bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
+                          >
+                            📅 REQUEST RESCHEDULE
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {["pending", "accepted"].includes(req.status) && (
+                    <div className="mt-4">
+                      <button 
+                        onClick={() => {
+                          if (confirm("Are you sure you want to cancel this job?")) {
+                            handleUpdateStatus(req.requestId, "cancelled");
+                          }
+                        }}
+                        className="w-full bg-[var(--color-brutal-red)] text-white border-4 border-black font-black uppercase text-center py-4 hover:bg-black transition-colors brutal-shadow-sm"
+                      >
+                        ❌ CANCEL JOB
+                      </button>
+                    </div>
+                  )}
+
+                  {req.status === "en_route" && (
+                    <div className="flex gap-4 mt-4">
+                      <a href={`/jobs/${req.requestId}/track`} className="flex-1 bg-black text-white px-6 py-4 font-black uppercase brutal-border text-center hover:bg-[var(--color-brutal-yellow)] hover:text-black transition-colors block">
+                        📍 TRACK TECHNICIAN
+                      </a>
+                    </div>
+                  )}
+
+                  {req.status === "completed" && (
+                    <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                      {!req.reviewed && reviewingJob !== req.requestId && (
+                        <button 
+                          onClick={() => setReviewingJob(req.requestId)}
+                          className="flex-1 bg-[var(--color-brutal-blue)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
+                        >
+                          ★ LEAVE A REVIEW
+                        </button>
+                      )}
+                      {req.reviewed && (
+                        <div className="flex-none bg-white border-4 border-black text-black px-4 py-3 text-sm font-black uppercase shadow-[4px_4px_0_0_#000] -rotate-2 self-start flex items-center justify-center">
+                          ✓ REVIEWED
+                        </div>
+                      )}
+                      <a 
+                        href={`/artisans/${req.artisanId}/request?trade=${encodeURIComponent(req.trade)}&subcategory=${encodeURIComponent(req.subcategory)}&desc=${encodeURIComponent(req.description)}`}
+                        className="flex-1 bg-[var(--color-brutal-yellow)] text-black px-6 py-3 font-black uppercase brutal-border text-center hover:-translate-y-1 transition-transform block"
+                      >
+                        🔄 BOOK AGAIN
+                      </a>
                     </div>
                   )}
 
@@ -308,11 +458,31 @@ export default function CustomerJobsPage() {
                       </div>
                     </form>
                   )}
+                  {["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(req.status) && (
+                    <div className="mt-6 pt-4 border-t-2 border-black/10 text-center">
+                      <button 
+                        onClick={() => setReportingJob(req)}
+                        className="text-xs font-black uppercase text-gray-500 hover:text-[var(--color-brutal-red)] transition-colors flex items-center justify-center gap-1 mx-auto"
+                      >
+                        <AlertTriangle className="w-3 h-3 stroke-[3]" /> REPORT AN ISSUE
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
+      )}
+
+      {reportingJob && auth.currentUser && (
+        <ReportModal 
+          jobId={reportingJob.requestId}
+          reportedUserId={reportingJob.artisanId!}
+          reporterUserId={auth.currentUser.uid}
+          reporterRole="customer"
+          onClose={() => setReportingJob(null)}
+        />
       )}
     </div>
   );

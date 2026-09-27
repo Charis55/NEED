@@ -460,7 +460,7 @@ export default function ChatPage() {
         
         <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
           <div className="flex items-center gap-2 w-full">
-            <h2 className="font-black text-black text-xl md:text-2xl uppercase truncate">{chatPartnerName}</h2>
+            <h2 className="font-black text-black text-xl md:text-2xl uppercase whitespace-normal break-words leading-tight">{chatPartnerName}</h2>
             {job?.status === "completed" && (
               <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-xs px-3 py-1 uppercase font-black rotate-2 shrink-0 shadow-[2px_2px_0_0_#000]">Completed</span>
             )}
@@ -663,11 +663,6 @@ export default function ChatPage() {
           </form>
         )}
       </div>
-
-      <div className="bg-white shrink-0">
-        <AdUnit adSlot="3608382521" className="border-t-0" />
-      </div>
-
       {/* Pending Image Preview Modal */}
       {pendingImagePreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">

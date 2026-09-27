@@ -35,10 +35,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         workflow_id: WORKFLOW_ID,
         vendor_data: vendorData,
-        // callback is where Didit redirects the user after completing the flow.
-        // For the web SDK modal this isn't strictly needed (the modal closes itself),
-        // but it's good practice and used as a fallback / cross-device flow.
-        callback: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/onboarding`,
+        // Removed callback URL to prevent HTTPS -> HTTP Mixed Content iframe crash in dev mode.
+        // The Web SDK modal will intercept the completion via onComplete anyway.
       }),
     });
 

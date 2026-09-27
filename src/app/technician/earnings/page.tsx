@@ -13,8 +13,8 @@ import { useAlert } from "@/components/AlertProvider";
 import dynamicImport from "next/dynamic";
 const PaymentModal = dynamicImport(() => import("@/components/PaymentModal"), { ssr: false });
 
-interface WeeklyEarning {
-  weekKey: string;
+interface EarningPeriod {
+  periodKey: string;
   startDate: Date;
   endDate: Date;
   jobs: JobRequest[];
@@ -80,8 +80,9 @@ const JobEarningRow = ({ job }: { job: JobRequest }) => {
 
 export default function EarningsPage() {
   const [loading, setLoading] = useState(true);
-  const [weeklyEarnings, setWeeklyEarnings] = useState<WeeklyEarning[]>([]);
-  const [showPaymentModal, setShowPaymentModal] = useState<WeeklyEarning | null>(null);
+  const [periods, setPeriods] = useState<EarningPeriod[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState<EarningPeriod | null>(null);
+  const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   
   const router = useRouter();
   const { showAlert } = useAlert();
@@ -100,26 +101,39 @@ export default function EarningsPage() {
         const snapshot = await getDocs(q);
         const jobs = snapshot.docs.map(d => ({ ...d.data(), requestId: d.id } as JobRequest));
         
-        // Group by week (ISO 8601 week)
-        const groups: Record<string, WeeklyEarning> = {};
+        const groups: Record<string, EarningPeriod> = {};
         
         jobs.forEach(job => {
           const date = new Date(job.completedAt || job.createdAt);
-          // Set to Monday of that week
-          const day = date.getDay() || 7; 
-          const startDate = new Date(date);
-          startDate.setDate(date.getDate() - day + 1);
-          startDate.setHours(0,0,0,0);
+          let startDate = new Date(date);
+          let endDate = new Date(date);
+          let periodKey = "";
+
+          if (viewMode === "daily") {
+            startDate.setHours(0,0,0,0);
+            endDate.setHours(23,59,59,999);
+            periodKey = `${startDate.getFullYear()}-${startDate.getMonth()}-${startDate.getDate()}`;
+          } else if (viewMode === "weekly") {
+            const day = date.getDay() || 7; 
+            startDate.setDate(date.getDate() - day + 1);
+            startDate.setHours(0,0,0,0);
+            endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6);
+            endDate.setHours(23,59,59,999);
+            periodKey = `${startDate.getFullYear()}-W${Math.ceil(startDate.getDate() / 7)}`;
+          } else {
+            startDate.setDate(1);
+            startDate.setHours(0,0,0,0);
+            endDate = new Date(startDate);
+            endDate.setMonth(startDate.getMonth() + 1);
+            endDate.setDate(0);
+            endDate.setHours(23,59,59,999);
+            periodKey = `${startDate.getFullYear()}-${startDate.getMonth()}`;
+          }
           
-          const endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + 6);
-          endDate.setHours(23,59,59,999);
-          
-          const weekKey = `${startDate.getFullYear()}-${startDate.getMonth()}-${startDate.getDate()}`;
-          
-          if (!groups[weekKey]) {
-            groups[weekKey] = {
-              weekKey,
+          if (!groups[periodKey]) {
+            groups[periodKey] = {
+              periodKey,
               startDate,
               endDate,
               jobs: [],
@@ -129,18 +143,18 @@ export default function EarningsPage() {
             };
           }
           
-          groups[weekKey].jobs.push(job);
+          groups[periodKey].jobs.push(job);
           const earn = job.counterOfferAmount || job.offerAmount || 0;
-          groups[weekKey].totalEarnings += earn;
+          groups[periodKey].totalEarnings += earn;
           
           if (!(job as any).commissionPaid) {
-            groups[weekKey].commissionOwed += earn * 0.20;
-            groups[weekKey].isPaid = false;
+            groups[periodKey].commissionOwed += earn * 0.20;
+            groups[periodKey].isPaid = false;
           }
         });
         
-        const sortedWeeks = Object.values(groups).sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
-        setWeeklyEarnings(sortedWeeks);
+        const sortedPeriods = Object.values(groups).sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+        setPeriods(sortedPeriods);
       } catch (err) {
         console.error("Error fetching earnings", err);
         showAlert("Failed to load earnings data.", "error");
@@ -150,7 +164,7 @@ export default function EarningsPage() {
     };
 
     fetchJobs();
-  }, [showAlert, showPaymentModal]); // Refetch when a payment completes
+  }, [showAlert, showPaymentModal, viewMode]);
 
   const handlePayCommission = async (method: "cash" | "paystack", reference?: string) => {
     if (!showPaymentModal || method !== "paystack") return;
@@ -172,15 +186,15 @@ export default function EarningsPage() {
     }
   };
 
-  const generateReceipt = (week: WeeklyEarning) => {
-    const receiptContent = `NEED PLATFORM - WEEKLY RECEIPT
+  const generateReceipt = (period: EarningPeriod) => {
+    const receiptContent = `NEED PLATFORM - EARNINGS RECEIPT
 ==============================
-Week: ${week.startDate.toLocaleDateString()} to ${week.endDate.toLocaleDateString()}
-Total Earned: NGN ${week.totalEarnings.toLocaleString()}
-Total Platform Fee Paid: NGN ${(week.totalEarnings * 0.20).toLocaleString()}
+Period: ${period.startDate.toLocaleDateString()} to ${period.endDate.toLocaleDateString()}
+Total Earned: NGN ${period.totalEarnings.toLocaleString()}
+Total Platform Fee Paid: NGN ${(period.totalEarnings * 0.20).toLocaleString()}
 
 Jobs Completed:
-${week.jobs.map(j => `- ${j.subcategory}: NGN ${(j.counterOfferAmount || j.offerAmount || 0).toLocaleString()}`).join('\n')}
+${period.jobs.map(j => `- ${j.subcategory}: NGN ${(j.counterOfferAmount || j.offerAmount || 0).toLocaleString()}`).join('\n')}
 
 Status: SETTLED
 Date: ${new Date().toLocaleDateString()}
@@ -190,7 +204,7 @@ Date: ${new Date().toLocaleDateString()}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Receipt_NEED_${week.weekKey}.txt`;
+    a.download = `Receipt_NEED_${period.periodKey}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -212,34 +226,54 @@ Date: ${new Date().toLocaleDateString()}
         <div>
           <h1 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">Payment History</h1>
           <p className="font-bold text-black text-sm uppercase mt-1 tracking-widest border-t-2 border-black pt-1 inline-block">
-            Weekly Settlements
+            Settlements & Payouts
           </p>
         </div>
       </div>
 
-      <div className="p-4 md:p-8 flex-1 overflow-y-auto space-y-8 max-w-6xl mx-auto w-full">
-        {weeklyEarnings.length === 0 ? (
-          <div className="bg-white border-4 border-black p-8 text-center brutal-shadow rotate-1">
-            <p className="font-black text-2xl uppercase mb-2">No earnings yet</p>
-            <p className="font-bold text-gray-600">Complete jobs to see your weekly breakdown.</p>
-          </div>
-        ) : (
-          weeklyEarnings.map((week, index) => (
-            <div key={week.weekKey} className="bg-white border-4 border-black brutal-shadow-sm flex flex-col">
-              <div className="bg-black text-white p-4 flex justify-between items-center border-b-4 border-black">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  <span className="font-black uppercase tracking-widest text-sm md:text-base">
-                    Week of {week.startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                </div>
-                {week.isPaid ? (
+      <div className="p-4 md:p-8 flex-1 overflow-y-auto max-w-6xl mx-auto w-full">
+        {/* Toggle Tabs */}
+        <div className="flex border-4 border-black bg-white brutal-shadow-sm mb-8">
+          {(['daily', 'weekly', 'monthly'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`flex-1 py-3 px-2 font-black uppercase text-sm md:text-base transition-colors ${
+                viewMode === mode 
+                  ? 'bg-black text-white' 
+                  : 'bg-white text-black hover:bg-[var(--color-brutal-bg)] border-r-4 border-black last:border-r-0'
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-8">
+          {periods.length === 0 ? (
+            <div className="bg-white border-4 border-black p-8 text-center brutal-shadow rotate-1">
+              <p className="font-black text-2xl uppercase mb-2">No earnings yet</p>
+              <p className="font-bold text-gray-600">Complete jobs to see your {viewMode} breakdown.</p>
+            </div>
+          ) : (
+            periods.map((period) => (
+              <div key={period.periodKey} className="bg-white border-4 border-black brutal-shadow-sm flex flex-col">
+                <div className="bg-black text-white p-4 flex justify-between items-center border-b-4 border-black">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    <span className="font-black uppercase tracking-widest text-sm md:text-base">
+                      {viewMode === 'daily' 
+                        ? period.startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : `${period.startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - ${period.endDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                    </span>
+                  </div>
+                  {period.isPaid ? (
                   <span className="bg-[var(--color-brutal-green)] text-black px-3 py-1 text-xs font-black uppercase border-2 border-white rotate-2">
                     Settled
                   </span>
                 ) : (
                   <span className="bg-[var(--color-brutal-red)] text-white px-3 py-1 text-xs font-black uppercase border-2 border-white -rotate-2">
-                    Pending ({week.jobs.filter(j => !(j as any).commissionPaid).length})
+                    Pending ({period.jobs.filter(j => !(j as any).commissionPaid).length})
                   </span>
                 )}
               </div>
@@ -248,26 +282,26 @@ Date: ${new Date().toLocaleDateString()}
                 <div className="flex justify-between items-end mb-6 pb-6 border-b-4 border-black border-dashed">
                   <div>
                     <p className="text-sm font-bold text-gray-600 uppercase mb-1">Total Earned</p>
-                    <p className="text-4xl font-black text-[var(--color-brutal-teal)]">₦{week.totalEarnings.toLocaleString()}</p>
+                    <p className="text-4xl font-black text-[var(--color-brutal-teal)]">₦{period.totalEarnings.toLocaleString()}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-[var(--color-brutal-red)] uppercase mb-1">Unpaid Platform Fee</p>
-                    <p className="text-2xl font-black text-black">₦{week.commissionOwed.toLocaleString()}</p>
+                    <p className="text-2xl font-black text-black">₦{period.commissionOwed.toLocaleString()}</p>
                   </div>
                 </div>
 
-                {week.commissionOwed > 0 && !week.isPaid && (
+                {period.commissionOwed > 0 && !period.isPaid && (
                    <button 
-                     onClick={() => setShowPaymentModal(week)}
+                     onClick={() => setShowPaymentModal(period)}
                      className="w-full bg-[var(--color-brutal-blue)] text-black border-4 border-black py-4 font-black text-lg uppercase mb-6 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all"
                    >
-                     PAY WEEKLY COMMISSION (₦{week.commissionOwed.toLocaleString()})
+                     PAY COMMISSION (₦{period.commissionOwed.toLocaleString()})
                    </button>
                 )}
                 
-                {week.isPaid && week.totalEarnings > 0 && (
+                {period.isPaid && period.totalEarnings > 0 && (
                    <button 
-                     onClick={() => generateReceipt(week)}
+                     onClick={() => generateReceipt(period)}
                      className="w-full bg-[var(--color-brutal-green)] text-black border-4 border-black py-4 font-black text-lg uppercase mb-6 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all flex items-center justify-center gap-2"
                    >
                      <ArrowUpRight className="w-6 h-6 stroke-[3]" />
@@ -276,8 +310,8 @@ Date: ${new Date().toLocaleDateString()}
                 )}
                 
                 <div className="space-y-3">
-                  <p className="font-black uppercase text-sm border-b-2 border-black inline-block pb-1 mb-2">Jobs Completed ({week.jobs.length})</p>
-                  {week.jobs.map(job => (
+                  <p className="font-black uppercase text-sm border-b-2 border-black inline-block pb-1 mb-2">Jobs Completed ({period.jobs.length})</p>
+                  {period.jobs.map(job => (
                     <JobEarningRow key={job.requestId} job={job} />
                   ))}
                 </div>
@@ -285,6 +319,7 @@ Date: ${new Date().toLocaleDateString()}
             </div>
           ))
         )}
+      </div>
       </div>
 
       {showPaymentModal && (

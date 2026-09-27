@@ -1,0 +1,27 @@
+{
+  "name": "NEED — Find Trusted Local Professionals",
+  "short_name": "NEED",
+  "description": "Find and book trusted artisans and technicians near you.",
+  "start_url": "/explore",
+  "display": "standalone",
+  "background_color": "#F5F0E8",
+  "theme_color": "#FFD700",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "utilities"],
+  "lang": "en",
+  "dir": "ltr"
+}

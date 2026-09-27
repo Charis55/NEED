@@ -14,8 +14,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { UserAccount } from "@/types";
 import ImageCropper from "@/components/ImageCropper";
-import { Eye, EyeOff, ArrowLeft, Upload, X, Check } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Upload, X, Check, Mail, Phone as PhoneIcon } from "lucide-react";
 import TermsDisclaimer from "@/components/TermsDisclaimer";
+import PhoneAuth from "@/components/PhoneAuth";
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -34,6 +35,7 @@ export default function AuthForm() {
   const [step, setStep] = useState<"auth" | "role">("auth");
   const [role, setRole] = useState<"customer" | "artisan">("customer");
   const [lockRole, setLockRole] = useState(false);
+  const [authMethod, setAuthMethod] = useState<"email" | "phone">("email");
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -165,6 +167,7 @@ export default function AuthForm() {
           const newUser: UserAccount = {
             userId: result.user.uid,
             phone: result.user.phoneNumber || "",
+            email: result.user.email || undefined,
             displayName: result.user.displayName || "User",
             role: role, // The role from the URL param
             createdAt: Date.now(),
@@ -251,6 +254,7 @@ export default function AuthForm() {
         const newUser: UserAccount = {
           userId: result.user.uid,
           phone: phoneNumber,
+          email: result.user.email || undefined,
           displayName: fullName,
           role: role,
           createdAt: Date.now(),
@@ -271,7 +275,11 @@ export default function AuthForm() {
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Authentication failed.");
+      if (err.code === 'auth/email-already-in-use') {
+        setError("An account with this email already exists. Please log in instead.");
+      } else {
+        setError(err.message || "Authentication failed.");
+      }
     } finally {
       setLoading(false);
     }
@@ -548,7 +556,29 @@ export default function AuthForm() {
             </div>
           </>
         )}
+        
+        <div className="flex bg-[var(--color-brutal-bg)] p-2 brutal-border mb-6 relative">
+          <button
+            type="button"
+            onClick={() => setAuthMethod("email")}
+            className={`flex-1 py-3 text-sm font-black uppercase transition-all z-10 flex items-center justify-center gap-2 ${authMethod === "email" ? "bg-white brutal-border brutal-shadow-sm text-black translate-x-[-2px] translate-y-[-2px]" : "text-gray-500 hover:text-black border-4 border-transparent"}`}
+          >
+            <Mail className="w-4 h-4 stroke-[3]" />
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMethod("phone")}
+            className={`flex-1 py-3 text-sm font-black uppercase transition-all z-10 flex items-center justify-center gap-2 ${authMethod === "phone" ? "bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm text-black translate-x-[-2px] translate-y-[-2px]" : "text-gray-500 hover:text-black border-4 border-transparent"}`}
+          >
+            <PhoneIcon className="w-4 h-4 stroke-[3]" />
+            Phone
+          </button>
+        </div>
 
+        {authMethod === "phone" ? (
+          <PhoneAuth role={role} isLogin={isLogin} onSuccess={() => {}} />
+        ) : (
         <form onSubmit={handleEmailAuth}>
           {!isLogin && (
             <>
@@ -788,6 +818,7 @@ export default function AuthForm() {
             </button>
           </div>
         </form>
+        )}
       </div>
 
       {/* Right side: Brutalist Banner for Desktop */}

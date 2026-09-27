@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ClipboardList, Inbox, Settings } from "lucide-react";
+import { Home, ClipboardList, Inbox, Settings, Heart } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import AdUnit from "./AdUnit";
 const navItems = [
   { href: "/explore", icon: Home, label: "Home" },
   { href: "/jobs", icon: ClipboardList, label: "Bookings" },
+  { href: "/favorites", icon: Heart, label: "Favorites" },
   { href: "/inbox", icon: Inbox, label: "Inbox" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];

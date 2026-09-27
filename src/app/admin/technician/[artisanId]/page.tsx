@@ -121,7 +121,11 @@ export default function AdminTechnicianProfile() {
             <div className="space-y-4 font-bold">
               <div className="flex justify-between border-b-2 border-dashed border-gray-300 pb-2">
                 <span className="text-gray-500 uppercase">Verified Name</span>
-                <span>{artisan.identityVerifiedName || "N/A"}</span>
+                <span>{artisan.identityVerifiedName || artisan.name || "N/A"}</span>
+              </div>
+              <div className="flex justify-between border-b-2 border-dashed border-gray-300 pb-2">
+                <span className="text-gray-500 uppercase">Email</span>
+                <span>{userAccount?.email || "N/A"}</span>
               </div>
               <div className="flex justify-between border-b-2 border-dashed border-gray-300 pb-2">
                 <span className="text-gray-500 uppercase">Contact Phone</span>

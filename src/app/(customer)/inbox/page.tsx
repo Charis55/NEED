@@ -9,6 +9,7 @@ import { useAlert } from "@/components/AlertProvider";
 import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
 import { MessageCircle } from "lucide-react";
+import AuthGate from "@/components/AuthGate";
 
 interface ChatListItem {
   job: JobRequest;
@@ -18,6 +19,14 @@ interface ChatListItem {
 }
 
 export default function InboxPage() {
+  return (
+    <AuthGate title="Sign in to view messages" description="Create a free account to chat with technicians.">
+      <InboxContent />
+    </AuthGate>
+  );
+}
+
+function InboxContent() {
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { showAlert } = useAlert();
