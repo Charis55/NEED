@@ -37,3 +37,33 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     return "Unknown Location";
   }
 }
+
+export async function geocode(address: string): Promise<{lat: number, lng: number}> {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+      {
+        headers: {
+          "Accept-Language": "en",
+          "User-Agent": "NeedArtisanMarketplace/1.0",
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error("Failed to geocode");
+    }
+
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon)
+      };
+    }
+    throw new Error("No results found");
+  } catch (error) {
+    console.error("Geocoding error:", error);
+    throw error;
+  }
+}
