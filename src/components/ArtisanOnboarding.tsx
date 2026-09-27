@@ -10,7 +10,7 @@ import ngeohash from "ngeohash";
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 import { reverseGeocode } from "@/utils/location";
-import { ShieldCheck, AlertTriangle, CheckCircle, Loader2, Camera, ExternalLink } from "lucide-react";
+import { ShieldCheck, AlertTriangle, CheckCircle, Loader2, Camera, ExternalLink, UserCheck, Lock, Clock, MapPin } from "lucide-react";
 
 const tradeCategories = Object.values(servicesData);
 
@@ -551,10 +551,10 @@ export default function ArtisanOnboarding() {
                 </a>, a trusted KYC provider.
               </p>
               <div className="bg-white brutal-border p-3 text-xs font-bold text-black space-y-1">
-                <p>📸 You will be asked to scan a valid government-issued ID document</p>
-                <p>🤳 A quick selfie will verify it&apos;s really you (liveness check)</p>
-                <p>🔒 Your data is encrypted and processed securely by Didit</p>
-                <p>⏱️ The entire process takes about 2 minutes</p>
+                <p className="flex items-center gap-1"><Camera className="w-4 h-4" /> You will be asked to scan a valid government-issued ID document</p>
+                <p className="flex items-center gap-1"><UserCheck className="w-4 h-4" /> A quick selfie will verify it&apos;s really you (liveness check)</p>
+                <p className="flex items-center gap-1"><Lock className="w-4 h-4" /> Your data is encrypted and processed securely by Didit</p>
+                <p className="flex items-center gap-1"><Clock className="w-4 h-4" /> The entire process takes about 2 minutes</p>
               </div>
             </div>
 
@@ -693,7 +693,7 @@ export default function ArtisanOnboarding() {
               
               {locationData ? (
                 <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center">
-                  <span>📍 {locationData.name}</span>
+                  <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {locationData.name}</span>
                   <button 
                     type="button" 
                     onClick={detectLocation}
@@ -709,7 +709,7 @@ export default function ArtisanOnboarding() {
                   disabled={isLocating}
                   className="w-full p-4 bg-[var(--color-brutal-yellow)] brutal-btn text-black font-black uppercase text-left flex justify-between items-center"
                 >
-                  <span>{isLocating ? "DETECTING..." : "📍 DETECT MY LOCATION"}</span>
+                  <span className="flex items-center gap-1">{isLocating ? "DETECTING..." : <><MapPin className="w-4 h-4" /> DETECT MY LOCATION</>}</span>
                 </button>
               )}
               

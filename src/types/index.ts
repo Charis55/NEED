@@ -14,6 +14,7 @@ export interface UserAccount {
     messagingNotifications: boolean;
     locationEnabled: boolean;
   };
+  accountStatus?: "active" | "suspended" | "banned";
 }
 
 export interface ArtisanService {

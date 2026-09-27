@@ -63,17 +63,25 @@ export const checkPoliceClearanceExpiry = functions.pubsub
           const fcmToken = artisanData?.fcmToken;
 
           if (fcmToken) {
-            await admin.messaging().send({
-              token: fcmToken,
-              notification: {
-                title: "Police Clearance Expired",
-                body: "Your Police Clearance Certificate has expired. Please re-upload a current clearance to continue accepting job requests.",
-              },
-              data: {
-                type: "police_clearance_expired",
-              },
-            });
-            console.log(`Expiry notification sent to artisan ${artisanId}`);
+            // Check push preferences
+            const userDoc = await db.collection("users").doc(artisanId).get();
+            const pushEnabled = userDoc.exists ? (userDoc.data()?.preferences?.pushNotifications ?? true) : true;
+
+            if (pushEnabled) {
+              await admin.messaging().send({
+                token: fcmToken,
+                notification: {
+                  title: "Police Clearance Expired",
+                  body: "Your Police Clearance Certificate has expired. Please re-upload a current clearance to continue accepting job requests.",
+                },
+                data: {
+                  type: "police_clearance_expired",
+                },
+              });
+              console.log(`Expiry notification sent to artisan ${artisanId}`);
+            } else {
+              console.log(`Expiry notification skipped for ${artisanId} due to preferences`);
+            }
           }
         } catch (notifError) {
           console.error(

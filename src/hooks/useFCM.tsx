@@ -15,7 +15,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
           const token = await getToken(messaging as any, {
-            vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+            vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",
           });
 
           if (token && auth.currentUser) {

@@ -5,7 +5,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, orderBy, getDocs, doc, updateDoc } from "firebase/firestore";
 import Link from "next/link";
 import GlobalSpinner from "@/components/GlobalSpinner";
-import { AlertTriangle, ExternalLink, ShieldAlert, CheckCircle, Search } from "lucide-react";
+import { AlertTriangle, ExternalLink, ShieldAlert, CheckCircle, Search, DollarSign } from "lucide-react";
 
 interface Dispute {
   id: string;
@@ -51,6 +51,23 @@ export default function AdminDisputes() {
     } catch (error) {
       console.error("Error updating status:", error);
       alert("Failed to update status");
+    }
+  };
+
+  const processRefund = async (disputeId: string, jobId: string) => {
+    if (confirm("Are you sure you want to process a refund for this job? This will cancel the job and resolve the dispute.")) {
+      try {
+        await updateDoc(doc(db, "jobRequests", jobId), {
+          status: "cancelled",
+          refunded: true,
+          refundedAt: Date.now()
+        });
+        await updateStatus(disputeId, "resolved");
+        alert("Refund processed successfully!");
+      } catch (error) {
+        console.error("Error processing refund:", error);
+        alert("Failed to process refund");
+      }
     }
   };
 
@@ -190,6 +207,14 @@ export default function AdminDisputes() {
                       >
                         <CheckCircle className="w-4 h-4" /> Mark Resolved
                       </button>
+                      {dispute.jobId && (
+                        <button 
+                          onClick={() => processRefund(dispute.id, dispute.jobId!)}
+                          className="bg-[var(--color-brutal-pink)] text-black px-4 py-3 font-black uppercase text-center border-4 border-black brutal-shadow-sm hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center gap-2"
+                        >
+                          <DollarSign className="w-4 h-4" /> Process Refund
+                        </button>
+                      )}
                       <button 
                         onClick={() => updateStatus(dispute.id, "dismissed")}
                         className="bg-gray-200 text-black px-4 py-3 font-black uppercase text-center border-4 border-black brutal-shadow-sm hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"

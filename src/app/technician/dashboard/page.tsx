@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import Link from "next/link";
-import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, PowerOff, Navigation, ArrowRight } from "lucide-react";
+import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, PowerOff, Navigation, ArrowRight, MapPin } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 
 export default function ArtisanDashboard() {
@@ -191,7 +191,7 @@ export default function ArtisanDashboard() {
                         {job.status.replace("_", " ")}
                       </span>
                       <h3 className="text-2xl font-black uppercase">{job.trade}</h3>
-                      <p className="font-bold text-sm">📍 {job.neighborhood}</p>
+                      <p className="font-bold text-sm flex items-center gap-1"><MapPin className="w-4 h-4 shrink-0" /> {job.neighborhood}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-3xl font-black">₦{((job.counterOfferAmount || job.offerAmount || 0) * (promoDaysLeft && promoDaysLeft > 0 ? 1 : 0.8)).toLocaleString()}</p>

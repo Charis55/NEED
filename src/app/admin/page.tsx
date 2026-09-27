@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, updateDoc, query, orderBy } from "firebase/firestore";
-import { ArtisanProfile, UserAccount } from "@/types";
+import { ArtisanProfile, UserAccount, JobRequest } from "@/types";
 import {
   BadgeCheck, XCircle, MapPin, Star, ShieldCheck, Users, Wrench, Search,
   Clock, CheckCircle, AlertTriangle, ExternalLink, FileText, UserCheck,
-  ClipboardList, ChevronRight,
+  ClipboardList, ChevronRight, TrendingUp, Settings
 } from "lucide-react";
 import Link from "next/link";
 
@@ -87,6 +87,7 @@ function StepBar({ artisan }: { artisan: ArtisanProfile }) {
 export default function AdminDashboard() {
   const [artisans, setArtisans] = useState<ArtisanProfile[]>([]);
   const [customers, setCustomers] = useState<UserAccount[]>([]);
+  const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,12 +99,14 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [artisanSnap, userSnap] = await Promise.all([
+      const [artisanSnap, userSnap, jobsSnap] = await Promise.all([
         getDocs(query(collection(db, "artisans"), orderBy("createdAt", "desc"))),
         getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"))),
+        getDocs(query(collection(db, "jobRequests"), orderBy("createdAt", "desc"))),
       ]);
       setArtisans(artisanSnap.docs.map((d) => d.data() as ArtisanProfile));
       setCustomers(userSnap.docs.map((d) => d.data() as UserAccount));
+      setJobs(jobsSnap.docs.map((d) => d.data() as JobRequest));
     } catch (error) {
       console.error("Error fetching admin data:", error);
     } finally {
@@ -200,6 +203,20 @@ export default function AdminDashboard() {
             Disputes
           </Link>
           <Link
+            href="/admin/moderation"
+            className="flex items-center gap-3 bg-[var(--color-brutal-teal)] hover:bg-teal-400 text-black px-6 py-4 border-4 border-black font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none"
+          >
+            <ShieldCheck className="w-6 h-6" />
+            Moderation
+          </Link>
+          <Link
+            href="/admin/settings"
+            className="flex items-center gap-3 bg-white hover:bg-gray-100 text-black px-6 py-4 border-4 border-black font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none"
+          >
+            <Settings className="w-6 h-6" />
+            Config
+          </Link>
+          <Link
             href="/admin/verification"
             className="flex items-center gap-3 bg-[#FF4D4D] hover:bg-[#ff3333] text-white px-6 py-4 border-4 border-black font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none"
           >
@@ -233,32 +250,68 @@ export default function AdminDashboard() {
 
       {/* ─── OVERVIEW ──────────────────────────────────────────────── */}
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#E5F0FF] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-            <div className="flex justify-between items-start mb-4">
-              <Users className="w-10 h-10 text-blue-600" />
-              <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">TOTAL</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-[#E5F0FF] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex justify-between items-start mb-4">
+                <Users className="w-10 h-10 text-blue-600" />
+                <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">TOTAL</span>
+              </div>
+              <div className="text-5xl font-black mb-1">{customers.length}</div>
+              <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Registered Customers</div>
             </div>
-            <div className="text-5xl font-black mb-1">{customers.length}</div>
-            <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Registered Customers</div>
+
+            <div className="bg-[#FFE5F0] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex justify-between items-start mb-4">
+                <Wrench className="w-10 h-10 text-pink-600" />
+                <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">TOTAL</span>
+              </div>
+              <div className="text-5xl font-black mb-1">{artisans.length}</div>
+              <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Registered Technicians</div>
+            </div>
+
+            <div className="bg-[#E5FFE5] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex justify-between items-start mb-4">
+                <BadgeCheck className="w-10 h-10 text-emerald-600" />
+                <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">ACTIVE</span>
+              </div>
+              <div className="text-5xl font-black mb-1">{artisans.filter((a) => a.verified).length}</div>
+              <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Verified Technicians</div>
+            </div>
           </div>
 
-          <div className="bg-[#FFE5F0] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-            <div className="flex justify-between items-start mb-4">
-              <Wrench className="w-10 h-10 text-pink-600" />
-              <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">TOTAL</span>
+          <h2 className="text-2xl font-black uppercase tracking-tight mt-8 mb-4">Platform Analytics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-[#FFF0E5] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex justify-between items-start mb-4">
+                <ClipboardList className="w-10 h-10 text-orange-600" />
+                <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">TOTAL</span>
+              </div>
+              <div className="text-5xl font-black mb-1">{jobs.length}</div>
+              <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Jobs Requested</div>
             </div>
-            <div className="text-5xl font-black mb-1">{artisans.length}</div>
-            <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Registered Technicians</div>
-          </div>
+            
+            <div className="bg-[#E5FFE5] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex justify-between items-start mb-4">
+                <CheckCircle className="w-10 h-10 text-emerald-600" />
+                <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">RATE</span>
+              </div>
+              <div className="text-5xl font-black mb-1">
+                {jobs.length > 0 ? Math.round((jobs.filter(j => j.status === "completed").length / jobs.length) * 100) : 0}%
+              </div>
+              <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Completion Rate</div>
+            </div>
 
-          <div className="bg-[#E5FFE5] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-            <div className="flex justify-between items-start mb-4">
-              <BadgeCheck className="w-10 h-10 text-emerald-600" />
-              <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">ACTIVE</span>
+            <div className="bg-[#CCFF00] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex justify-between items-start mb-4">
+                <TrendingUp className="w-10 h-10 text-black" />
+                <span className="bg-white border-2 border-black px-2 py-1 font-black text-sm">NGN</span>
+              </div>
+              <div className="text-5xl font-black mb-1 truncate" title={jobs.filter(j => j.status === "completed" && j.price).reduce((acc, curr) => acc + (curr.price || 0), 0).toLocaleString()}>
+                ₦{jobs.filter(j => j.status === "completed" && j.price).reduce((acc, curr) => acc + (curr.price || 0), 0).toLocaleString()}
+              </div>
+              <div className="font-bold uppercase tracking-widest text-sm text-gray-800">Transaction Volume</div>
             </div>
-            <div className="text-5xl font-black mb-1">{artisans.filter((a) => a.verified).length}</div>
-            <div className="font-bold uppercase tracking-widest text-sm text-gray-600">Verified Technicians</div>
           </div>
         </div>
       )}
@@ -306,11 +359,11 @@ export default function AdminDashboard() {
                         : "bg-gray-100"
                     }`}
                   >
-                    <span>
+                    <span className="flex items-center gap-1">
                       {artisan.verified
-                        ? "✅ Approved"
+                        ? <><CheckCircle className="w-4 h-4" /> Approved</>
                         : artisan.manualReviewRequired
-                        ? "⚠️ Awaiting Review"
+                        ? <><AlertTriangle className="w-4 h-4" /> Awaiting Review</>
                         : "Pending"}
                     </span>
                     <span className="opacity-70">
@@ -363,7 +416,7 @@ export default function AdminDashboard() {
 
                       {needsDiditReview && (
                         <div className="bg-amber-50 border-2 border-amber-400 px-3 py-2 text-xs font-bold text-amber-800 mb-3">
-                          <p className="mb-1 font-black">⚠️ This account needs Didit review.</p>
+                          <p className="mb-1 font-black flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> This account needs Didit review.</p>
                           <p>
                             Search for <span className="font-black">"{artisan.identityVerifiedName || artisan.name}"</span>
                             {artisan.identityVerificationReference && (

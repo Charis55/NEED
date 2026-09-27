@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { doc, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { JobRequest, ArtisanProfile } from "@/types";
-import { Phone, MessageSquare } from "lucide-react";
+import { Phone, MessageSquare, Bike, Star } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import dynamicImport from "next/dynamic";
 
@@ -77,7 +77,7 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
           </h2>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 bg-[var(--color-brutal-teal)] border-2 border-black flex items-center justify-center text-2xl animate-bounce shadow-[2px_2px_0_0_#000]">
-              🛵
+              <Bike className="w-6 h-6 stroke-[3]" />
             </div>
             <div>
               <p className="font-black text-2xl uppercase tracking-tighter text-black">
@@ -100,14 +100,14 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
               <img 
                 src={technician.profilePictureUrl || `https://i.pravatar.cc/150?u=${technician.artisanId}`} 
                 alt={technician.name} 
-                className="w-full h-full object-cover grayscale"
+                className="w-full h-full object-cover"
               />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="font-black text-xl text-black uppercase truncate">{technician.name || "Technician"}</h3>
               <p className="font-bold text-sm text-black uppercase">{technician.trade}</p>
               <p className="text-xs font-black bg-white px-2 py-1 border-2 border-black inline-block mt-1">
-                ⭐ {technician.ratingAverage.toFixed(1)}
+                <span className="flex items-center justify-center gap-1"><Star className="w-3 h-3" /> {technician.ratingAverage.toFixed(1)}</span>
               </p>
             </div>
           </div>

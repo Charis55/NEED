@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth, db, storage } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, runTransaction } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, runTransaction, arrayUnion } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { JobRequest, ArtisanProfile, Review } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import UserAvatar from "@/components/UserAvatar";
-import { ChevronLeft, Send, Image as ImageIcon, X, Mic } from "lucide-react";
+import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
@@ -186,6 +186,20 @@ export default function ChatPage() {
         lastMessageSenderId: user.uid,
         lastMessageAt: Date.now()
       });
+
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+      if (partnerId) {
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: partnerId,
+            title: "New Voice Note",
+            body: "Sent an audio message",
+            data: { requestId, type: "chat" }
+          })
+        }).catch(err => console.error("Push failed:", err));
+      }
     } catch (err) {
       console.error(err);
       showAlert("Failed to send voice note", "error");
@@ -273,11 +287,49 @@ export default function ChatPage() {
         lastMessageAt: Date.now()
       });
       setNewMessage("");
+
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+      if (partnerId) {
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: partnerId,
+            title: "New Message",
+            body: newMessage || "Sent a message",
+            data: { requestId, type: "chat" }
+          })
+        }).catch(err => console.error("Push failed:", err));
+      }
     } catch (err) {
       console.error(err);
       showAlert("Failed to send message", "error");
     } finally {
       setSending(false);
+    }
+  };
+  
+  const handleBlockUser = async () => {
+    const user = auth.currentUser;
+    if (!user || !job) return;
+    
+    const partnerId = isCustomerViewing ? job.artisanId : job.customerId;
+    const partnerName = isCustomerViewing 
+      ? (artisan?.name || "this technician")
+      : (customer?.displayName || "this customer");
+
+    if (confirm(`Are you sure you want to block ${partnerName}? You will not receive any more messages from them.`)) {
+      try {
+        await updateDoc(doc(db, "users", user.uid), {
+          blockedUsers: arrayUnion(partnerId)
+        });
+        showAlert("User blocked successfully.", "success");
+        // Optionally navigate away
+        router.push(isCustomerViewing ? "/inbox" : "/technician/inbox");
+      } catch (err) {
+        console.error("Failed to block user:", err);
+        showAlert("Failed to block user", "error");
+      }
     }
   };
   
@@ -349,6 +401,20 @@ export default function ChatPage() {
       setNewMessage("");
       setPendingImage(null);
       setPendingImagePreview(null);
+
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+      if (partnerId) {
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: partnerId,
+            title: "New Photo",
+            body: "Sent an image",
+            data: { requestId, type: "chat" }
+          })
+        }).catch(err => console.error("Push failed:", err));
+      }
     } catch (err) {
       console.error(err);
       showAlert("Failed to send photo", "error");
@@ -478,13 +544,20 @@ export default function ChatPage() {
             REVIEW
           </button>
         )}
+        <button 
+          onClick={handleBlockUser}
+          className="ml-2 bg-black text-white border-2 border-white px-2 py-1.5 font-black uppercase text-xs md:text-sm hover:scale-105 transition-transform shrink-0 flex items-center justify-center"
+          title="Block User"
+        >
+          <ShieldAlert className="w-4 h-4" />
+        </button>
       </div>
       
       {/* Liability Disclaimer */}
       {job?.status === "completed" && (
         <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-2 md:p-3 text-center shrink-0 z-0 flex items-center justify-between shadow-[0_4px_0_0_#000]">
-          <p className="font-bold text-black text-[10px] md:text-xs uppercase leading-tight text-left flex-1 mr-2">
-            ⚠️ Upload Proof of Payment (receipt) to avoid liability.
+          <p className="font-bold text-black text-[10px] md:text-xs uppercase leading-tight text-left flex-1 mr-2 flex items-center gap-1">
+            <AlertTriangle className="w-4 h-4 shrink-0" /> Upload Proof of Payment (receipt) to avoid liability.
           </p>
         
         {job?.proofOfPaymentUrl ? (
@@ -722,11 +795,11 @@ export default function ChatPage() {
                       key={star}
                       type="button"
                       onClick={() => setRating(star)}
-                      className={`w-12 h-12 border-4 border-black text-2xl brutal-shadow hover:-translate-y-1 transition-transform ${
+                      className={`w-12 h-12 border-4 border-black text-2xl brutal-shadow hover:-translate-y-1 transition-transform flex justify-center items-center ${
                         rating >= star ? 'bg-[var(--color-brutal-yellow)]' : 'bg-gray-100 grayscale'
                       }`}
                     >
-                      ⭐
+                      <Star className={`w-6 h-6 stroke-[3] ${rating >= star ? 'fill-black' : ''}`} />
                     </button>
                   ))}
                 </div>

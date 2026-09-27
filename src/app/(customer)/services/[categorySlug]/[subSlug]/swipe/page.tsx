@@ -96,7 +96,7 @@ function SwipeCard({
               <img 
                 src={artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/150?u=" + artisan.artisanId} 
                 alt={artisan.name} 
-                className="w-full h-full object-cover grayscale contrast-125"
+                className="w-full h-full object-cover"
                 draggable="false"
               />
             </div>
@@ -294,7 +294,7 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
                     <img 
                       src={selectedArtisan.profilePictureUrl || selectedArtisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedArtisan.name || 'Artisan')}&background=random&size=150`} 
                       alt={selectedArtisan.name} 
-                      className="w-full h-full object-cover grayscale contrast-125"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">

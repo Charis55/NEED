@@ -63,7 +63,7 @@ export default function PerformancePage() {
 
         const jobsQ = query(collection(db, "jobRequests"), where("artisanId", "==", user.uid));
         const jobsSnap = await getDocs(jobsQ);
-        const fetchedJobs = jobsSnap.docs.map(d => ({ ...d.data(), id: d.id } as JobRequest));
+        const fetchedJobs = jobsSnap.docs.map(d => ({ ...d.data(), requestId: d.id } as unknown as JobRequest));
         setJobs(fetchedJobs);
 
       } catch (err) {
@@ -94,7 +94,7 @@ export default function PerformancePage() {
   const totalJobs = jobs.length;
   const completedJobs = jobs.filter(j => j.status === "completed").length;
   const cancelledJobs = jobs.filter(j => j.status === "cancelled").length;
-  const rejectedJobs = jobs.filter(j => j.status === "rejected").length;
+  const declinedJobs = jobs.filter(j => j.status === "declined").length;
   const completionRate = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
   
   // Chart Data: Jobs completed per month for the last 6 months
@@ -179,7 +179,7 @@ export default function PerformancePage() {
             <div className="bg-white border-4 border-black p-6 brutal-shadow-sm">
               <h3 className="font-black uppercase mb-2">Cancelled/Rejected</h3>
               <div className="flex items-end gap-2 mb-2">
-                <span className="text-4xl font-black text-[var(--color-brutal-red)]">{cancelledJobs + rejectedJobs}</span>
+                <span className="text-4xl font-black text-[var(--color-brutal-red)]">{cancelledJobs + declinedJobs}</span>
               </div>
               <p className="text-sm font-bold text-gray-600">Jobs missed</p>
             </div>

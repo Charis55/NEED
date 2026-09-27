@@ -65,20 +65,17 @@ export default function TrackingMap({
   const createDestIcon = () => {
     return L.divIcon({
       html: `
-        <div class="relative w-12 h-16 group cursor-pointer drop-shadow-[4px_4px_0_rgba(0,0,0,1)]">
-          <div class="absolute inset-x-0 top-0 h-12 bg-[var(--color-brutal-yellow)] border-4 border-black flex items-center justify-center text-2xl z-20">
-            🏠
-          </div>
-          <!-- pin triangle base -->
-          <div class="absolute top-[44px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[16px] border-l-transparent border-r-transparent border-t-black z-10"></div>
-          <!-- pin triangle fill -->
-          <div class="absolute top-[44px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-[var(--color-brutal-yellow)] z-20"></div>
+        <div class="relative flex items-center justify-center w-12 h-12">
+          <!-- Pulsing background -->
+          <div class="absolute inset-2 bg-[var(--color-brutal-blue)] rounded-full animate-ping opacity-60"></div>
+          <!-- Core dot -->
+          <div class="relative w-6 h-6 bg-[var(--color-brutal-blue)] border-4 border-black rounded-full shadow-[2px_2px_0_rgba(0,0,0,1)] z-10"></div>
         </div>
       `,
       className: 'bg-transparent border-none bg-none outline-none',
-      iconSize: [48, 64],
-      iconAnchor: [24, 60],
-      popupAnchor: [0, -60]
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+      popupAnchor: [0, -12]
     });
   };
 

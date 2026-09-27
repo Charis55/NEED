@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { ArtisanProfile } from '@/types';
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, MapPin, Star, Zap, CheckCircle, XCircle } from 'lucide-react';
 import BackButton from '@/components/BackButton';
 import FavoriteButton from '@/components/FavoriteButton';
 
@@ -98,7 +98,7 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
               <img 
                 src={artisan.profilePictureUrl || artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
                 alt={artisan.name} 
-                className="w-full h-full object-cover grayscale contrast-125"
+                className="w-full h-full object-cover"
               />
             </div>
             
@@ -126,15 +126,15 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
               <div className="grid grid-cols-2 md:flex md:flex-row gap-3 mb-6">
                 <div className="bg-[var(--color-brutal-bg)] p-2 brutal-border">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Location</p>
-                  <p className="font-black text-sm uppercase truncate">📍 {artisan.neighborhood}</p>
+                  <p className="font-black text-sm uppercase truncate flex items-center gap-1"><MapPin className="w-4 h-4" /> {artisan.neighborhood}</p>
                 </div>
                 <div className="bg-[var(--color-brutal-bg)] p-2 brutal-border">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Rating</p>
-                  <p className="font-black text-sm uppercase">⭐ {artisan.ratingAverage.toFixed(1)} <span className="text-xs text-gray-400">({artisan.ratingCount})</span></p>
+                  <p className="font-black text-sm uppercase flex items-center gap-1"><Star className="w-4 h-4" /> {artisan.ratingAverage.toFixed(1)} <span className="text-xs text-gray-400">({artisan.ratingCount})</span></p>
                 </div>
                 <div className="bg-[var(--color-brutal-bg)] p-2 brutal-border col-span-2 md:col-span-1">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Responds In</p>
-                  <p className="font-black text-sm uppercase text-black">⚡ {artisan.typicalResponseTime || "1-3 hours"}</p>
+                  <p className="font-black text-sm uppercase text-black flex items-center gap-1"><Zap className="w-4 h-4" /> {artisan.typicalResponseTime || "1-3 hours"}</p>
                 </div>
               </div>
               
@@ -150,8 +150,8 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
               >
                 BOOK NOW
               </Link>
-              <div className={`p-3 text-center border-2 border-black font-black uppercase text-sm ${artisan.available ? 'bg-[#bbf7d0] text-black' : 'bg-[var(--color-brutal-red)] text-white'}`}>
-                {artisan.available ? '🟢 AVAILABLE' : '🔴 BUSY'}
+              <div className={`p-3 text-center border-2 border-black font-black uppercase text-sm flex items-center justify-center gap-2 ${artisan.available ? 'bg-[#bbf7d0] text-black' : 'bg-[var(--color-brutal-red)] text-white'}`}>
+                {artisan.available ? <><CheckCircle className="w-5 h-5" /> AVAILABLE</> : <><XCircle className="w-5 h-5" /> BUSY</>}
               </div>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {artisan.portfolioPhotoUrls.map((url, i) => (
                 <div key={i} className="aspect-square bg-gray-200 brutal-border brutal-shadow-sm overflow-hidden hover:-translate-y-1 transition-transform">
-                  <img src={url} alt={`Portfolio item ${i+1}`} className="w-full h-full object-cover grayscale contrast-125 transition-all duration-300" />
+                  <img src={url} alt={`Portfolio item ${i+1}`} className="w-full h-full object-cover transition-all duration-300" />
                 </div>
               ))}
             </div>

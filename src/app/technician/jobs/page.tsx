@@ -8,7 +8,7 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall } from "lucide-react";
 
 export default function ArtisanDashboard() {
   const [requests, setRequests] = useState<JobRequest[]>([]);
@@ -176,6 +176,35 @@ export default function ArtisanDashboard() {
         }).catch(e => console.error("Failed to send job completed email:", e));
       }
 
+      // Send push notification to the customer via API
+      if (req?.customerId && user) {
+        let title = "Job Update";
+        let body = "The status of your job request has changed.";
+        
+        if (newStatus === "accepted") {
+          title = "Job Accepted!"; body = "Your technician has accepted the job request.";
+        } else if (newStatus === "en_route") {
+          title = "Technician En Route!"; body = "Your technician is on their way.";
+        } else if (newStatus === "in_progress") {
+          title = "Technician Arrived!"; body = "Your technician has arrived and started the job.";
+        } else if (newStatus === "completed" || newStatus === "payment_pending") {
+          title = "Job Completed!"; body = "The job has been marked as completed.";
+        }
+        
+        if (["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(newStatus)) {
+          fetch("/api/send-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: req.customerId,
+              title,
+              body,
+              data: { requestId, type: "job_update", status: newStatus }
+            })
+          }).catch(err => console.error("Failed to push:", err));
+        }
+      }
+
       setRequests(prev => prev.map(req => {
         if (req.requestId === requestId) {
           const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
@@ -191,6 +220,23 @@ export default function ArtisanDashboard() {
       setShowCounterFor(null);
     } catch (error) {
       console.error("Failed to update status", error);
+    }
+  };
+
+  const handleSOS = async (requestId: string) => {
+    if (confirm("Are you in immediate danger? This will alert our safety team and the authorities.")) {
+      try {
+        const reqRef = doc(db, "jobRequests", requestId);
+        await updateDoc(reqRef, {
+          sosAlert: true,
+          sosTriggeredBy: "artisan",
+          sosTriggeredAt: Date.now()
+        });
+        alert("SOS Alert triggered! Our team has been notified and will contact you immediately.");
+      } catch (err) {
+        console.error(err);
+        alert("Failed to trigger SOS");
+      }
     }
   };
 
@@ -268,7 +314,7 @@ export default function ArtisanDashboard() {
         {outstandingBalance > 0 && (
           <div className={`mb-10 p-6 brutal-border shadow-[4px_4px_0_0_#000] ${isRestricted ? 'bg-[var(--color-brutal-red)]' : 'bg-[var(--color-brutal-pink)]'}`}>
             <h2 className="text-2xl font-black uppercase text-black mb-2">
-              {isRestricted ? '⚠️ ACCOUNT RESTRICTED' : 'OUTSTANDING BALANCE'}
+              {isRestricted ? <span className="flex items-center gap-2"><AlertTriangle className="w-6 h-6" /> ACCOUNT RESTRICTED</span> : 'OUTSTANDING BALANCE'}
             </h2>
             <p className="text-black font-bold mb-4 text-lg">
               You owe the platform <span className="font-black text-2xl">₦{outstandingBalance.toLocaleString()}</span> in commission for completed jobs.
@@ -293,7 +339,7 @@ export default function ArtisanDashboard() {
         ) : requests.length === 0 ? (
           <div className="bg-white p-12 text-center brutal-border brutal-shadow-sm">
             <div className="w-20 h-20 bg-[var(--color-brutal-pink)] brutal-border flex items-center justify-center mx-auto mb-4 rotate-6">
-              <span className="text-3xl">📭</span>
+              <Mailbox className="w-12 h-12 stroke-[3] mx-auto" />
             </div>
             <h3 className="text-2xl font-black text-black mb-2 uppercase">No Requests Yet</h3>
             <p className="text-black font-bold">When customers request your services, they will appear here.</p>
@@ -335,8 +381,8 @@ export default function ArtisanDashboard() {
                           {req.isBroadcast && req.status === "pending" ? "Broadcast Request" : "Job Details"}
                         </h3>
                         <p className="text-sm text-black font-bold flex items-center gap-2 uppercase tracking-widest">
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">📍 {req.neighborhood}</span>
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">🕒 {req.preferredTime}</span>
+                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood}</span>
+                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {req.preferredTime}</span>
                         </p>
                       </div>
                       
@@ -471,17 +517,15 @@ export default function ArtisanDashboard() {
                     {["accepted", "en_route", "in_progress", "payment_pending"].includes(req.status) && (
                       <div className="mt-4 flex flex-col gap-4">
                         {req.status === "en_route" && (
-                          <a 
-                            href={`https://maps.google.com/?q=${encodeURIComponent(req.neighborhood)}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="w-full bg-black text-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-white hover:text-black transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                          <Link 
+                            href={`/technician/jobs/${req.requestId}/navigate`} 
+                            className="w-full bg-black text-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-blue)] hover:text-black transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
                           >
-                            🗺️ NAVIGATE TO CUSTOMER
-                          </a>
+                            <span className="flex items-center justify-center gap-2"><MapIcon className="w-5 h-5" /> NAVIGATE TO CUSTOMER</span>
+                          </Link>
                         )}
                         <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
-                          💬 CHAT WITH CUSTOMER
+                          <span className="flex items-center justify-center gap-2"><MessageSquare className="w-5 h-5" /> CHAT WITH CUSTOMER</span>
                         </Link>
                       </div>
                     )}
@@ -523,7 +567,7 @@ export default function ArtisanDashboard() {
                               }}
                               className="w-full bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
                             >
-                              📅 REQUEST RESCHEDULE
+                              <span className="flex items-center justify-center gap-2"><Calendar className="w-5 h-5" /> REQUEST RESCHEDULE</span>
                             </button>
                           )
                         )}
@@ -540,7 +584,7 @@ export default function ArtisanDashboard() {
                           }}
                           className="w-full bg-[var(--color-brutal-red)] text-white border-4 border-black font-black uppercase text-center py-4 hover:bg-black transition-colors brutal-shadow-sm"
                         >
-                          ❌ CANCEL JOB
+                          <span className="flex items-center justify-center gap-2"><X className="w-5 h-5 stroke-[3]" /> CANCEL JOB</span>
                         </button>
                       </div>
                     )}
@@ -570,7 +614,15 @@ export default function ArtisanDashboard() {
                       </div>
                     )}
                   {["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(req.status) && (
-                    <div className="mt-6 pt-4 border-t-2 border-black/10 text-center">
+                    <div className="mt-6 pt-4 border-t-2 border-black/10 flex flex-col gap-3">
+                      {req.status === "in_progress" && (
+                        <button 
+                          onClick={() => handleSOS(req.requestId)}
+                          className="w-full bg-red-600 text-white py-3 border-4 border-black font-black uppercase tracking-widest text-lg hover:bg-red-700 transition-colors brutal-shadow-sm flex items-center justify-center gap-2"
+                        >
+                          <PhoneCall className="w-5 h-5 fill-current" /> SOS / PANIC BUTTON
+                        </button>
+                      )}
                       <button 
                         onClick={() => setReportingJob(req)}
                         className="text-xs font-black uppercase text-gray-500 hover:text-[var(--color-brutal-red)] transition-colors flex items-center justify-center gap-1 mx-auto"
@@ -640,6 +692,16 @@ export default function ArtisanDashboard() {
           ));
         }}
       />
+
+      {reportingJob && auth.currentUser && (
+        <ReportModal 
+          jobId={reportingJob.requestId}
+          reportedUserId={reportingJob.customerId}
+          reporterUserId={auth.currentUser.uid}
+          reporterRole="artisan"
+          onClose={() => setReportingJob(null)}
+        />
+      )}
     </div>
   );
 }

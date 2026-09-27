@@ -17,6 +17,7 @@ export default function AdminTechnicianProfile() {
   const [userAccount, setUserAccount] = useState<UserAccount | null>(null);
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (artisanId) fetchTechnicianData();
@@ -47,6 +48,21 @@ export default function AdminTechnicianProfile() {
       console.error("Error fetching technician data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAccountAction = async (action: "active" | "suspended" | "banned") => {
+    if (!userAccount) return;
+    setActionLoading(action);
+    try {
+      const { updateDoc } = await import("firebase/firestore");
+      await updateDoc(doc(db, "users", artisanId), { accountStatus: action });
+      setUserAccount({ ...userAccount, accountStatus: action });
+    } catch (error) {
+      console.error("Error updating account status:", error);
+      alert("Failed to update account status.");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -254,6 +270,55 @@ export default function AdminTechnicianProfile() {
           ) : (
             <p className="text-gray-500 font-bold text-center py-4">No portfolio photos uploaded.</p>
           )}
+        </div>
+
+        {/* Account Actions */}
+        <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0_0_#000]">
+          <h2 className="text-2xl font-black uppercase border-b-4 border-black pb-2 mb-4 flex items-center gap-2">
+            <Ban className="w-6 h-6" /> Account Management
+          </h2>
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div>
+              <p className="font-bold text-gray-600">Current Status:</p>
+              <span className={`inline-block px-3 py-1 font-black text-white uppercase tracking-widest mt-1 border-2 border-black shadow-[2px_2px_0_0_#000] ${
+                userAccount?.accountStatus === "banned" ? "bg-black" : 
+                userAccount?.accountStatus === "suspended" ? "bg-red-500" : 
+                "bg-[var(--color-brutal-green)] text-black"
+              }`}>
+                {userAccount?.accountStatus || "active"}
+              </span>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              {(userAccount?.accountStatus === "suspended" || userAccount?.accountStatus === "banned") ? (
+                <button
+                  onClick={() => handleAccountAction("active")}
+                  disabled={!!actionLoading}
+                  className="bg-[var(--color-brutal-green)] text-black px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50"
+                >
+                  {actionLoading === "active" ? "Reinstating..." : "Reinstate Account"}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleAccountAction("suspended")}
+                    disabled={!!actionLoading}
+                    className="bg-red-500 text-white px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50"
+                  >
+                    {actionLoading === "suspended" ? "Suspending..." : "Suspend"}
+                  </button>
+                  <button
+                    onClick={() => handleAccountAction("banned")}
+                    disabled={!!actionLoading}
+                    className="bg-black text-white px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-[var(--color-brutal-yellow)]" />
+                    {actionLoading === "banned" ? "Banning..." : "Ban"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Job History */}

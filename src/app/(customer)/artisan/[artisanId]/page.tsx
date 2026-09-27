@@ -87,7 +87,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
             <img 
               src={artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/150?u=" + artisan.artisanId} 
               alt={artisan.name} 
-              className="w-full h-full object-cover grayscale contrast-125"
+              className="w-full h-full object-cover"
             />
           </div>
           
@@ -196,7 +196,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
           <div className="space-y-6">
             {reviews.length === 0 ? (
               <div className="bg-white border-4 border-black p-8 text-center brutal-shadow-sm">
-                <div className="text-4xl mb-4">⭐</div>
+                <Star className="w-12 h-12 stroke-[3] mx-auto text-[var(--color-brutal-yellow)] fill-[var(--color-brutal-yellow)] mb-4" />
                 <h3 className="text-2xl font-black uppercase text-black mb-2">No Reviews Yet</h3>
                 <p className="font-bold text-gray-500">Be the first to hire and review {artisan.name || "this pro"}!</p>
               </div>

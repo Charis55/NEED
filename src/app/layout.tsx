@@ -37,11 +37,14 @@ export const metadata: Metadata = {
     viewportFit: "cover",
   },
   icons: {
+    icon: "/LOGO.png",
+    shortcut: "/LOGO.png",
     apple: "/icons/icon-192.png",
   },
 };
 
 import GlobalNotificationListener from "@/components/GlobalNotificationListener";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -60,6 +63,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full flex flex-col">
+        <OfflineIndicator />
         <AlertProvider>
           <FCMProvider>{children}</FCMProvider>
           <GlobalNotificationListener />

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { UserAccount, JobRequest } from "@/types";
-import { ArrowLeft, User, Phone, MapPin, Calendar, CheckCircle, Clock, XCircle, Settings, Ban } from "lucide-react";
+import { ArrowLeft, User, Phone, MapPin, Calendar, CheckCircle, Clock, XCircle, Settings, Ban, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import GlobalSpinner from "@/components/GlobalSpinner";
@@ -15,6 +15,7 @@ export default function AdminCustomerProfile() {
   const [customer, setCustomer] = useState<UserAccount | null>(null);
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (userId) fetchCustomerData();
@@ -38,6 +39,22 @@ export default function AdminCustomerProfile() {
       console.error("Error fetching customer data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAccountAction = async (action: "active" | "suspended" | "banned") => {
+    if (!customer) return;
+    setActionLoading(action);
+    try {
+      // Import updateDoc locally or globally
+      const { updateDoc } = await import("firebase/firestore");
+      await updateDoc(doc(db, "users", userId), { accountStatus: action });
+      setCustomer({ ...customer, accountStatus: action });
+    } catch (error) {
+      console.error("Error updating account status:", error);
+      alert("Failed to update account status.");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -134,6 +151,55 @@ export default function AdminCustomerProfile() {
                   {customer.preferences?.locationEnabled ? "ENABLED" : "DISABLED"}
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Account Actions */}
+        <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0_0_#000]">
+          <h2 className="text-2xl font-black uppercase border-b-4 border-black pb-2 mb-4 flex items-center gap-2">
+            <Ban className="w-6 h-6" /> Account Management
+          </h2>
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div>
+              <p className="font-bold text-gray-600">Current Status:</p>
+              <span className={`inline-block px-3 py-1 font-black text-white uppercase tracking-widest mt-1 border-2 border-black shadow-[2px_2px_0_0_#000] ${
+                customer.accountStatus === "banned" ? "bg-black" : 
+                customer.accountStatus === "suspended" ? "bg-red-500" : 
+                "bg-[var(--color-brutal-green)] text-black"
+              }`}>
+                {customer.accountStatus || "active"}
+              </span>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              {(customer.accountStatus === "suspended" || customer.accountStatus === "banned") ? (
+                <button
+                  onClick={() => handleAccountAction("active")}
+                  disabled={!!actionLoading}
+                  className="bg-[var(--color-brutal-green)] text-black px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50"
+                >
+                  {actionLoading === "active" ? "Reinstating..." : "Reinstate Account"}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleAccountAction("suspended")}
+                    disabled={!!actionLoading}
+                    className="bg-red-500 text-white px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50"
+                  >
+                    {actionLoading === "suspended" ? "Suspending..." : "Suspend"}
+                  </button>
+                  <button
+                    onClick={() => handleAccountAction("banned")}
+                    disabled={!!actionLoading}
+                    className="bg-black text-white px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-[var(--color-brutal-yellow)]" />
+                    {actionLoading === "banned" ? "Banning..." : "Ban"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -6,9 +6,10 @@ import { collection, doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { JobRequest, ArtisanProfile } from "@/types";
 import BackButton from "@/components/BackButton";
-import { ArrowRight, MapPin, Clock, Info } from "lucide-react";
+import { ArrowRight, MapPin, Clock, Info, Image as ImageIcon, X } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
+import { compressImage } from "@/utils/imageCompression";
 
 export default function RequestArtisanPage({ params }: { params: Promise<{ artisanId: string }> }) {
   const unwrappedParams = use(params);
@@ -27,6 +28,10 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
   const [locationData, setLocationData] = useState<{lat: number, lng: number, name: string} | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
+  
+  // Media upload
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -99,6 +104,37 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
       }
     );
   };
+  
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check size (e.g. 50MB max for videos)
+    if (file.size > 50 * 1024 * 1024) {
+      setError("File is too large. Maximum size is 50MB.");
+      return;
+    }
+    
+    setMediaFile(file);
+    setMediaPreview(URL.createObjectURL(file));
+  };
+  
+  const uploadFileToR2 = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+
+    const res = await fetch('/api/upload-direct', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!res.ok) {
+      throw new Error("Failed to upload file");
+    }
+    
+    const { publicUrl } = await res.json();
+    return publicUrl;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,8 +178,26 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         }
       }
 
+      let mediaUrl = null;
+      if (mediaFile) {
+        try {
+          // Compress if image, just upload if video
+          let fileToUpload = mediaFile;
+          if (mediaFile.type.startsWith('image/')) {
+            fileToUpload = await compressImage(mediaFile, 2);
+            fileToUpload = new File([fileToUpload], mediaFile.name, { type: mediaFile.type });
+          }
+          mediaUrl = await uploadFileToR2(fileToUpload);
+        } catch (uploadErr) {
+          console.error(uploadErr);
+          setError("Failed to upload media. Please try again or remove it.");
+          setLoading(false);
+          return;
+        }
+      }
+
       const requestRef = doc(collection(db, "jobRequests"));
-      const newRequest: JobRequest = {
+      const newRequest: JobRequest & { mediaUrl?: string } = {
         requestId: requestRef.id,
         customerId: user.uid,
         artisanId: unwrappedParams.artisanId,
@@ -158,10 +212,23 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         status: "pending",
         createdAt: Date.now(),
         completedAt: null,
+        ...(mediaUrl && { mediaUrl })
       };
 
       await setDoc(requestRef, newRequest);
       
+      // Trigger Push Notification to artisan via API
+      fetch("/api/send-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: unwrappedParams.artisanId,
+          title: "New Job Request!",
+          body: `A customer requested you for a job in ${newRequest.neighborhood}.`,
+          data: { requestId: requestRef.id, type: "new_request" }
+        })
+      }).catch(err => console.error("Failed to push:", err));
+
       // Trigger New Job Request Email
       fetch('/api/emails/new-job-request', {
         method: 'POST',
@@ -212,7 +279,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               <img 
                 src={artisan.portfolioPhotoUrls?.[0] || `https://i.pravatar.cc/150?u=${artisan.artisanId}`} 
                 alt={artisan.name} 
-                className="w-full h-full object-cover grayscale"
+                className="w-full h-full object-cover"
               />
             </div>
             <div>
@@ -257,6 +324,43 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               placeholder="E.g., My kitchen sink is leaking heavily from the bottom pipe..."
               className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-medium resize-none bg-white placeholder:text-gray-400"
             />
+            
+            <div className="mt-4 border-4 border-black p-4 bg-white">
+              <label className="block text-sm font-black uppercase tracking-tighter text-black mb-2">
+                Attach Photo or Video (Optional)
+              </label>
+              
+              {mediaPreview ? (
+                <div className="relative inline-block border-4 border-black">
+                  {mediaFile?.type.startsWith('video/') ? (
+                    <video src={mediaPreview} className="w-full max-w-[200px] max-h-[200px] object-cover" controls />
+                  ) : (
+                    <img src={mediaPreview} alt="Preview" className="w-full max-w-[200px] max-h-[200px] object-cover" />
+                  )}
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setMediaFile(null);
+                      setMediaPreview(null);
+                    }}
+                    className="absolute -top-3 -right-3 w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center text-white hover:scale-110 transition-transform"
+                  >
+                    <X className="w-5 h-5 stroke-[3]" />
+                  </button>
+                </div>
+              ) : (
+                <label className="w-full md:w-auto inline-flex items-center gap-2 bg-[var(--color-brutal-pink)] text-black px-4 py-3 border-4 border-black font-black uppercase text-sm cursor-pointer hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all">
+                  <ImageIcon className="w-5 h-5" /> Select File
+                  <input 
+                    type="file" 
+                    accept="image/*,video/*" 
+                    onChange={handleMediaSelect} 
+                    className="hidden" 
+                  />
+                </label>
+              )}
+              <p className="text-xs font-bold text-gray-500 mt-2">Helps the technician understand the issue before accepting.</p>
+            </div>
           </div>
 
           <div className="bg-white brutal-card p-6">
@@ -267,7 +371,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
             
             {locationData ? (
               <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center">
-                <span className="truncate mr-2">📍 {locationData.name}</span>
+                <span className="truncate mr-2 flex items-center gap-1"><MapPin className="w-4 h-4 shrink-0" /> {locationData.name}</span>
                 <button 
                   type="button" 
                   onClick={detectLocation}
@@ -283,7 +387,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
                 disabled={isLocating}
                 className="w-full p-4 bg-[var(--color-brutal-yellow)] brutal-btn text-black font-black uppercase text-left flex justify-between items-center"
               >
-                <span>{isLocating ? "DETECTING..." : "📍 DETECT MY LOCATION"}</span>
+                <span className="flex items-center gap-2">{isLocating ? "DETECTING..." : <><MapPin className="w-5 h-5" /> DETECT MY LOCATION</>}</span>
               </button>
             )}
             

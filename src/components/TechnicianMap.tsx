@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Target, Star } from 'lucide-react';
+import { Target, Star, Navigation, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { ArtisanProfile } from '@/types';
 
@@ -21,6 +21,24 @@ export default function TechnicianMap({
   onMarkerClick?: (tech: ArtisanProfile) => void
 }) {
   const [selectedPlace, setSelectedPlace] = useState<{lat: number, lng: number} | null>(null);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+          });
+        },
+        (err) => {
+          console.warn("Could not retrieve user location for map:", err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+  }, []);
 
   const createCustomIcon = (trade: string) => {
     return L.divIcon({
@@ -42,7 +60,26 @@ export default function TechnicianMap({
     });
   };
 
-  const defaultCenter: [number, number] = technicians.length > 0 
+  const createUserIcon = () => {
+    return L.divIcon({
+      html: `
+        <div class="relative flex items-center justify-center w-12 h-12">
+          <!-- Pulsing background -->
+          <div class="absolute inset-2 bg-[var(--color-brutal-blue)] rounded-full animate-ping opacity-60"></div>
+          <!-- Core dot -->
+          <div class="relative w-6 h-6 bg-[var(--color-brutal-blue)] border-4 border-black rounded-full shadow-[2px_2px_0_rgba(0,0,0,1)] z-10"></div>
+        </div>
+      `,
+      className: 'bg-transparent border-none bg-none outline-none',
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+      popupAnchor: [0, -12]
+    });
+  };
+
+  const defaultCenter: [number, number] = userLocation 
+    ? [userLocation.lat, userLocation.lng]
+    : technicians.length > 0 
     ? [technicians[0].lat, technicians[0].lng] 
     : [6.5244, 3.3792]; // Default to Lagos
 
@@ -50,7 +87,7 @@ export default function TechnicianMap({
     <div className="absolute inset-0 z-0">
       <MapContainer
         center={defaultCenter}
-        zoom={12}
+        zoom={30}
         scrollWheelZoom={true}
         style={{ height: '100%', minHeight: '500px', width: '100%', zIndex: 0 }}
       >
@@ -59,6 +96,22 @@ export default function TechnicianMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        {/* Customer Location Marker */}
+        {userLocation && (
+          <Marker
+            position={[userLocation.lat, userLocation.lng]}
+            icon={createUserIcon()}
+          >
+            <Popup className="custom-popup">
+              <div className="p-3 bg-[var(--color-brutal-blue)] text-white border-4 border-black font-black uppercase text-center min-w-[150px]">
+                <p className="text-sm flex items-center justify-center gap-1"><MapPin className="w-3 h-3" /> YOU ARE HERE</p>
+                <p className="text-[10px] text-white/80 font-bold mt-1">Your current location</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Technician Markers */}
         {technicians.map(tech => (
           <Marker
             key={tech.artisanId}
@@ -73,13 +126,20 @@ export default function TechnicianMap({
           >
             {!onMarkerClick && (
               <Popup className="custom-popup">
-                <div className="p-0 min-w-[200px] font-sans">
-                  <div className="bg-[var(--color-brutal-teal)] p-2 border-b-4 border-black">
-                    <h3 className="font-black text-black text-lg uppercase leading-tight">{tech.name || tech.trade}</h3>
-                    <p className="font-bold text-xs uppercase">{tech.trade}</p>
+                <div className="p-0 min-w-[220px] font-sans">
+                  <div className="bg-[var(--color-brutal-teal)] p-3 border-b-4 border-black flex items-center gap-3">
+                    <img 
+                      src={tech.profilePictureUrl || `https://i.pravatar.cc/150?u=${tech.artisanId}`} 
+                      alt={tech.name || tech.trade} 
+                      className="w-12 h-12 object-cover border-2 border-black shrink-0 shadow-[2px_2px_0_0_#000]" 
+                    />
+                    <div>
+                      <h3 className="font-black text-black text-base uppercase leading-tight">{tech.name || tech.trade}</h3>
+                      <p className="font-bold text-xs uppercase">{tech.trade}</p>
+                    </div>
                   </div>
                   <div className="p-3 bg-white">
-                    <p className="text-black font-bold text-sm mb-2 uppercase">📍 {tech.neighborhood}</p>
+                    <p className="text-black font-bold text-sm mb-2 uppercase flex items-center gap-1"><MapPin className="w-4 h-4" /> {tech.neighborhood}</p>
                     <div className="flex items-center gap-1 text-black mb-4 text-sm font-black uppercase">
                       <Star className="w-4 h-4 fill-[var(--color-brutal-yellow)] stroke-black stroke-[2]" />
                       <span>{tech.ratingAverage.toFixed(1)} ({tech.ratingCount} reviews)</span>
@@ -101,7 +161,16 @@ export default function TechnicianMap({
         {selectedPlace && <ChangeView center={[selectedPlace.lat, selectedPlace.lng]} zoom={15} />}
       </MapContainer>
 
-      <div className="absolute top-4 right-4 z-[400]">
+      <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
+        {userLocation && (
+          <button
+            className="w-12 h-12 bg-[var(--color-brutal-blue)] text-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all active:translate-x-0 active:translate-y-0 active:shadow-none"
+            onClick={() => setSelectedPlace({ lat: userLocation.lat, lng: userLocation.lng })}
+            title="My Location"
+          >
+            <Navigation size={24} className="stroke-[3] text-white" />
+          </button>
+        )}
         <button
           className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all active:translate-x-0 active:translate-y-0 active:shadow-none"
           onClick={() => setSelectedPlace(defaultCenter[0] ? { lat: defaultCenter[0], lng: defaultCenter[1] } : null)}
@@ -129,3 +198,4 @@ export default function TechnicianMap({
     </div>
   );
 }
+

@@ -25,6 +25,33 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
   const [error, setError] = useState("");
   const router = useRouter();
 
+  // Draft persistence
+  const draftKey = `job_draft_broadcast_${unwrappedParams.categorySlug}_${unwrappedParams.subSlug}`;
+  
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed.description) setDescription(parsed.description);
+          if (parsed.preferredDate) setPreferredDate(parsed.preferredDate);
+          if (parsed.preferredTime) setPreferredTime(parsed.preferredTime);
+          if (parsed.offerAmount) setOfferAmount(parsed.offerAmount);
+        } catch (e) {
+          console.error("Failed to parse draft", e);
+        }
+      }
+    }
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const draft = { description, preferredDate, preferredTime, offerAmount };
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    }
+  }, [description, preferredDate, preferredTime, offerAmount, draftKey]);
+
   const decodeSlug = (slug: string) => decodeURIComponent(slug).replace(/-/g, ' ');
 
   const trade = decodeSlug(unwrappedParams.categorySlug);
@@ -105,6 +132,10 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
       };
 
       await setDoc(requestRef, newRequest);
+      
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(draftKey);
+      }
       
       router.push("/?requested=true");
     } catch (err: any) {

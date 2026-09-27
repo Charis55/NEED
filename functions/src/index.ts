@@ -4,44 +4,84 @@ import * as admin from "firebase-admin";
 admin.initializeApp();
 const db = admin.firestore();
 
+// Helper function to send push notification respecting user preferences
+async function sendPush(userId: string, title: string, body: string, data: any = {}) {
+  try {
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) return;
+    
+    const userData = userDoc.data();
+    const fcmToken = userData?.fcmToken;
+    const pushEnabled = userData?.preferences?.pushNotifications ?? true;
+    
+    if (fcmToken && pushEnabled) {
+      await admin.messaging().send({
+        token: fcmToken,
+        notification: { title, body },
+        data
+      });
+      console.log(`Push notification sent to ${userId}`);
+    }
+  } catch (err) {
+    console.error(`Failed to send push to ${userId}:`, err);
+  }
+}
+
 // Phase 6: Job Request Push Notification
 export const onJobRequestCreated = functions.firestore
   .document("jobRequests/{requestId}")
   .onCreate(async (snap, context) => {
     const requestData = snap.data();
-    const artisanId = requestData.artisanId;
+    if (!requestData.artisanId) return null;
+    await sendPush(
+      requestData.artisanId, 
+      "New Job Request!", 
+      `A customer requested you for a job in ${requestData.neighborhood}.`,
+      { requestId: context.params.requestId }
+    );
+    return null;
+  });
 
-    if (!artisanId) return null;
-
-    try {
-      const artisanDoc = await db.collection("artisans").doc(artisanId).get();
-      if (!artisanDoc.exists) return null;
-
-      const artisanData = artisanDoc.data();
-      const fcmToken = artisanData?.fcmToken;
-
-      // Only send if the artisan has registered an FCM token for push notifications
-      if (fcmToken) {
-        const payload = {
-          notification: {
-            title: "New Job Request!",
-            body: `A customer requested you for a job in ${requestData.neighborhood}.`,
-          },
-          data: {
-            requestId: context.params.requestId,
-          },
-        };
-
-        await admin.messaging().send({
-          token: fcmToken,
-          ...payload,
-        });
-        console.log("Push notification sent to artisan:", artisanId);
+export const onJobRequestUpdated = functions.firestore
+  .document("jobRequests/{requestId}")
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    
+    if (before.status !== after.status) {
+      if (after.status === "accepted") {
+        await sendPush(after.customerId, "Job Accepted!", "Your technician has accepted the job request.", { requestId: context.params.requestId });
+      } else if (after.status === "en_route") {
+        await sendPush(after.customerId, "Technician En Route!", "Your technician is on their way.", { requestId: context.params.requestId });
+      } else if (after.status === "in_progress") {
+        await sendPush(after.customerId, "Technician Arrived!", "Your technician has arrived and started the job.", { requestId: context.params.requestId });
+      } else if (after.status === "completed") {
+        await sendPush(after.customerId, "Job Completed!", "The job has been marked as completed.", { requestId: context.params.requestId });
       }
-    } catch (error) {
-      console.error("Error sending push notification:", error);
     }
+    return null;
+  });
 
+export const onChatMessageCreated = functions.firestore
+  .document("jobRequests/{requestId}/messages/{messageId}")
+  .onCreate(async (snap, context) => {
+    const msg = snap.data();
+    const requestId = context.params.requestId;
+    
+    // Get the job request to find out who is customer and who is artisan
+    const jobDoc = await db.collection("jobRequests").doc(requestId).get();
+    if (!jobDoc.exists) return null;
+    
+    const jobData = jobDoc.data()!;
+    const isSenderCustomer = msg.senderId === jobData.customerId;
+    const recipientId = isSenderCustomer ? jobData.artisanId : jobData.customerId;
+    
+    await sendPush(
+      recipientId, 
+      "New Message", 
+      msg.text || "Sent an image", 
+      { requestId, type: "chat" }
+    );
     return null;
   });
 

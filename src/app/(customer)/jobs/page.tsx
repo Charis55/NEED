@@ -9,7 +9,7 @@ import { useAlert } from "@/components/AlertProvider";
 import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wrench, MapPin, Clock, MessageSquare, Calendar, X, Star, CheckCircle, RefreshCw, FileText, PhoneCall } from "lucide-react";
 
 export default function CustomerJobsPage() {
   return (
@@ -97,6 +97,23 @@ function JobsContent() {
     } catch (error) {
       console.error("Failed to update status", error);
       showAlert("Error updating status", "error");
+    }
+  };
+
+  const handleSOS = async (requestId: string) => {
+    if (confirm("Are you in immediate danger? This will alert our safety team and the authorities.")) {
+      try {
+        const reqRef = doc(db, "jobRequests", requestId);
+        await updateDoc(reqRef, {
+          sosAlert: true,
+          sosTriggeredBy: "customer",
+          sosTriggeredAt: Date.now()
+        });
+        showAlert("SOS Alert triggered! Our team has been notified and will contact you immediately.", "success");
+      } catch (err) {
+        console.error(err);
+        showAlert("Failed to trigger SOS", "error");
+      }
     }
   };
 
@@ -215,7 +232,7 @@ function JobsContent() {
       ) : requests.length === 0 ? (
         <div className="bg-[var(--color-brutal-yellow)] brutal-border p-12 text-center shadow-[8px_8px_0_0_#000] rotate-1 max-w-2xl mx-auto my-12">
           <div className="w-24 h-24 bg-white border-4 border-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0_0_#000] -rotate-6">
-            <span className="text-5xl">🛠️</span>
+            <Wrench className="w-12 h-12 stroke-[3] mx-auto" />
           </div>
           <h2 className="text-3xl font-black text-black uppercase tracking-tighter mb-4">No Bookings Yet!</h2>
           <p className="text-black font-bold text-lg bg-white border-2 border-black inline-block px-4 py-2 -rotate-1">
@@ -250,8 +267,8 @@ function JobsContent() {
                         {req.trade} - {req.subcategory}
                       </h3>
                       <p className="text-sm text-black font-bold flex items-center gap-2 uppercase tracking-widest">
-                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">📍 {req.neighborhood}</span>
-                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">🕒 {req.preferredTime}</span>
+                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood}</span>
+                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {req.preferredTime}</span>
                       </p>
                     </div>
                     
@@ -333,7 +350,7 @@ function JobsContent() {
                   {["accepted", "en_route", "in_progress", "payment_pending"].includes(req.status) && (
                     <div className="mt-4 flex flex-col gap-4">
                       <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
-                        💬 CHAT WITH TECHNICIAN
+                        <span className="flex items-center justify-center gap-2"><MessageSquare className="w-5 h-5" /> CHAT WITH TECHNICIAN</span>
                       </Link>
                     </div>
                   )}
@@ -375,7 +392,7 @@ function JobsContent() {
                             }}
                             className="w-full bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
                           >
-                            📅 REQUEST RESCHEDULE
+                            <span className="flex items-center justify-center gap-2"><Calendar className="w-5 h-5" /> REQUEST RESCHEDULE</span>
                           </button>
                         )
                       )}
@@ -392,7 +409,7 @@ function JobsContent() {
                         }}
                         className="w-full bg-[var(--color-brutal-red)] text-white border-4 border-black font-black uppercase text-center py-4 hover:bg-black transition-colors brutal-shadow-sm"
                       >
-                        ❌ CANCEL JOB
+                        <span className="flex items-center justify-center gap-2"><X className="w-5 h-5 stroke-[3]" /> CANCEL JOB</span>
                       </button>
                     </div>
                   )}
@@ -400,7 +417,7 @@ function JobsContent() {
                   {req.status === "en_route" && (
                     <div className="flex gap-4 mt-4">
                       <a href={`/jobs/${req.requestId}/track`} className="flex-1 bg-black text-white px-6 py-4 font-black uppercase brutal-border text-center hover:bg-[var(--color-brutal-yellow)] hover:text-black transition-colors block">
-                        📍 TRACK TECHNICIAN
+                        <span className="flex items-center justify-center gap-2"><MapPin className="w-5 h-5" /> TRACK TECHNICIAN</span>
                       </a>
                     </div>
                   )}
@@ -412,19 +429,25 @@ function JobsContent() {
                           onClick={() => setReviewingJob(req.requestId)}
                           className="flex-1 bg-[var(--color-brutal-blue)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
                         >
-                          ★ LEAVE A REVIEW
+                          <span className="flex items-center justify-center gap-2"><Star className="w-5 h-5" /> LEAVE A REVIEW</span>
                         </button>
                       )}
                       {req.reviewed && (
                         <div className="flex-none bg-white border-4 border-black text-black px-4 py-3 text-sm font-black uppercase shadow-[4px_4px_0_0_#000] -rotate-2 self-start flex items-center justify-center">
-                          ✓ REVIEWED
+                          <span className="flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5" /> REVIEWED</span>
                         </div>
                       )}
                       <a 
                         href={`/artisans/${req.artisanId}/request?trade=${encodeURIComponent(req.trade)}&subcategory=${encodeURIComponent(req.subcategory)}&desc=${encodeURIComponent(req.description)}`}
                         className="flex-1 bg-[var(--color-brutal-yellow)] text-black px-6 py-3 font-black uppercase brutal-border text-center hover:-translate-y-1 transition-transform block"
                       >
-                        🔄 BOOK AGAIN
+                        <span className="flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5" /> BOOK AGAIN</span>
+                      </a>
+                      <a 
+                        href={`/jobs/${req.requestId}/receipt`}
+                        className="flex-1 bg-white text-black px-6 py-3 font-black uppercase brutal-border text-center hover:-translate-y-1 transition-transform block"
+                      >
+                        <span className="flex items-center justify-center gap-2"><FileText className="w-5 h-5" /> RECEIPT</span>
                       </a>
                     </div>
                   )}
@@ -459,7 +482,15 @@ function JobsContent() {
                     </form>
                   )}
                   {["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(req.status) && (
-                    <div className="mt-6 pt-4 border-t-2 border-black/10 text-center">
+                    <div className="mt-6 pt-4 border-t-2 border-black/10 flex flex-col gap-3">
+                      {req.status === "in_progress" && (
+                        <button 
+                          onClick={() => handleSOS(req.requestId)}
+                          className="w-full bg-red-600 text-white py-3 border-4 border-black font-black uppercase tracking-widest text-lg hover:bg-red-700 transition-colors brutal-shadow-sm flex items-center justify-center gap-2"
+                        >
+                          <PhoneCall className="w-5 h-5 fill-current" /> SOS / PANIC BUTTON
+                        </button>
+                      )}
                       <button 
                         onClick={() => setReportingJob(req)}
                         className="text-xs font-black uppercase text-gray-500 hover:text-[var(--color-brutal-red)] transition-colors flex items-center justify-center gap-1 mx-auto"
