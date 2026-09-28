@@ -4,8 +4,11 @@ import { useEffect } from "react";
 import { getToken, onMessage } from "firebase/messaging";
 import { auth, messaging, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
+import { useAlert } from "@/components/AlertProvider";
 
 export function FCMProvider({ children }: { children: React.ReactNode }) {
+  const { showAlert } = useAlert();
+
   useEffect(() => {
     // Only run on client
     if (typeof window === "undefined" || !messaging) return;
@@ -51,8 +54,9 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
     // Handle foreground messages
     const unsubscribeMessage = onMessage(messaging, (payload) => {
       console.log("Foreground message received:", payload);
-      // In a real app, use a toast library like react-hot-toast or sonner here
-      alert(`${payload.notification?.title}\n\n${payload.notification?.body}`);
+      const title = payload.notification?.title || "New Notification";
+      const body = payload.notification?.body || "";
+      showAlert(`${title}: ${body}`, "info");
     });
 
     return () => {

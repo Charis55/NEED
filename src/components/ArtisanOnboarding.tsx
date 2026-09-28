@@ -54,7 +54,6 @@ export default function ArtisanOnboarding() {
   const [bio, setBio] = useState("");
 
   // --- Step 5: Documents & Portfolio ---
-  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   const [policeClearanceFile, setPoliceClearanceFile] = useState<File | null>(null);
   const [files, setFiles] = useState<FileList | null>(null);
 
@@ -171,7 +170,7 @@ export default function ArtisanOnboarding() {
       // 2. Open the Didit SDK modal
       const { DiditSdk } = await import("@didit-protocol/sdk-web");
 
-      DiditSdk.shared.onComplete = (result: any) => {
+      DiditSdk.shared.onComplete = (result: { type: string }) => {
         // This is a UI hint only — the webhook is the source of truth.
         // result.type: "completed" | "cancelled" | "failed"
         if (result.type === "completed" || result.type === "cancelled") {
@@ -209,10 +208,6 @@ export default function ArtisanOnboarding() {
         setLocationError("You have selected duplicate services. Please remove or change them before proceeding.");
         return;
       }
-    }
-    if (step === 5 && !profilePictureFile) {
-      setError("A Profile Picture is strictly required to proceed.");
-      return;
     }
     if (step === 5 && !policeClearanceFile) {
       setError("A Police Clearance Certificate is strictly required to proceed.");
@@ -320,11 +315,11 @@ export default function ArtisanOnboarding() {
     setServices(services.filter((_, i) => i !== index));
   };
 
-  const updateService = (index: number, field: string, value: any) => {
+  const updateService = <K extends keyof typeof services[0]>(index: number, field: K, value: typeof services[0][K]) => {
     const newServices = [...services];
-    (newServices[index] as any)[field] = value;
+    newServices[index][field] = value;
     if (field === 'tradeCategory') {
-      newServices[index].subcategory = servicesData[value].subServices[0].title;
+      newServices[index].subcategory = servicesData[value as string].subServices[0].title;
     }
     setServices(newServices);
   };
@@ -403,16 +398,6 @@ export default function ArtisanOnboarding() {
         policeClearanceUrl = await uploadFileToR2(fileToUpload);
       }
 
-      // Upload profile picture
-      let profilePictureUrl: string | null = null;
-      if (profilePictureFile) {
-        let fileToUpload = profilePictureFile;
-        if (profilePictureFile.type.startsWith('image/')) {
-          fileToUpload = await compressImage(profilePictureFile, 4);
-        }
-        profilePictureUrl = await uploadFileToR2(fileToUpload);
-      }
-
       // Calculate geohash
       if (!locationData) throw new Error("Location data is missing.");
       const geohash = ngeohash.encode(locationData.lat, locationData.lng);
@@ -440,7 +425,7 @@ export default function ArtisanOnboarding() {
         geohash,
         lat: locationData.lat,
         lng: locationData.lng,
-        profilePictureUrl: profilePictureUrl || undefined,
+        profilePictureUrl: user.photoURL || undefined,
         portfolioPhotoUrls: photoUrls,
         hasPoliceClearance: !!policeClearanceUrl,
         policeClearanceUrl,
@@ -507,7 +492,6 @@ export default function ArtisanOnboarding() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to create profile");
-    } finally {
       setLoading(false);
     }
   };
@@ -587,7 +571,7 @@ export default function ArtisanOnboarding() {
                 </button>
               </>
             ) : (
-              <div className="p-6 bg-[var(--color-brutal-teal)] brutal-border brutal-shadow space-y-3">
+              <div className="p-6 bg-[var(--color-brutal-teal)] brutal-border brutal-shadow space-y-4">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-8 h-8 text-black" />
                   <h4 className="text-xl font-black text-black uppercase">Verification Submitted</h4>
@@ -597,13 +581,15 @@ export default function ArtisanOnboarding() {
                     Your identity verification has been submitted and is being processed.
                   </p>
                   <p className="text-xs font-bold text-black opacity-70">
-                    Session ID: <span className="font-mono">{kycSessionId?.substring(0, 12)}...</span>
+                    Session ID: <span className="font-mono">{kycSessionId?.substring(0, 12) || "N/A"}</span>
                   </p>
                 </div>
-                <p className="text-xs font-bold text-black opacity-70">
-                  ✓ You can proceed with the rest of your profile while we verify your identity.
-                  You&apos;ll be notified once the review is complete.
-                </p>
+                
+                <div className="bg-[var(--color-brutal-yellow)] p-4 brutal-border">
+                  <p className="text-sm font-black text-black">
+                    You do <span className="underline">not</span> need to wait! Please click the <strong>NEXT STEP</strong> button below to continue filling out your profile.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -775,20 +761,6 @@ export default function ArtisanOnboarding() {
         {/* ==================== STEP 5: DOCUMENTS & PORTFOLIO ==================== */}
         {step === 5 && (
           <div className="space-y-6">
-            <div>
-              <label className="block text-lg font-black text-black mb-2 uppercase text-[var(--color-brutal-red)]">Profile Picture *</label>
-              <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">A clear, professional photo of your face is strictly required.</p>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files && setProfilePictureFile(e.target.files[0])}
-                className="w-full p-6 bg-[var(--color-brutal-teal)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-yellow)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors mb-6"
-              />
-              {profilePictureFile && (
-                <p className="text-sm font-black text-black mt-2 inline-block px-2 border-2 border-black rotate-1 bg-white mb-6">Selected: {profilePictureFile.name}</p>
-              )}
-            </div>
-
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Portfolio Photos</label>
               <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">Upload photos of your past work to build trust with customers.</p>

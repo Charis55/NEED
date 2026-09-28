@@ -105,7 +105,7 @@ export default function EarningsPage() {
         
         jobs.forEach(job => {
           const date = new Date(job.completedAt || job.createdAt);
-          let startDate = new Date(date);
+          const startDate = new Date(date);
           let endDate = new Date(date);
           let periodKey = "";
 

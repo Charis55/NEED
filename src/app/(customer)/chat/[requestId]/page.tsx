@@ -500,8 +500,8 @@ export default function ChatPage() {
 
   const isCustomerViewing = auth.currentUser?.uid === job?.customerId;
   const chatPartnerName = isCustomerViewing 
-    ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName}` : "Unknown Technician")) 
-    : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName}` : "Unknown Customer"));
+    ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || artisanUser?.phone || "Unknown Technician") 
+    : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Unknown Customer");
 
   return (
     <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">
@@ -521,7 +521,7 @@ export default function ChatPage() {
         </button>
         
         <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-4">
-          <UserAvatar photoURL={isCustomerViewing ? (artisanUser?.photoURL || artisan?.portfolioPhotoUrls?.[0]) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-2xl font-black text-black" />
+          <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL || artisan?.portfolioPhotoUrls?.[0]) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-2xl font-black text-black" />
         </div>
         
         <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
@@ -653,13 +653,7 @@ export default function ChatPage() {
                   )}
                   {msg.audioUrl && (
                     <div className="mb-2">
-                      {Date.now() - msg.createdAt > 30 * 24 * 60 * 60 * 1000 ? (
-                        <div className="p-3 bg-gray-200 border-4 border-black text-gray-600 text-sm font-bold shadow-[4px_4px_0_0_#000]">
-                          Voice note expired
-                        </div>
-                      ) : (
-                        <VoiceNotePlayer audioUrl={msg.audioUrl} waveform={msg.waveform} />
-                      )}
+                      <VoiceNotePlayer audioUrl={msg.audioUrl} waveform={msg.waveform} />
                     </div>
                   )}
                   {msg.text && (

@@ -82,10 +82,10 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
         <div className="flex flex-col items-center text-center mt-2">
           <div 
             className="w-32 h-32 bg-[var(--color-brutal-blue)] brutal-border brutal-shadow mb-4 overflow-hidden cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => setFullscreenImage(artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/1024?u=" + artisan.artisanId)}
+            onClick={() => setFullscreenImage(artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=1024`)}
           >
             <img 
-              src={artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/150?u=" + artisan.artisanId} 
+              src={artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
               alt={artisan.name} 
               className="w-full h-full object-cover"
             />

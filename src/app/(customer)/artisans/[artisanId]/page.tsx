@@ -20,27 +20,29 @@ async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
     // e.g., { fields: { trade: { stringValue: "Plumber" } } }
     const fields = data.fields;
     
-    const extractArray = (arrField: any) => {
+    const extractArray = (arrField: { arrayValue?: { values?: { stringValue: string }[] } } | undefined) => {
       if (!arrField?.arrayValue?.values) return [];
-      return arrField.arrayValue.values.map((v: any) => v.stringValue);
+      return arrField.arrayValue.values.map(v => v.stringValue);
     };
 
     return {
-      artisanId: fields.artisanId.stringValue,
-      userId: fields.userId.stringValue,
-      trade: fields.trade.stringValue,
-      bio: fields.bio.stringValue,
-      neighborhood: fields.neighborhood.stringValue,
-      geohash: fields.geohash.stringValue,
-      lat: Number(fields.lat.doubleValue || fields.lat.integerValue),
-      lng: Number(fields.lng.doubleValue || fields.lng.integerValue),
+      artisanId: fields.artisanId?.stringValue,
+      userId: fields.userId?.stringValue,
+      name: fields.name?.stringValue || "Technician",
+      trade: fields.trade?.stringValue,
+      bio: fields.bio?.stringValue,
+      neighborhood: fields.neighborhood?.stringValue,
+      geohash: fields.geohash?.stringValue,
+      lat: Number(fields.lat?.doubleValue || fields.lat?.integerValue || 0),
+      lng: Number(fields.lng?.doubleValue || fields.lng?.integerValue || 0),
+      profilePictureUrl: fields.profilePictureUrl?.stringValue || fields.photoURL?.stringValue || undefined,
       portfolioPhotoUrls: extractArray(fields.portfolioPhotoUrls),
       isCertificateVerified: fields.isCertificateVerified?.booleanValue || false,
-      verified: fields.verified.booleanValue,
-      ratingAverage: Number(fields.ratingAverage.doubleValue || fields.ratingAverage.integerValue),
-      ratingCount: Number(fields.ratingCount.integerValue),
-      available: fields.available.booleanValue,
-      createdAt: Number(fields.createdAt.integerValue),
+      verified: fields.verified?.booleanValue || false,
+      ratingAverage: Number(fields.ratingAverage?.doubleValue || fields.ratingAverage?.integerValue || 0),
+      ratingCount: Number(fields.ratingCount?.integerValue || 0),
+      available: fields.available?.booleanValue || false,
+      createdAt: Number(fields.createdAt?.integerValue || 0),
     } as ArtisanProfile;
   } catch (err) {
     console.error("Error fetching artisan:", err);

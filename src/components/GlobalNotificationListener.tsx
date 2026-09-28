@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDoc, doc, QuerySnapshot, QueryDocumentSnapshot } from "firebase/firestore";
 import { useAlert } from "@/components/AlertProvider";
 import { useRouter } from "next/navigation";
 import { JobRequest } from "@/types";
@@ -35,11 +35,11 @@ export default function GlobalNotificationListener() {
       const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", user.uid));
       const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", user.uid));
 
-      const handleJobChange = async (snapshot: any, role: "artisan" | "customer") => {
+      const handleJobChange = async (snapshot: QuerySnapshot, role: "artisan" | "customer") => {
         const isInitial = role === "artisan" ? initialArtisanLoad.current : initialCustomerLoad.current;
         
         if (isInitial) {
-          snapshot.docs.forEach((doc: any) => {
+          snapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
             const data = doc.data();
             if (data.lastMessageAt) {
               lastMessageAtMap.current[doc.id] = data.lastMessageAt;

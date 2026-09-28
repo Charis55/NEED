@@ -66,11 +66,85 @@ async function deleteCollection(collectionPath: string, fieldPath: string, uid: 
   }
 
   for (const chunk of chunks) {
-    const batch = adminDb.batch();
-    chunk.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
+    let batch = adminDb.batch();
+    let opCount = 0;
+
+    for (const d of chunk) {
+      batch.delete(d.ref);
+      opCount++;
+      if (opCount === 490) {
+        await batch.commit();
+        batch = adminDb.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) {
+      await batch.commit();
+    }
   }
 }
+
+// ─── Firestore anonymize and cancel jobs helper ──────────────────────────────
+async function anonymizeAndCancelJobs(fieldPath: string, uid: string, userType: "customer" | "technician") {
+  const snap = await adminDb.collection("jobRequests").where(fieldPath, "==", uid).get();
+  if (snap.empty) return;
+
+  const chunks: FirebaseFirestore.QueryDocumentSnapshot[][] = [];
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    chunks.push(snap.docs.slice(i, i + 400));
+  }
+
+  for (const chunk of chunks) {
+    let batch = adminDb.batch();
+    let opCount = 0;
+
+    for (const d of chunk) {
+      const data = d.data();
+      const updateData: Record<string, unknown> = {};
+
+      // Cancel if active
+      if (["pending", "accepted", "in_progress"].includes(data.status)) {
+        updateData.status = "cancelled";
+        updateData.cancelledReason = `The ${userType} has deleted their account. This job cannot be completed.`;
+        updateData.cancelledAt = new Date().toISOString();
+      }
+
+      // Anonymize
+      if (userType === "customer") {
+        updateData.customerName = "Deleted User";
+        updateData.customerPhone = "";
+      } else {
+        updateData.artisanName = "Deleted Technician";
+        updateData.artisanPhone = "";
+      }
+
+      batch.update(d.ref, updateData);
+      opCount++;
+
+      // Also we need to delete the messages this user sent within this job
+      const msgs = await d.ref.collection("messages").where("senderId", "==", uid).get();
+      for (const m of msgs.docs) {
+        batch.delete(m.ref);
+        opCount++;
+        if (opCount >= 490) {
+          await batch.commit();
+          batch = adminDb.batch();
+          opCount = 0;
+        }
+      }
+
+      if (opCount >= 490) {
+        await batch.commit();
+        batch = adminDb.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) {
+      await batch.commit();
+    }
+  }
+}
+
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
@@ -88,14 +162,35 @@ export async function POST(req: NextRequest) {
     let uid: string;
     let userEmail: string | undefined;
     let userName: string = "User";
+    
     try {
       const decoded = await adminAuth.verifyIdToken(idToken);
       uid = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token. Please sign in again." }, { status: 401 });
+    }
+
+    // Check if an admin is requesting to delete another user
+    const body = await req.json().catch(() => ({}));
+    const targetUid = body.targetUid;
+
+    if (targetUid && targetUid !== uid) {
+      // Verify the requester is an admin
+      const adminDoc = await adminDb.collection("users").doc(uid).get();
+      const isAdmin = uid === "bl6OE9ODGGhIbtBo16JGqZaJ0YE2" || adminDoc.data()?.isAdmin === true;
+      if (!isAdmin) {
+        return NextResponse.json({ error: "Unauthorized. Admin privileges required." }, { status: 403 });
+      }
+      uid = targetUid;
+    }
+
+    try {
       const userRecord = await adminAuth.getUser(uid);
       userEmail = userRecord.email;
       userName = userRecord.displayName || "User";
     } catch {
-      return NextResponse.json({ error: "Invalid or expired token. Please sign in again." }, { status: 401 });
+      // Auth user might already be missing, we can still attempt to clean up Firestore
+      console.warn(`Auth user ${uid} not found, proceeding with DB cleanup.`);
     }
 
     // ── 2. Fetch all Firestore data to collect R2 URLs before deleting ────────
@@ -143,20 +238,27 @@ export async function POST(req: NextRequest) {
       adminDb.collection("artisans").doc(uid).delete(),
       adminDb.collection("verificationReviewQueue").doc(uid).delete(),
 
+      // Jobs: Anonymize and cancel active ones instead of deleting
+      anonymizeAndCancelJobs("customerId", uid, "customer"),
+      anonymizeAndCancelJobs("artisanId", uid, "technician"),
+
       // Collections with user references
-      deleteCollection("jobRequests", "customerId", uid),
-      deleteCollection("jobRequests", "artisanId", uid),
       deleteCollection("reviews", "customerId", uid),
       deleteCollection("reviews", "artisanId", uid),
+      deleteCollection("disputes", "reportedUserId", uid),
+      deleteCollection("disputes", "reporterId", uid),
 
-      // Chat messages (stored under jobRequests/{requestId}/messages — handled via jobs delete above)
       // Also delete any top-level messages docs if they exist
       deleteCollection("messages", "senderId", uid),
       deleteCollection("messages", "recipientId", uid),
     ]);
 
     // ── 5. Delete Firebase Auth account ──────────────────────────────────────
-    await adminAuth.deleteUser(uid);
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (authErr) {
+      console.warn("Failed to delete Firebase Auth user on server, relying on client-side deletion.", authErr);
+    }
 
     // ── 6. Send Account Deletion Confirmation Email ──────────────────────────
     if (userEmail) {

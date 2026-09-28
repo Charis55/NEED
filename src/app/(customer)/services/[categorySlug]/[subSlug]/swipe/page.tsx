@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck, X, Check } from "lucide-react";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, limit, where, doc, getDoc } from "firebase/firestore";
@@ -48,7 +48,7 @@ function SwipeCard({
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0]);
 
-  const handleDragEnd = (event: any, info: any) => {
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const swipeThreshold = 100;
     if (info.offset.x > swipeThreshold) {
       removeCard(artisan.artisanId, "right");
@@ -90,18 +90,18 @@ function SwipeCard({
               className="w-20 h-20 bg-gray-100 flex-shrink-0 brutal-border brutal-shadow-sm hover:scale-105 transition-transform"
               onClick={(e) => {
                 e.stopPropagation();
-                onImageClick(artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/1024?u=" + artisan.artisanId);
+                onImageClick(artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=1024`);
               }}
             >
               <img 
-                src={artisan.portfolioPhotoUrls?.[0] || "https://i.pravatar.cc/150?u=" + artisan.artisanId} 
+                src={artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
                 alt={artisan.name} 
                 className="w-full h-full object-cover"
                 draggable="false"
               />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{((artisan as any).firstName && (artisan as any).lastName) ? `${(artisan as any).firstName} ${(artisan as any).lastName}` : (artisan.name || "Technician")}</h2>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tighter leading-tight mb-1">{(((artisan as ArtisanProfile & { firstName?: string, lastName?: string }).firstName && (artisan as ArtisanProfile & { firstName?: string, lastName?: string }).lastName) ? `${(artisan as ArtisanProfile & { firstName?: string, lastName?: string }).firstName} ${(artisan as ArtisanProfile & { firstName?: string, lastName?: string }).lastName}` : (artisan.name || "Technician"))}</h2>
               <p className="text-black font-bold text-sm mb-2 uppercase">{artisan.yearsOfExperience || "3-5 years"} exp</p>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-1 bg-[var(--color-brutal-yellow)] text-black border-2 border-black px-2 py-0.5 font-black text-xs shadow-[2px_2px_0_0_#000]">
@@ -184,7 +184,8 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
       try {
         const q = query(
           collection(db, "artisans"),
-          where("available", "==", true)
+          where("available", "==", true),
+          where("verified", "==", true)
         );
         const snap = await getDocs(q);
         const allData = snap.docs.map(doc => doc.data() as ArtisanProfile);
@@ -206,7 +207,7 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
                  artisan.subcategory?.toLowerCase() === decodedSub.toLowerCase();
         });
 
-        const populateNames = async (list: any[]) => {
+        const populateNames = async (list: (ArtisanProfile & { distance?: number; firstName?: string; lastName?: string })[]) => {
           for (let i = 0; i < list.length; i++) {
             if (!list[i].name && !list[i].firstName) {
               try {

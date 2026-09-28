@@ -36,7 +36,7 @@ function getHeaders(): Record<string, string> {
   };
 }
 
-function extractName(data: any): string | null {
+function extractName(data: { first_name?: string; last_name?: string; middle_name?: string; full_name?: string; name?: string; [key: string]: unknown }): string | null {
   // Dojah returns names in various fields depending on the lookup type
   if (data.first_name || data.last_name) {
     return [data.first_name, data.middle_name, data.last_name]

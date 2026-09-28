@@ -9,8 +9,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import Image from "next/image";
+import { useAlert } from "@/components/AlertProvider";
 
 export default function AdminTechnicianProfile() {
+  const { showAlert } = useAlert();
   const params = useParams();
   const artisanId = params.artisanId as string;
   const [artisan, setArtisans] = useState<ArtisanProfile | null>(null);
@@ -60,7 +62,7 @@ export default function AdminTechnicianProfile() {
       setUserAccount({ ...userAccount, accountStatus: action });
     } catch (error) {
       console.error("Error updating account status:", error);
-      alert("Failed to update account status.");
+      showAlert("Failed to update account status.", "error");
     } finally {
       setActionLoading(null);
     }
@@ -317,6 +319,41 @@ export default function AdminTechnicianProfile() {
                   </button>
                 </>
               )}
+              <button
+                onClick={async () => {
+                  if (confirm("Are you SURE you want to completely eviscerate this technician? This CANNOT be undone.")) {
+                    setActionLoading("deleting");
+                    try {
+                      const { auth } = await import("@/lib/firebase");
+                      const user = auth.currentUser;
+                      if (!user) throw new Error("Admin not authenticated.");
+                      const token = await user.getIdToken();
+                      
+                      const res = await fetch("/api/delete-account", {
+                        method: "POST",
+                        headers: {
+                          "Authorization": `Bearer ${token}`,
+                          "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ targetUid: artisanId })
+                      });
+                      
+                      if (!res.ok) throw new Error("Failed to delete account");
+                      
+                      showAlert("Technician completely eviscerated from the system.", "success");
+                      window.location.href = "/admin";
+                    } catch (error) {
+                      console.error(error);
+                      showAlert("Failed to delete technician.", "error");
+                      setActionLoading(null);
+                    }
+                  }
+                }}
+                disabled={!!actionLoading}
+                className="bg-white text-red-600 px-6 py-3 border-4 border-black font-black uppercase tracking-widest hover:bg-red-50 hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none shadow-[4px_4px_0_0_#000] transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {actionLoading === "deleting" ? "Deleting..." : "Eviscerate Account"}
+              </button>
             </div>
           </div>
         </div>

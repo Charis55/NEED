@@ -77,7 +77,7 @@ export const AccountDeletedEmail = ({
             </Section>
 
             <Text className="text-black text-[16px] font-medium leading-[24px]">
-              We're sorry to see you go. If you ever need our services again, you can always create a new account.
+              We&apos;re sorry to see you go. If you ever need our services again, you can always create a new account.
             </Text>
 
             <Text className="text-gray-500 text-[12px] font-bold mt-8 mb-0">

@@ -4,6 +4,7 @@ export interface UserAccount {
   email?: string;
   firstName?: string;
   lastName?: string;
+  photoURL?: string;
   displayName: string;
   role: "customer" | "artisan";
   isAdmin?: boolean;
@@ -146,6 +147,8 @@ export interface JobRequest {
   platformFee: number | null;
   cancellationFee?: number;
   cancelledBy?: "customer" | "artisan";
+  cancelledReason?: string;
+  cancelledAt?: string | number;
   rescheduledAt?: number;
   newPreferredTime?: string;
   rescheduleRequestedBy?: "customer" | "artisan";

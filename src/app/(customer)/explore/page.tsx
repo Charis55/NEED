@@ -35,7 +35,7 @@ const GENERATED_IMAGE_IDS = [
 type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [sortBy, setSortBy] = useState<SortType>("Most Available");
 
   useEffect(() => {
@@ -65,12 +65,13 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchCounts() {
       try {
-        const snapshot = await getDocs(collection(db, "artisans"));
+        const q = query(collection(db, "artisans"), where("verified", "==", true));
+        const snapshot = await getDocs(q);
         const counts: Record<string, number> = {};
         snapshot.forEach((doc) => {
           const data = doc.data();
           if (data.services && Array.isArray(data.services)) {
-            data.services.forEach((svc: any) => {
+            data.services.forEach((svc: { trade?: string; [key: string]: unknown }) => {
               if (svc.trade) {
                 counts[svc.trade] = (counts[svc.trade] || 0) + 1;
               }

@@ -96,7 +96,7 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
 
       <div className="flex-1 flex flex-col gap-1">
         <div 
-          className="flex items-end h-8 gap-1 cursor-pointer"
+          className="flex items-end h-8 gap-1 cursor-pointer relative"
           onClick={handleSeek}
         >
           {visualWaveform.map((val, i) => {
@@ -109,6 +109,11 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
               />
             );
           })}
+          {/* Highlighter / Scrubber Handle */}
+          <div 
+            className="absolute top-1/2 w-4 h-4 bg-[var(--color-brutal-yellow)] border-2 border-black rounded-full pointer-events-none transition-all duration-75 z-10"
+            style={{ left: `${progress * 100}%`, transform: 'translate(-50%, -50%)', boxShadow: '2px 2px 0 0 #000' }}
+          />
         </div>
         
         <div className="flex justify-between items-center text-[10px] font-black uppercase text-black">

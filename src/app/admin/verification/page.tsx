@@ -31,10 +31,12 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useAlert } from "@/components/AlertProvider";
 
 const POSSAP_PORTAL_URL = "https://pfrps.npf.gov.ng";
 
 export default function VerificationQueuePage() {
+  const { showAlert } = useAlert();
   const [queueItems, setQueueItems] = useState<
     (VerificationReviewItem & { artisanProfile?: ArtisanProfile })[]
   >([]);
@@ -132,7 +134,7 @@ export default function VerificationQueuePage() {
       }
     } catch (error) {
       console.error("Error approving artisan:", error);
-      alert("Failed to approve. Please try again.");
+      showAlert("Failed to approve. Please try again.", "error");
     } finally {
       setActionLoading(null);
     }
@@ -141,7 +143,7 @@ export default function VerificationQueuePage() {
   const handleReject = async (artisanId: string) => {
     const reason = rejectReason[artisanId];
     if (!reason || reason.trim().length === 0) {
-      alert("Please provide a rejection reason.");
+      showAlert("Please provide a rejection reason.", "error");
       return;
     }
 
@@ -184,7 +186,7 @@ export default function VerificationQueuePage() {
       );
     } catch (error) {
       console.error("Error rejecting artisan:", error);
-      alert("Failed to reject. Please try again.");
+      showAlert("Failed to reject. Please try again.", "error");
     } finally {
       setActionLoading(null);
     }

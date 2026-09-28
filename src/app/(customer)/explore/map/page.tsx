@@ -15,7 +15,7 @@ async function getTechnicians(): Promise<ArtisanProfile[]> {
     const data = await res.json();
     if (!data.documents) return [];
 
-    return data.documents.map((doc: any) => {
+    return data.documents.map((doc: { fields: Record<string, { stringValue?: string; doubleValue?: number; integerValue?: string | number; booleanValue?: boolean }> }) => {
       const fields = doc.fields;
       return {
         artisanId: fields.artisanId?.stringValue,

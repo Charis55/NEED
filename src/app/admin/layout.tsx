@@ -32,21 +32,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists() || user.uid === "bl6OE9ODGGhIbtBo16JGqZaJ0YE2") {
-          const userData = userDoc.exists() ? (userDoc.data() as UserAccount) : null;
-          
-          if (user.uid === "bl6OE9ODGGhIbtBo16JGqZaJ0YE2" || (userData && userData.isAdmin)) {
-            setIsAuthorized(true);
-            if (isLoginPage) {
-              router.replace("/admin");
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists() || user.uid === "bl6OE9ODGGhIbtBo16JGqZaJ0YE2") {
+            const userData = userDoc.exists() ? (userDoc.data() as UserAccount) : null;
+            
+            if (user.uid === "bl6OE9ODGGhIbtBo16JGqZaJ0YE2" || (userData && userData.isAdmin)) {
+              setIsAuthorized(true);
+              if (isLoginPage) {
+                router.replace("/admin");
+              }
+            } else {
+              // Not an admin
+              router.replace("/");
             }
           } else {
-            // Not an admin
             router.replace("/");
           }
-        } else {
+        } catch (err) {
+          console.error("Error verifying admin status:", err);
           router.replace("/");
         }
       } else {

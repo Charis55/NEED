@@ -19,16 +19,22 @@ export async function POST(req: NextRequest) {
     const fcmToken = userData.fcmToken;
     const pushEnabled = userData.preferences?.pushNotifications ?? true;
 
-    if (!fcmToken || !pushEnabled) {
-      return NextResponse.json({ success: true, message: "User disabled notifications or has no token" });
+    let pushSuccess = false;
+
+    if (fcmToken && pushEnabled) {
+      try {
+        await getMessaging(adminApp_).send({
+          token: fcmToken,
+          notification: { title, body },
+          data: data || {},
+        });
+        pushSuccess = true;
+      } catch (e) {
+        console.error("FCM Send failed:", e);
+      }
     }
 
-    // This requires FIREBASE_SERVICE_ACCOUNT_JSON env var to be set for the admin SDK to authenticate!
-    await getMessaging(adminApp_).send({
-      token: fcmToken,
-      notification: { title, body },
-      data: data || {},
-    });
+
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

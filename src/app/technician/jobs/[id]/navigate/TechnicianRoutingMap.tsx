@@ -29,7 +29,7 @@ function RoutingControl({ startCoords, destCoords }: { startCoords: {lat: number
       lineOptions: {
         styles: [{ color: '#000000', opacity: 0.8, weight: 6 }]
       },
-      createMarker: (i: number, wp: any, nWps: number) => {
+      createMarker: (i: number, wp: Record<string, unknown>, nWps: number) => {
         // We will render our own markers
         return null;
       },
@@ -134,6 +134,7 @@ export default function TechnicianRoutingMap({
       <MapContainer
         center={[currentLocation.lat, currentLocation.lng]}
         zoom={15}
+        zoomControl={false}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', zIndex: 0 }}
       >

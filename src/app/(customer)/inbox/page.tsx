@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, orderBy, onSnapshot } from "firebase/firestore";
-import { JobRequest, ArtisanProfile } from "@/types";
+import { JobRequest, ArtisanProfile, UserAccount } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import Link from "next/link";
@@ -14,7 +14,7 @@ import AuthGate from "@/components/AuthGate";
 interface ChatListItem {
   job: JobRequest;
   artisan: ArtisanProfile | null;
-  artisanUser: any | null;
+  artisanUser: UserAccount | null;
   unreadCount: number;
 }
 
@@ -56,7 +56,7 @@ function InboxContent() {
         
         for (const job of activeJobs) {
           let artisan: ArtisanProfile | null = null;
-          let artisanUser: any = null;
+          let artisanUser: UserAccount | null = null;
           
           if (job.artisanId) {
             const artDoc = await getDoc(doc(db, "artisans", job.artisanId));
@@ -65,7 +65,7 @@ function InboxContent() {
             }
             const userDoc = await getDoc(doc(db, "users", job.artisanId));
             if (userDoc.exists()) {
-              artisanUser = userDoc.data();
+              artisanUser = userDoc.data() as UserAccount;
             }
           }
           
@@ -114,7 +114,7 @@ function InboxContent() {
                 <div className="relative mr-4 shrink-0">
                   <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
                     <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 flex items-center justify-center">
-                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.portfolioPhotoUrls?.[0]} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName}` : "Artisan")} className="w-full h-full text-2xl text-black font-black" />
+                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.portfolioPhotoUrls?.[0]} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || item.artisanUser?.phone || "Unknown Technician"} className="w-full h-full text-2xl text-black font-black" />
                     </div>
                   </div>
                   {/* Unread Badge */}
@@ -129,7 +129,7 @@ function InboxContent() {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-black text-black text-lg truncate uppercase">
-                      {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName}` : "Unknown Technician")}
+                      {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || item.artisanUser?.phone || "Unknown Technician"}
                     </h3>
                     <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
                       {new Date(item.job.createdAt).toLocaleDateString('en-GB')}

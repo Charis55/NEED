@@ -30,7 +30,7 @@ export default function PayCommissionModal({ isOpen, onClose, unpaidJobs, totalO
 
   const initializePayment = usePaystackPayment(config);
 
-  const handlePaystackSuccessAction = async (reference: any) => {
+  const handlePaystackSuccessAction = async (reference: Record<string, unknown>) => {
     setLoading(true);
     try {
       const batch = writeBatch(db);
@@ -59,14 +59,13 @@ export default function PayCommissionModal({ isOpen, onClose, unpaidJobs, totalO
   const startPayment = () => {
     if (totalOwed <= 0) return;
     setError("");
-    
     try {
       initializePayment({
+        // @ts-expect-error react-paystack types are poorly defined
         onSuccess: handlePaystackSuccessAction,
         onClose: handlePaystackCloseAction,
-      } as any);
+      });
     } catch (err) {
-      console.error("Paystack initialization failed:", err);
       setError("Failed to open payment gateway. Please ensure you have a stable connection and no adblockers.");
     }
   };

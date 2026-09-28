@@ -107,7 +107,7 @@ export async function POST(req: Request) {
 }
 
 // ─── Event dispatcher ────────────────────────────────────────────────────────
-async function handleEvent(event: any) {
+async function handleEvent(event: { vendor_data?: string; session_id?: string; status?: string; decision?: Record<string, any>; resubmit_info?: Record<string, any> }) {
   const userId = event.vendor_data; // This is the artisan's Firebase UID
   const sessionId = event.session_id;
   const status = event.status;
@@ -120,7 +120,7 @@ async function handleEvent(event: any) {
   }
 
   // Build the Firestore update based on the status
-  const update: Record<string, any> = {
+  const update: Record<string, unknown> = {
     kycSessionId: sessionId,
     kycStatus: status,
     kycUpdatedAt: Date.now(),

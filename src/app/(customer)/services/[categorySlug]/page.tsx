@@ -43,7 +43,8 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       try {
         const q = query(
           collection(db, "artisans"),
-          where("available", "==", true)
+          where("available", "==", true),
+          where("verified", "==", true)
         );
         const snapshot = await getDocs(q);
         const counts: Record<string, number> = {};
@@ -51,7 +52,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
         snapshot.forEach((doc) => {
           const data = doc.data();
           if (data.services && Array.isArray(data.services)) {
-            data.services.forEach((svc: any) => {
+            data.services.forEach((svc: { trade?: string; subcategory?: string; [key: string]: unknown }) => {
               if (svc.trade === category.title && svc.subcategory) {
                 counts[svc.subcategory] = (counts[svc.subcategory] || 0) + 1;
               }

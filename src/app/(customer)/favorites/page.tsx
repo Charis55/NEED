@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, getDocs, doc, getDoc, deleteDoc, updateDoc, arrayRemove } from "firebase/firestore";
 import Link from "next/link";
+import AuthGate from "@/components/AuthGate";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { ArtisanProfile } from "@/types";
 import { Heart, Star, MapPin } from "lucide-react";
@@ -11,6 +12,7 @@ import { Heart, Star, MapPin } from "lucide-react";
 export default function FavoritesPage() {
   const [favorites, setFavorites] = useState<ArtisanProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const fetchFavorites = async () => {
@@ -53,8 +55,9 @@ export default function FavoritesPage() {
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged(user => {
-      if (user) fetchFavorites();
+    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+      setUser(currentUser);
+      if (currentUser) fetchFavorites();
       else setLoading(false);
     });
 
@@ -78,27 +81,31 @@ export default function FavoritesPage() {
   if (loading) return <GlobalSpinner text="LOADING FAVORITES..." />;
 
   return (
-    <div className="w-full pt-16 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black min-h-[80vh]">
-      <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] mt-4">
-        SAVED ARTISANS
-      </h1>
+    <AuthGate 
+      title="Sign in to view favorites" 
+      description="Create a free account to save and view favorite technicians."
+    >
+      <div className="w-full pt-16 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black min-h-[80vh]">
+        <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] mt-4">
+          SAVED ARTISANS
+        </h1>
 
-      {favorites.length === 0 ? (
-        <div className="bg-white brutal-border p-12 text-center shadow-[8px_8px_0_0_#000]">
-          <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">No saved artisans</h2>
-          <p className="font-bold text-gray-500 mb-6 uppercase text-sm">Save your favorite technicians to book them again quickly.</p>
-          <Link href="/explore" className="bg-[var(--color-brutal-teal)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] inline-block hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
-            EXPLORE TECHNICIANS
-          </Link>
-        </div>
-      ) : (
+        {favorites.length === 0 ? (
+          <div className="bg-white brutal-border p-12 text-center shadow-[8px_8px_0_0_#000]">
+            <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">No saved artisans</h2>
+            <p className="font-bold text-gray-500 mb-6 uppercase text-sm">Save your favorite technicians to book them again quickly.</p>
+            <Link href="/explore" className="bg-[var(--color-brutal-teal)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] inline-block hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
+              EXPLORE TECHNICIANS
+            </Link>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {favorites.map(artisan => (
             <div key={artisan.artisanId} className="bg-white brutal-border overflow-hidden flex flex-col group shadow-[6px_6px_0_0_#000] hover:shadow-[2px_2px_0_0_#000] hover:translate-x-1 hover:translate-y-1 transition-all">
               <div className="h-48 relative border-b-4 border-black bg-gray-200">
                 <img 
-                  src={artisan.portfolioPhotoUrls?.[0] || `https://i.pravatar.cc/150?u=${artisan.artisanId}`} 
+                  src={artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
                   alt={artisan.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
@@ -130,6 +137,7 @@ export default function FavoritesPage() {
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </AuthGate>
   );
 }

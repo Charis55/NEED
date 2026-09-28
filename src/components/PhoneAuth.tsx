@@ -27,7 +27,7 @@ export default function PhoneAuth({ role, onSuccess, isLogin = true }: PhoneAuth
     e.preventDefault();
     if (!phoneNumber) return;
     
-    let formattedPhone = phoneNumber.trim();
+    const formattedPhone = phoneNumber.trim();
     if (!formattedPhone.startsWith("+")) {
       setError("Please include country code, e.g., +2348012345678");
       return;

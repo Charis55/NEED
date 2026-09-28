@@ -45,20 +45,16 @@ export default function TrackingMap({
   const createTechIcon = () => {
     return L.divIcon({
       html: `
-        <div class="relative w-12 h-16 group cursor-pointer hover:-translate-y-2 transition-transform drop-shadow-[4px_4px_0_rgba(0,0,0,1)]">
-          <div class="absolute inset-x-0 top-0 h-12 bg-[var(--color-brutal-teal)] border-4 border-black flex items-center justify-center z-20 animate-pulse overflow-hidden">
-            <img src="/LOGO.png" alt="Need" class="w-full h-full object-contain scale-[1.5]" />
+        <div class="relative w-12 h-12 group cursor-pointer hover:-translate-y-1 transition-transform">
+          <div class="w-12 h-12 bg-white border-4 border-black flex items-center justify-center z-20 overflow-hidden relative shadow-[4px_4px_0_0_#000]">
+            <img src="/LOGO.png" alt="Need" class="w-8 h-8 object-contain" />
           </div>
-          <!-- pin triangle base -->
-          <div class="absolute top-[44px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[16px] border-l-transparent border-r-transparent border-t-black z-10"></div>
-          <!-- pin triangle fill -->
-          <div class="absolute top-[44px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-[var(--color-brutal-teal)] z-20"></div>
         </div>
       `,
       className: 'bg-transparent border-none bg-none outline-none',
-      iconSize: [48, 64],
-      iconAnchor: [24, 60],
-      popupAnchor: [0, -60]
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+      popupAnchor: [0, -28]
     });
   };
 
@@ -87,6 +83,7 @@ export default function TrackingMap({
       <MapContainer
         center={center}
         zoom={14}
+        zoomControl={false}
         scrollWheelZoom={true}
         style={{ height: '100%', minHeight: '500px', width: '100%', zIndex: 0 }}
       >

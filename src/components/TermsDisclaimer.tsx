@@ -32,12 +32,12 @@ export default function TermsDisclaimer({ role, onClose }: TermsDisclaimerProps)
               <h3 className="text-xl font-black uppercase bg-[var(--color-brutal-yellow)] inline-block px-2 border-2 border-black -rotate-1">Customer Terms of Service</h3>
               
               <p>
-                By registering for and using the NEED platform, you explicitly acknowledge and agree to the following terms regarding security, liability, and platform usage. NEED serves solely as an introductory conduit connecting independent service professionals ("Technicians") with users seeking services.
+                By registering for and using the NEED platform, you explicitly acknowledge and agree to the following terms regarding security, liability, and platform usage. NEED serves solely as an introductory conduit connecting independent service professionals (&quot;Technicians&quot;) with users seeking services.
               </p>
               
               <p className="font-bold border-l-4 border-[var(--color-brutal-red)] pl-4">
                 1. Assumption of Risk and Safety Precautions
-                You acknowledge that inviting any third-party Technician into your home, office, or designated location carries inherent risks. While NEED implements certain screening protocols (such as identity and police clearance verification for Technicians), we cannot absolutely guarantee the safety, conduct, or intent of any independent Technician. You assume all risks associated with utilizing services procured through our platform. You are strongly advised to independently verify the Technician’s identity upon arrival, ensure another adult is present during the service provision, and secure all valuables.
+                You acknowledge that inviting any third-party Technician into your home, office, or designated location carries inherent risks. While NEED implements certain screening protocols (such as identity and police clearance verification for Technicians), we cannot absolutely guarantee the safety, conduct, or intent of any independent Technician. You assume all risks associated with utilizing services procured through our platform. You are strongly advised to independently verify the Technician&apos;s identity upon arrival, ensure another adult is present during the service provision, and secure all valuables.
               </p>
 
               <p>
@@ -69,12 +69,12 @@ export default function TermsDisclaimer({ role, onClose }: TermsDisclaimerProps)
 
               <p>
                 2. Liability and Quality of Work
-                You are strictly liable for the quality of the services you provide, any damages caused to a customer's property, and any bodily injury resulting from your work. NEED assumes absolutely no liability for your actions. In the event of a dispute, claim, or legal action initiated by a customer resulting from your conduct or workmanship, you agree to fully indemnify and hold NEED harmless.
+                You are strictly liable for the quality of the services you provide, any damages caused to a customer&apos;s property, and any bodily injury resulting from your work. NEED assumes absolutely no liability for your actions. In the event of a dispute, claim, or legal action initiated by a customer resulting from your conduct or workmanship, you agree to fully indemnify and hold NEED harmless.
               </p>
 
               <p>
                 3. Security, Background Checks, and Police Clearance
-                To ensure platform safety, you must consent to comprehensive background checks. You are strictly required to upload a valid, up-to-date Police Clearance Certificate during onboarding. NEED reserves the right to suspend or permanently terminate your account without notice if we detect fraudulent documents, if you receive reports of aggressive or unprofessional behavior, or if you attempt to circumvent the platform's payment ecosystem.
+                To ensure platform safety, you must consent to comprehensive background checks. You are strictly required to upload a valid, up-to-date Police Clearance Certificate during onboarding. NEED reserves the right to suspend or permanently terminate your account without notice if we detect fraudulent documents, if you receive reports of aggressive or unprofessional behavior, or if you attempt to circumvent the platform&apos;s payment ecosystem.
               </p>
 
               <p>

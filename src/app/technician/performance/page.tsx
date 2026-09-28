@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { JobRequest } from "@/types";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useAlert } from "@/components/AlertProvider";
 
 export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,7 @@ export default function PerformancePage() {
   const [submittingReply, setSubmittingReply] = useState(false);
   const [jobs, setJobs] = useState<JobRequest[]>([]);
   const router = useRouter();
+  const { showAlert } = useAlert();
 
   const submitReply = async (reviewId: string) => {
     if (!replyText.trim()) return;
@@ -34,7 +36,7 @@ export default function PerformancePage() {
       setReplyText("");
     } catch (error) {
       console.error(error);
-      alert("Failed to submit reply");
+      showAlert("Failed to submit reply", "error");
     } finally {
       setSubmittingReply(false);
     }

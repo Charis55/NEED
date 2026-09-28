@@ -6,6 +6,7 @@ import { collection, query, orderBy, getDocs, doc, updateDoc } from "firebase/fi
 import Link from "next/link";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { AlertTriangle, ExternalLink, ShieldAlert, CheckCircle, Search, DollarSign } from "lucide-react";
+import { useAlert } from "@/components/AlertProvider";
 
 interface Dispute {
   id: string;
@@ -17,10 +18,11 @@ interface Dispute {
   description: string;
   evidenceUrl: string | null;
   status: "open" | "resolved" | "dismissed";
-  createdAt: any;
+  createdAt: { toDate?: () => Date } | number;
 }
 
 export default function AdminDisputes() {
+  const { showAlert } = useAlert();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "open" | "resolved" | "dismissed">("open");
@@ -50,7 +52,7 @@ export default function AdminDisputes() {
       setDisputes(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update status");
+      showAlert("Failed to update status", "error");
     }
   };
 
@@ -63,10 +65,10 @@ export default function AdminDisputes() {
           refundedAt: Date.now()
         });
         await updateStatus(disputeId, "resolved");
-        alert("Refund processed successfully!");
+        showAlert("Refund processed successfully!", "success");
       } catch (error) {
         console.error("Error processing refund:", error);
-        alert("Failed to process refund");
+        showAlert("Failed to process refund", "error");
       }
     }
   };
@@ -155,7 +157,7 @@ export default function AdminDisputes() {
                       {dispute.category}
                     </span>
                     <span className="text-gray-500 font-bold text-sm">
-                      {new Date(dispute.createdAt?.toDate?.() || Date.now()).toLocaleString()}
+                      {new Date(typeof dispute.createdAt === 'number' ? dispute.createdAt : dispute.createdAt?.toDate?.() || Date.now()).toLocaleString()}
                     </span>
                   </div>
                   

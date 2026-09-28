@@ -63,7 +63,7 @@ function JobsContent() {
     try {
       const reqRef = doc(db, "jobRequests", requestId);
       
-      const updatePayload: any = { 
+      const updatePayload: Partial<JobRequest> = { 
         status: newStatus 
       };
 
@@ -148,7 +148,7 @@ function JobsContent() {
   const handleRespondReschedule = async (requestId: string, response: "accepted" | "declined", newPreferredTime: string) => {
     try {
       const reqRef = doc(db, "jobRequests", requestId);
-      const updatePayload: any = {
+      const updatePayload: Partial<JobRequest> = {
         rescheduleStatus: response
       };
       if (response === "accepted") {
@@ -286,6 +286,13 @@ function JobsContent() {
                   <div className="bg-[var(--color-brutal-yellow)] p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000]">
                     <p className="text-black font-bold leading-relaxed">{req.description}</p>
                   </div>
+
+                  {req.status === "cancelled" && req.cancelledReason && (
+                    <div className="bg-red-100 p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000] border-red-500">
+                      <p className="font-black text-red-900 flex items-center gap-2 mb-1 uppercase tracking-widest"><AlertTriangle className="w-5 h-5" /> Job Cancelled</p>
+                      <p className="font-bold text-red-800">{req.cancelledReason}</p>
+                    </div>
+                  )}
 
                   {req.status === "countered" && req.lastCounterBy !== "customer" && (
                     <div className="space-y-4">

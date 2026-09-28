@@ -18,7 +18,7 @@ interface Report {
   reason: string;
   status: ModerationStatus;
   createdAt: number;
-  metadata?: any; // Additional context (e.g. image URL, chat text)
+  metadata?: { url?: string; artisanId?: string; text?: string; jobId?: string; rating?: number } & Record<string, unknown>; // Additional context (e.g. image URL, chat text)
 }
 
 export default function ModerationPanel() {
@@ -78,7 +78,7 @@ export default function ModerationPanel() {
 
   const handleAction = async (reportId: string, action: ModerationStatus) => {
     try {
-      // await updateDoc(doc(db, "reports", reportId), { status: action });
+      await updateDoc(doc(db, "reports", reportId), { status: action });
       setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: action } : r));
     } catch (err) {
       console.error("Action failed", err);
@@ -182,7 +182,7 @@ export default function ModerationPanel() {
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-1 text-[var(--color-brutal-yellow)]">
                         {Array.from({length: 5}).map((_, i) => (
-                          <Star key={i} className={`w-4 h-4 ${i < (report.metadata.rating||0) ? 'fill-current' : 'text-gray-400'}`} />
+                          <Star key={i} className={`w-4 h-4 ${i < (report.metadata?.rating || 0) ? 'fill-current' : 'text-gray-400'}`} />
                         ))}
                       </div>
                       <div className="border-l-4 border-black pl-4">

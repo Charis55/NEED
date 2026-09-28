@@ -10,6 +10,7 @@ import {
   ClipboardList, ChevronRight, TrendingUp, Settings
 } from "lucide-react";
 import Link from "next/link";
+import { useAlert } from "@/components/AlertProvider";
 
 type Tab = "overview" | "applications" | "customers" | "technicians";
 
@@ -85,6 +86,7 @@ function StepBar({ artisan }: { artisan: ArtisanProfile }) {
 }
 
 export default function AdminDashboard() {
+  const { showAlert } = useAlert();
   const [artisans, setArtisans] = useState<ArtisanProfile[]>([]);
   const [customers, setCustomers] = useState<UserAccount[]>([]);
   const [jobs, setJobs] = useState<JobRequest[]>([]);
@@ -117,7 +119,7 @@ export default function AdminDashboard() {
   const handleVerify = async (artisanId: string, status: boolean) => {
     setActionLoading(artisanId);
     try {
-      const updateData: any = {
+      const updateData: Partial<ArtisanProfile> = {
         verified: status,
         available: status,
       };
@@ -142,7 +144,7 @@ export default function AdminDashboard() {
       );
     } catch (error) {
       console.error("Error updating artisan verification:", error);
-      alert("Failed to update verification status.");
+      showAlert("Failed to update verification status.", "error");
     } finally {
       setActionLoading(null);
     }

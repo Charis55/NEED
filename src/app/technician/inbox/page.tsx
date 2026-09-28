@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
-import { JobRequest } from "@/types";
+import { JobRequest, UserAccount } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import Link from "next/link";
@@ -12,7 +12,7 @@ import { MessageCircle } from "lucide-react";
 
 interface ChatListItem {
   job: JobRequest;
-  customer: any | null;
+  customer: UserAccount | null;
   unreadCount: number;
 }
 
@@ -43,11 +43,11 @@ export default function InboxPage() {
         const listItems: ChatListItem[] = [];
         
         for (const job of activeJobs) {
-          let customer: any | null = null;
+          let customer: UserAccount | null = null;
           if (job.customerId) {
             const cusDoc = await getDoc(doc(db, "users", job.customerId));
             if (cusDoc.exists()) {
-              customer = cusDoc.data();
+              customer = cusDoc.data() as UserAccount;
             }
           }
           
@@ -98,7 +98,7 @@ export default function InboxPage() {
                   <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-black flex-shrink-0 bg-[var(--color-brutal-yellow)]">
                     <UserAvatar 
                       photoURL={customer?.photoURL} 
-                      name={customer?.displayName || "Customer"} 
+                      name={customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Customer"} 
                       className="w-full h-full text-xl text-black font-black" 
                     />
                   </div>
@@ -106,7 +106,7 @@ export default function InboxPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-1">
                       <h3 className="text-xl font-black text-black truncate uppercase tracking-tighter">
-                        {customer?.displayName || "Customer"}
+                        {customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Customer"}
                       </h3>
                       <span className="text-xs font-black px-2 py-0.5 bg-[var(--color-brutal-bg)] border-2 border-black -rotate-2 whitespace-nowrap ml-2">
                         {new Date(job.createdAt).toLocaleDateString('en-GB')}

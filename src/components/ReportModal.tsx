@@ -5,6 +5,7 @@ import { X, Upload, AlertTriangle } from "lucide-react";
 import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { useAlert } from "@/components/AlertProvider";
 
 interface ReportModalProps {
   jobId?: string;
@@ -20,6 +21,7 @@ export default function ReportModal({ jobId, reportedUserId, reporterUserId, rep
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const { showAlert } = useAlert();
 
   const categories = [
     { id: "quality", label: "Quality of Work / No Show" },
@@ -59,7 +61,7 @@ export default function ReportModal({ jobId, reportedUserId, reporterUserId, rep
       }, 2000);
     } catch (error) {
       console.error("Error submitting report:", error);
-      alert("Failed to submit report. Please try again.");
+      showAlert("Failed to submit report. Please try again.", "error");
     } finally {
       setLoading(false);
     }

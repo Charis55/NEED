@@ -5,7 +5,7 @@ import { auth, db, storage } from "@/lib/firebase";
 import { 
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence
+  updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -16,7 +16,7 @@ import { UserAccount } from "@/types";
 import ImageCropper from "@/components/ImageCropper";
 import { Eye, EyeOff, ArrowLeft, Upload, X, Check, Mail, Phone as PhoneIcon } from "lucide-react";
 import TermsDisclaimer from "@/components/TermsDisclaimer";
-import PhoneAuth from "@/components/PhoneAuth";
+
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -31,7 +31,7 @@ export default function AuthForm() {
   const [rememberMe, setRememberMe] = useState(true);
   
   // Profile completion fields
-  const [phoneNumber, setPhoneNumber] = useState("");
+
   const [step, setStep] = useState<"auth" | "role">("auth");
   const [role, setRole] = useState<"customer" | "artisan">("customer");
   const [lockRole, setLockRole] = useState(false);
@@ -73,7 +73,7 @@ export default function AuthForm() {
     setCropImageSrc(null);
   };
 
-  const uploadAndSetPhoto = async (user: any) => {
+  const uploadAndSetPhoto = async (user: User) => {
     if (profileFile) {
       try {
         const uploadTask = async () => {
@@ -121,7 +121,7 @@ export default function AuthForm() {
     }
   }, []);
 
-  const handlePostLogin = async (user: any, nameToSave?: string) => {
+  const handlePostLogin = async (user: User, nameToSave?: string) => {
     const userDocRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
 
@@ -213,7 +213,6 @@ export default function AuthForm() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Google Sign-In failed.");
-    } finally {
       setLoading(false);
     }
   };
@@ -228,7 +227,7 @@ export default function AuthForm() {
       let fullName = "";
       
       if (!isLogin) {
-        if (!firstName || !lastName || !phoneNumber) {
+        if (!firstName || !lastName) {
           throw new Error("Please fill in all fields.");
         }
         
@@ -253,7 +252,7 @@ export default function AuthForm() {
         
         const newUser: UserAccount = {
           userId: result.user.uid,
-          phone: phoneNumber,
+          phone: result.user.phoneNumber || "",
           email: result.user.email || undefined,
           displayName: fullName,
           role: role,
@@ -280,7 +279,6 @@ export default function AuthForm() {
       } else {
         setError(err.message || "Authentication failed.");
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -314,7 +312,7 @@ export default function AuthForm() {
 
       const newUser: UserAccount = {
         userId: user.uid,
-        phone: user.phoneNumber || phoneNumber || "",
+        phone: user.phoneNumber || "",
         displayName: finalName || "",
         role,
         createdAt: Date.now(),
@@ -332,7 +330,6 @@ export default function AuthForm() {
     } catch (err: any) {
       console.error(err);
       setError("Failed to create profile.");
-    } finally {
       setLoading(false);
     }
   };
@@ -409,17 +406,7 @@ export default function AuthForm() {
               </div>
             </div>
 
-            <div className="mb-6">
-              <label className="block text-lg font-black text-black mb-2 uppercase">Phone Number</label>
-              <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+2348012345678"
-                className="w-full px-5 py-4 brutal-border bg-white text-black font-medium focus:outline-none focus:bg-[var(--color-brutal-bg)] transition-colors placeholder:text-gray-400"
-                required
-              />
-            </div>
+
 
             <div className="mb-8">
               <label className="block text-lg font-black text-black mb-3 uppercase">I want to...</label>
@@ -557,28 +544,6 @@ export default function AuthForm() {
           </>
         )}
         
-        <div className="flex bg-[var(--color-brutal-bg)] p-2 brutal-border mb-6 relative">
-          <button
-            type="button"
-            onClick={() => setAuthMethod("email")}
-            className={`flex-1 py-3 text-sm font-black uppercase transition-all z-10 flex items-center justify-center gap-2 ${authMethod === "email" ? "bg-white brutal-border brutal-shadow-sm text-black translate-x-[-2px] translate-y-[-2px]" : "text-gray-500 hover:text-black border-4 border-transparent"}`}
-          >
-            <Mail className="w-4 h-4 stroke-[3]" />
-            Email
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthMethod("phone")}
-            className={`flex-1 py-3 text-sm font-black uppercase transition-all z-10 flex items-center justify-center gap-2 ${authMethod === "phone" ? "bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm text-black translate-x-[-2px] translate-y-[-2px]" : "text-gray-500 hover:text-black border-4 border-transparent"}`}
-          >
-            <PhoneIcon className="w-4 h-4 stroke-[3]" />
-            Phone
-          </button>
-        </div>
-
-        {authMethod === "phone" ? (
-          <PhoneAuth role={role} isLogin={isLogin} onSuccess={() => {}} />
-        ) : (
         <form onSubmit={handleEmailAuth}>
           {!isLogin && (
             <>
@@ -662,17 +627,7 @@ export default function AuthForm() {
                 </div>
               </div>
 
-              <div className="mb-6">
-                <label className="block text-lg font-black text-black mb-2 uppercase">Phone</label>
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+2348012345678"
-                  className="w-full px-5 py-4 brutal-border bg-white text-black font-medium focus:outline-none focus:bg-[var(--color-brutal-bg)] transition-colors placeholder:text-gray-400"
-                  required={!isLogin}
-                />
-              </div>
+
             </>
           )}
 
@@ -818,7 +773,6 @@ export default function AuthForm() {
             </button>
           </div>
         </form>
-        )}
       </div>
 
       {/* Right side: Brutalist Banner for Desktop */}

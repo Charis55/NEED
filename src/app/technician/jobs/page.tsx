@@ -9,10 +9,13 @@ import PayCommissionModal from "@/components/PayCommissionModal";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
 import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall } from "lucide-react";
+import { useAlert } from "@/components/AlertProvider";
 
 export default function ArtisanDashboard() {
+  const { showAlert } = useAlert();
   const [requests, setRequests] = useState<JobRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
   const [reportingJob, setReportingJob] = useState<JobRequest | null>(null);
   const [counterInputs, setCounterInputs] = useState<Record<string, string>>({});
   const [showCounterFor, setShowCounterFor] = useState<string | null>(null);
@@ -97,15 +100,18 @@ export default function ArtisanDashboard() {
             } else {
               validServices = [{ trade: artisanData.trade, subcategory: artisanData.subcategory }];
             }
+            setIsVerified(artisanData.verified || false);
           }
 
           const directResults = directSnapshot.docs.map(doc => doc.data() as JobRequest);
           const allBroadcastResults = broadcastSnapshot.docs.map(doc => doc.data() as JobRequest);
           
-          // Only show broadcast jobs that match the artisan's services
-          const matchedBroadcastResults = allBroadcastResults.filter(job => 
-            validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory)
-          );
+          // Only show broadcast jobs that match the artisan's services (and only if verified)
+          const matchedBroadcastResults = (artisanSnapshot.empty || !(artisanSnapshot.docs[0].data().verified)) 
+            ? [] 
+            : allBroadcastResults.filter(job => 
+                validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory)
+              );
 
           // Combine and deduplicate
           const combined = [...directResults, ...matchedBroadcastResults];
@@ -127,10 +133,14 @@ export default function ArtisanDashboard() {
   }, []);
 
   const handleUpdateStatus = async (requestId: string, newStatus: JobRequest['status'], counterAmt: number | null = null) => {
+    if ((newStatus === 'accepted' || newStatus === 'countered') && !isVerified) {
+      showAlert("Your account must be approved by an administrator before you can accept or counter jobs.", "error");
+      return;
+    }
     try {
       const reqRef = doc(db, "jobRequests", requestId);
       
-      const updatePayload: any = { 
+      const updatePayload: Partial<JobRequest> = { 
         status: newStatus 
       };
 
@@ -232,10 +242,10 @@ export default function ArtisanDashboard() {
           sosTriggeredBy: "artisan",
           sosTriggeredAt: Date.now()
         });
-        alert("SOS Alert triggered! Our team has been notified and will contact you immediately.");
+        showAlert("SOS Alert triggered! Our team has been notified and will contact you immediately.", "info");
       } catch (err) {
         console.error(err);
-        alert("Failed to trigger SOS");
+        showAlert("Failed to trigger SOS", "error");
       }
     }
   };
@@ -246,7 +256,7 @@ export default function ArtisanDashboard() {
 
   const handleRequestReschedule = async (requestId: string) => {
     if (!newDate || !newTime) {
-      alert("Please select a new date and time");
+      showAlert("Please select a new date and time", "error");
       return;
     }
     
@@ -258,20 +268,20 @@ export default function ArtisanDashboard() {
         rescheduleRequestedBy: "artisan",
         rescheduleStatus: "pending"
       };
-      await updateDoc(reqRef, updatePayload as any);
+      await updateDoc(reqRef, updatePayload);
       setRequests(prev => prev.map(req => req.requestId === requestId ? { ...req, ...updatePayload } : req));
       setReschedulingJob(null);
-      alert("Reschedule request sent!");
+      showAlert("Reschedule request sent!", "success");
     } catch (err) {
       console.error(err);
-      alert("Failed to send reschedule request");
+      showAlert("Failed to send reschedule request", "error");
     }
   };
 
   const handleRespondReschedule = async (requestId: string, response: "accepted" | "declined", newPreferredTime: string) => {
     try {
       const reqRef = doc(db, "jobRequests", requestId);
-      const updatePayload: any = {
+      const updatePayload: Partial<JobRequest> = {
         rescheduleStatus: response
       };
       if (response === "accepted") {
@@ -279,10 +289,10 @@ export default function ArtisanDashboard() {
       }
       await updateDoc(reqRef, updatePayload);
       setRequests(prev => prev.map(req => req.requestId === requestId ? { ...req, ...updatePayload } : req));
-      alert(`Reschedule ${response}`);
+      showAlert(`Reschedule ${response}`, "success");
     } catch (err) {
       console.error(err);
-      alert("Error responding to reschedule");
+      showAlert("Error responding to reschedule", "error");
     }
   };
 
@@ -411,6 +421,13 @@ export default function ArtisanDashboard() {
                     <div className="bg-[var(--color-brutal-yellow)] p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000]">
                       <p className="text-black font-bold leading-relaxed">{req.description}</p>
                     </div>
+
+                    {req.status === "cancelled" && req.cancelledReason && (
+                      <div className="bg-red-100 p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000] border-red-500">
+                        <p className="font-black text-red-900 flex items-center gap-2 mb-1 uppercase tracking-widest"><AlertTriangle className="w-5 h-5" /> Job Cancelled</p>
+                        <p className="font-bold text-red-800">{req.cancelledReason}</p>
+                      </div>
+                    )}
 
                     {/* Pending Status Actions */}
                     {(req.status === "pending" || (req.status === "countered" && req.lastCounterBy === "customer")) && (

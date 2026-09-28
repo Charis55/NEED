@@ -38,7 +38,7 @@ export const compressImage = (file: File, maxSizeMB: number = 1): Promise<File> 
         ctx.drawImage(img, 0, 0, width, height);
 
         // Try reducing quality to ensure it fits the size
-        let quality = 0.95; // Start very high
+        const quality = 0.95; // Start very high
         const compressToBlob = (q: number) => {
           canvas.toBlob(
             (blob) => {

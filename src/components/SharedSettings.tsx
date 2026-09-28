@@ -259,6 +259,9 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         throw new Error(data.error || "Failed to delete account");
       }
       
+      // Delete the user from Firebase Auth on the client side
+      await authUser.delete();
+      
       await auth.signOut();
       router.push("/");
     } catch (err: any) {
@@ -521,7 +524,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               <h2 className="text-2xl font-black uppercase text-black tracking-tighter">The NEED Vision</h2>
             </div>
             <p className="text-black font-bold text-lg leading-snug">
-              NEED is a premium service marketplace designed to bridge the gap between skilled technicians and customers. Whether you're booking a quick repair or a major project, NEED makes every interaction seamless.
+              NEED is a premium service marketplace designed to bridge the gap between skilled technicians and customers. Whether you&apos;re booking a quick repair or a major project, NEED makes every interaction seamless.
             </p>
           </div>
 
@@ -547,7 +550,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             <p className="text-black font-bold text-lg leading-snug mb-4">
               <span className="uppercase text-xl font-black border-b-2 border-black mb-2 inline-block">Graduate Engr. Obunezi Chidugam Charis, B.Sc. (Software Engineering), GMCPN</span><br/>
               <span className="font-black text-xl">CEO & Lead Architect</span><br/><br/>
-              A forward-thinking engineer with a passion for building software that isn't just functional, but inspiring. Under his leadership, CharisCorp continues to push the boundaries of what's possible in the digital ecosystem.
+              A forward-thinking engineer with a passion for building software that isn&apos;t just functional, but inspiring. Under his leadership, CharisCorp continues to push the boundaries of what&apos;s possible in the digital ecosystem.
             </p>
             <a 
               href="https://charis-portfolio-orpin.vercel.app/"

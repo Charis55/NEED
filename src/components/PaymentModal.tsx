@@ -35,15 +35,16 @@ export default function PaymentModal({ amount, email, onSuccess, onClose }: Paym
     
     try {
       initializePayment({
-        onSuccess: (reference: any) => {
+        onSuccess: (reference: Record<string, unknown>) => {
           setProcessing(true); // Only process after success
-          onSuccess("paystack", reference.reference);
+          onSuccess("paystack", reference.reference as string);
         },
         onClose: () => {
           setProcessing(false);
           showAlert("Payment window closed", "error");
         }
-      } as any);
+        // @ts-expect-error react-paystack types are poorly defined for onSuccess
+      });
     } catch (e) {
       console.error(e);
       showAlert("Failed to initialize payment gateway.", "error");

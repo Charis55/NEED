@@ -98,7 +98,7 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
           <div className="flex gap-4 items-center">
             <div className="w-16 h-16 bg-gray-200 border-2 border-black overflow-hidden shrink-0 shadow-[2px_2px_0_0_#000]">
               <img 
-                src={technician.profilePictureUrl || `https://i.pravatar.cc/150?u=${technician.artisanId}`} 
+                src={technician.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(technician.name || 'Tech')}&background=random&size=150`} 
                 alt={technician.name} 
                 className="w-full h-full object-cover"
               />
