@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../Music/Fineman"
+		}
+	],
+	"settings": {
+		"git.ignoreLimitWarning": true
+	}
+}

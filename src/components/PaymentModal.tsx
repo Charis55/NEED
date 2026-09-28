@@ -43,7 +43,6 @@ export default function PaymentModal({ amount, email, onSuccess, onClose }: Paym
           setProcessing(false);
           showAlert("Payment window closed", "error");
         }
-        // @ts-expect-error react-paystack types are poorly defined for onSuccess
       });
     } catch (e) {
       console.error(e);

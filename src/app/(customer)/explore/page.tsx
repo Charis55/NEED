@@ -5,7 +5,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { auth, db } from "@/lib/firebase";
 import { User } from "firebase/auth";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import UserAvatar from "@/components/UserAvatar";
 import GlobalSearch from "@/components/GlobalSearch";
 import { servicesData } from "@/data/services";

@@ -61,7 +61,6 @@ export default function PayCommissionModal({ isOpen, onClose, unpaidJobs, totalO
     setError("");
     try {
       initializePayment({
-        // @ts-expect-error react-paystack types are poorly defined
         onSuccess: handlePaystackSuccessAction,
         onClose: handlePaystackCloseAction,
       });
