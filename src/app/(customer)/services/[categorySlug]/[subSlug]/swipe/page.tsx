@@ -293,7 +293,7 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
                 <div className="p-4 border-b-4 border-black flex gap-4 bg-[var(--color-brutal-teal)]">
                   <div className="w-16 h-16 bg-white border-2 border-black flex-shrink-0">
                     <img 
-                      src={selectedArtisan.profilePictureUrl || selectedArtisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedArtisan.name || 'Artisan')}&background=random&size=150`} 
+                      src={selectedArtisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedArtisan.name || 'Artisan')}&background=random&size=150`} 
                       alt={selectedArtisan.name} 
                       className="w-full h-full object-cover"
                     />

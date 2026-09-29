@@ -273,11 +273,26 @@ export default function AuthForm() {
         await handlePostLogin(result.user, fullName);
       }
     } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
+      console.error("Auth error:", err.code, err.message);
+      const code = err.code || "";
+      if (code === "auth/email-already-in-use") {
         setError("An account with this email already exists. Please log in instead.");
+      } else if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
+        setError("No account found with that email/password combination. Check your credentials or sign up.");
+      } else if (code === "auth/wrong-password") {
+        setError("Incorrect password. Please try again or use 'Forgot Password'.");
+      } else if (code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many failed attempts. Please wait a moment and try again.");
+      } else if (code === "auth/user-disabled") {
+        setError("This account has been disabled. Contact support for assistance.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Please check your internet connection and try again.");
+      } else if (code === "auth/operation-not-allowed") {
+        setError("Email/password sign-in is not enabled. Please contact the administrator.");
       } else {
-        setError(err.message || "Authentication failed.");
+        setError(err.message || "Authentication failed. Please try again.");
       }
       setLoading(false);
     }

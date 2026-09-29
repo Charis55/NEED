@@ -46,7 +46,7 @@ function InboxContent() {
         const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
         
         // Filter locally because Firestore OR queries are complex
-        const activeJobs = allJobs.filter(j => j.status === "accepted" || j.status === "completed" || j.status === "payment_pending");
+        const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
         
         // Sort by newest first
         activeJobs.sort((a, b) => b.createdAt - a.createdAt);
@@ -114,7 +114,7 @@ function InboxContent() {
                 <div className="relative mr-4 shrink-0">
                   <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
                     <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 flex items-center justify-center">
-                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.portfolioPhotoUrls?.[0]} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || item.artisanUser?.phone || "Unknown Technician"} className="w-full h-full text-2xl text-black font-black" />
+                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.profilePictureUrl} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || item.artisanUser?.phone || "Unknown Technician"} className="w-full h-full text-2xl text-black font-black" />
                     </div>
                   </div>
                   {/* Unread Badge */}

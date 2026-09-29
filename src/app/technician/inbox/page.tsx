@@ -37,7 +37,7 @@ export default function InboxPage() {
         const snapshot = await getDocs(q);
         const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
         
-        const activeJobs = allJobs.filter(j => j.status === "accepted" || j.status === "completed" || j.status === "payment_pending");
+        const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
         activeJobs.sort((a, b) => b.createdAt - a.createdAt);
 
         const listItems: ChatListItem[] = [];

@@ -98,7 +98,7 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
           <div className="relative z-10 flex flex-col md:flex-row gap-6 md:gap-10 items-start">
             <div className="w-24 h-24 md:w-32 md:h-32 bg-gray-200 border-4 border-black brutal-shadow-sm shrink-0 overflow-hidden">
               <img 
-                src={artisan.profilePictureUrl || artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
+                src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
                 alt={artisan.name} 
                 className="w-full h-full object-cover"
               />

@@ -15,10 +15,12 @@ async function getTechnicians(): Promise<ArtisanProfile[]> {
     const data = await res.json();
     if (!data.documents) return [];
 
-    return data.documents.map((doc: { fields: Record<string, { stringValue?: string; doubleValue?: number; integerValue?: string | number; booleanValue?: boolean }> }) => {
-      const fields = doc.fields;
+    return data.documents.map((doc: any) => {
+      const fields = doc.fields || {};
       return {
         artisanId: fields.artisanId?.stringValue,
+        name: fields.name?.stringValue || 'Technician',
+        profilePictureUrl: fields.profilePictureUrl?.stringValue || undefined,
         trade: fields.trade?.stringValue || 'Technician',
         neighborhood: fields.neighborhood?.stringValue || 'Unknown Location',
         lat: Number(fields.lat?.doubleValue || fields.lat?.integerValue || 6.5244),

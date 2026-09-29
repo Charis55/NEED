@@ -506,7 +506,7 @@ export default function ChatPage() {
   return (
     <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">
       {/* Header */}
-      <div className="bg-[var(--color-brutal-blue)] border-b-8 border-black pt-6 md:pt-10 pb-4 px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
+      <div className="bg-[var(--color-brutal-blue)] border-b-4 md:border-b-8 border-black pt-[max(env(safe-area-inset-top),0.75rem)] md:pt-10 pb-3 md:pb-4 px-3 md:px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
           onClick={() => {
             if (isCustomerViewing) {
@@ -515,42 +515,45 @@ export default function ChatPage() {
               router.push("/technician/inbox");
             }
           }}
-          className="w-12 h-12 bg-white border-4 border-black flex justify-center items-center mr-4 brutal-shadow hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-transform shrink-0"
+          className="w-9 h-9 md:w-12 md:h-12 bg-white border-3 md:border-4 border-black flex justify-center items-center mr-2 md:mr-4 shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] hover:-translate-y-1 transition-transform shrink-0"
         >
-          <ChevronLeft className="w-6 h-6 stroke-[3]" />
+          <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
         </button>
         
-        <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-4">
-          <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL || artisan?.portfolioPhotoUrls?.[0]) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-2xl font-black text-black" />
+        <div className="w-10 h-10 md:w-14 md:h-14 rounded-full border-3 md:border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-2 md:mr-4">
+          <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-lg md:text-2xl font-black text-black" />
         </div>
         
         <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
-          <div className="flex items-center gap-2 w-full">
-            <h2 className="font-black text-black text-xl md:text-2xl uppercase whitespace-normal break-words leading-tight">{chatPartnerName}</h2>
+          <div className="flex items-center gap-1.5 md:gap-2 w-full flex-wrap">
+            <h2 className="font-black text-black text-base md:text-2xl uppercase leading-tight truncate max-w-[45vw] md:max-w-none">{chatPartnerName}</h2>
             {job?.status === "completed" && (
-              <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-xs px-3 py-1 uppercase font-black rotate-2 shrink-0 shadow-[2px_2px_0_0_#000]">Completed</span>
+              <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-[10px] md:text-xs px-2 md:px-3 py-0.5 md:py-1 uppercase font-black shrink-0 shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000]">Done</span>
             )}
           </div>
-          <p className="text-black font-bold text-xs md:text-sm bg-white border-2 border-black px-1.5 py-0.5 inline-block -rotate-1 shadow-[2px_2px_0_0_#000] whitespace-normal break-words max-w-full leading-tight mt-1">
+          <p className="text-black font-bold text-[10px] md:text-sm bg-white border-2 border-black px-1 md:px-1.5 py-0.5 inline-block shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000] truncate max-w-full leading-tight mt-0.5 md:mt-1">
             {job?.subcategory}
           </p>
         </div>
 
-        {job?.status === "completed" && isCustomerViewing && !job.reviewed && (
+        <div className="flex items-center gap-1 md:gap-2 ml-1 md:ml-2 shrink-0">
+          {job?.status === "completed" && isCustomerViewing && !job.reviewed && (
+            <button 
+              onClick={() => setShowReviewModal(true)}
+              className="bg-[var(--color-brutal-yellow)] border-2 border-black px-2 md:px-3 py-1 md:py-1.5 font-black uppercase text-black text-[10px] md:text-sm shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-transform"
+            >
+              <Star className="w-4 h-4 md:hidden" />
+              <span className="hidden md:inline">REVIEW</span>
+            </button>
+          )}
           <button 
-            onClick={() => setShowReviewModal(true)}
-            className="ml-2 bg-[var(--color-brutal-yellow)] border-2 border-black px-3 py-1.5 font-black uppercase text-black text-xs md:text-sm brutal-shadow hover:-translate-y-0.5 transition-transform shrink-0"
+            onClick={handleBlockUser}
+            className="bg-black text-white border-2 border-white p-1.5 md:px-2 md:py-1.5 font-black uppercase text-xs hover:scale-105 transition-transform flex items-center justify-center"
+            title="Block User"
           >
-            REVIEW
+            <ShieldAlert className="w-4 h-4" />
           </button>
-        )}
-        <button 
-          onClick={handleBlockUser}
-          className="ml-2 bg-black text-white border-2 border-white px-2 py-1.5 font-black uppercase text-xs md:text-sm hover:scale-105 transition-transform shrink-0 flex items-center justify-center"
-          title="Block User"
-        >
-          <ShieldAlert className="w-4 h-4" />
-        </button>
+        </div>
       </div>
       
       {/* Liability Disclaimer */}
@@ -623,7 +626,7 @@ export default function ChatPage() {
       )}
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-0 pb-6">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 relative z-0 pb-6">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <div className="bg-white border-4 border-black p-6 brutal-shadow -rotate-2 max-w-xs">
@@ -637,7 +640,7 @@ export default function ChatPage() {
             return (
               <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                 <div 
-                  className={`max-w-[80%] p-3 border-4 border-black shadow-[4px_4px_0_0_#000] flex flex-col ${
+                  className={`max-w-[85%] md:max-w-[80%] p-2.5 md:p-3 border-3 md:border-4 border-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] flex flex-col ${
                     isMe 
                       ? "bg-[var(--color-brutal-yellow)] rounded-l-xl rounded-tr-xl" 
                       : "bg-white rounded-r-xl rounded-tl-xl"
@@ -671,7 +674,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t-8 border-black p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
+      <div className="bg-white border-t-4 md:border-t-8 border-black p-2.5 md:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-[calc(1rem+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
         {isRecording ? (
           <div className="flex gap-2 items-center">
             <button
@@ -700,32 +703,32 @@ export default function ChatPage() {
           </div>
         ) : (
           <form onSubmit={handleSendMessage} className="flex gap-2 items-center min-w-0 w-full">
-            <label className={`cursor-pointer border-4 border-black p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black brutal-shadow shrink-0 hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
-              <ImageIcon className="w-6 h-6 stroke-[3]" />
+            <label className={`cursor-pointer border-3 md:border-4 border-black p-2.5 md:p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] shrink-0 hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
+              <ImageIcon className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
               <input type="file" accept="image/*" onChange={handleChatPhotoSelect} className="hidden" disabled={sending} />
             </label>
             
             <button
               type="button"
               onClick={startRecording}
-              className={`border-4 border-black p-3 flex items-center justify-center transition-all text-black brutal-shadow shrink-0 bg-[var(--color-brutal-yellow)] hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`border-3 md:border-4 border-black p-2.5 md:p-3 flex items-center justify-center transition-all text-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] shrink-0 bg-[var(--color-brutal-yellow)] hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}
             >
-              <Mic className="w-6 h-6 stroke-[3]" />
+              <Mic className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
             </button>
             
             <input 
               type="text" 
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 min-w-0 bg-gray-50 border-4 border-black p-3 font-bold text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none w-full"
+              placeholder="Type a message."
+              className="flex-1 min-w-0 bg-gray-50 border-3 md:border-4 border-black p-2.5 md:p-3 font-bold text-sm md:text-base text-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 rounded-none w-full"
             />
             <button 
               type="submit"
               disabled={!newMessage.trim() || sending}
-              className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center shrink-0 hover:-translate-y-1 brutal-shadow disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-[4px_4px_0_0_#000] transition-all"
+              className="bg-[var(--color-brutal-pink)] border-3 md:border-4 border-black p-2.5 md:p-3 flex items-center justify-center shrink-0 hover:-translate-y-1 shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] disabled:opacity-50 disabled:hover:translate-y-0 transition-all"
             >
-              <Send className="w-6 h-6 stroke-[3] text-black" />
+              <Send className="w-5 h-5 md:w-6 md:h-6 stroke-[3] text-black" />
             </button>
           </form>
         )}

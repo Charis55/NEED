@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
-import { updateProfile, updateEmail, deleteUser, User } from "firebase/auth";
+import { updateProfile, updateEmail, deleteUser, User, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import SignOutButton from "@/components/SignOutButton";
@@ -434,8 +434,20 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
           
           <button 
             type="button"
-            className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
-            onClick={() => showAlert("Password reset email sent (simulated).", "success")}
+            className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            onClick={async () => {
+              if (!authUser || !authUser.email) {
+                showAlert("No email associated with this account.", "error");
+                return;
+              }
+              try {
+                await sendPasswordResetEmail(auth, authUser.email);
+                showAlert(`Password reset email sent to ${authUser.email}.`, "success");
+              } catch (error: any) {
+                showAlert(error.message || "Failed to send password reset email.", "error");
+              }
+            }}
+            disabled={loading}
           >
             CHANGE PASSWORD
           </button>

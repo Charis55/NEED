@@ -105,7 +105,7 @@ export default function FavoritesPage() {
             <div key={artisan.artisanId} className="bg-white brutal-border overflow-hidden flex flex-col group shadow-[6px_6px_0_0_#000] hover:shadow-[2px_2px_0_0_#000] hover:translate-x-1 hover:translate-y-1 transition-all">
               <div className="h-48 relative border-b-4 border-black bg-gray-200">
                 <img 
-                  src={artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
+                  src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
                   alt={artisan.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
