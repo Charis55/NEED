@@ -18,9 +18,9 @@ export async function sendCustomOtp(phoneNumber: string) {
     });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error sending OTP:", error);
-    return { success: false, error: error.message || "Failed to send OTP" };
+    return { success: false, error: (error as Error).message || "Failed to send OTP" };
   }
 }
 
@@ -52,8 +52,8 @@ export async function verifyCustomOtp(phoneNumber: string, otp: string) {
       success: true, 
       credentials: { email, password } 
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error verifying OTP:", error);
-    return { success: false, error: error.message || "Failed to verify OTP" };
+    return { success: false, error: (error as Error).message || "Failed to verify OTP" };
   }
 }

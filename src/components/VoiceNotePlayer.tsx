@@ -1,28 +1,39 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, Pause } from "lucide-react";
 
 export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl: string; waveform?: number[] }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const reqRef = useRef<number>(0);
   
   // Create a default waveform if none is provided
   const [visualWaveform] = useState(() => {
     return waveform.length > 0 ? waveform : Array.from({ length: 30 }, () => Math.random() * 0.5 + 0.1);
   });
 
+  const updateProgress = () => {
+    if (audioRef.current) {
+      const current = audioRef.current.currentTime;
+      const dur = audioRef.current.duration;
+      
+      setCurrentTime(current);
+      
+      if (isFinite(dur) && dur > 0) {
+        setProgress(current / dur);
+        setDuration(prev => prev !== dur ? dur : prev);
+      }
+    }
+    reqRef.current = requestAnimationFrame(updateProgress);
+  };
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    const handleTimeUpdate = () => {
-      if (audio.duration) {
-        setProgress(audio.currentTime / audio.duration);
-      }
-    };
 
     const handleLoadedMetadata = () => {
       if (audio.duration === Infinity) {
@@ -39,18 +50,28 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
     const handleEnded = () => {
       setIsPlaying(false);
       setProgress(0);
+      setCurrentTime(0);
+      if (audioRef.current) audioRef.current.currentTime = 0;
     };
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
 
     return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
+      cancelAnimationFrame(reqRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (isPlaying) {
+      reqRef.current = requestAnimationFrame(updateProgress);
+    } else {
+      cancelAnimationFrame(reqRef.current);
+    }
+    return () => cancelAnimationFrame(reqRef.current);
+  }, [isPlaying]);
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -64,12 +85,18 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration) return;
+    if (!audioRef.current || !duration || !isFinite(duration)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const newProgress = Math.max(0, Math.min(1, x / rect.width));
-    audioRef.current.currentTime = newProgress * duration;
-    setProgress(newProgress);
+    
+    try {
+      audioRef.current.currentTime = newProgress * duration;
+      setProgress(newProgress);
+      setCurrentTime(newProgress * duration);
+    } catch (err) {
+      console.warn("Failed to seek audio:", err);
+    }
   };
 
   const formatTime = (time: number) => {
@@ -96,7 +123,7 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
 
       <div className="flex-1 flex flex-col gap-1">
         <div 
-          className="flex items-end h-8 gap-1 cursor-pointer relative"
+          className="flex items-end h-8 gap-0.5 cursor-pointer relative"
           onClick={handleSeek}
         >
           {visualWaveform.map((val, i) => {
@@ -104,20 +131,20 @@ export default function VoiceNotePlayer({ audioUrl, waveform = [] }: { audioUrl:
             return (
               <div 
                 key={i} 
-                className={`flex-1 border-x border-t border-black transition-colors ${isPlayed ? 'bg-[var(--color-brutal-teal)]' : 'bg-gray-300'}`}
-                style={{ height: `${Math.max(10, val * 100)}%` }}
+                className={`flex-1 transition-colors duration-75 ${isPlayed ? 'bg-[var(--color-brutal-teal)]' : 'bg-gray-300'}`}
+                style={{ height: `${Math.max(15, val * 100)}%` }}
               />
             );
           })}
           {/* Highlighter / Scrubber Handle */}
           <div 
-            className="absolute top-1/2 w-4 h-4 bg-[var(--color-brutal-yellow)] border-2 border-black rounded-full pointer-events-none transition-all duration-75 z-10"
+            className="absolute top-1/2 w-3 h-3 bg-[var(--color-brutal-yellow)] border-2 border-black rounded-full pointer-events-none z-10"
             style={{ left: `${progress * 100}%`, transform: 'translate(-50%, -50%)', boxShadow: '2px 2px 0 0 #000' }}
           />
         </div>
         
         <div className="flex justify-between items-center text-[10px] font-black uppercase text-black">
-          <span>{formatTime(progress * duration)}</span>
+          <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>

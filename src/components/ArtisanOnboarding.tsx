@@ -184,8 +184,8 @@ export default function ArtisanOnboarding() {
       };
 
       DiditSdk.shared.startVerification({ url: data.url });
-    } catch (err: any) {
-      setIdentityError(err.message || "Failed to start verification. Please try again.");
+    } catch (error: unknown) {
+      setIdentityError((error as Error).message || "Failed to start verification. Please try again.");
       setIdentityVerifying(false);
     }
   };
@@ -489,7 +489,8 @@ export default function ArtisanOnboarding() {
       }).catch(e => console.error("Failed to send welcome email:", e));
 
       router.push("/technician/dashboard");
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       console.error(err);
       setError(err.message || "Failed to create profile");
       setLoading(false);

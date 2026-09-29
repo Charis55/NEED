@@ -43,7 +43,8 @@ export default function PhoneAuth({ role, onSuccess, isLogin = true }: PhoneAuth
       } else {
         setError(result.error || "Failed to send verification code.");
       }
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       console.error(err);
       setError(err.message || "Failed to send verification code.");
     } finally {
@@ -72,7 +73,8 @@ export default function PhoneAuth({ role, onSuccess, isLogin = true }: PhoneAuth
       let userCredential;
       try {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
-      } catch (authErr: any) {
+      } catch (error: unknown) {
+        const authErr = error as Error & { code?: string };
         if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/invalid-login-credentials') {
           userCredential = await createUserWithEmailAndPassword(auth, email, password);
         } else {
@@ -113,8 +115,8 @@ export default function PhoneAuth({ role, onSuccess, isLogin = true }: PhoneAuth
       }
       
       if (onSuccess) onSuccess();
-    } catch (err: any) {
-      console.error(err);
+    } catch (error: unknown) {
+      console.error(error);
       setError("An error occurred during authentication.");
     } finally {
       setLoading(false);

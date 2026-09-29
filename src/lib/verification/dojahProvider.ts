@@ -80,7 +80,8 @@ export class DojahProvider implements IIdentityVerificationProvider {
         referenceId: entity.nin || nin,
         photoUrl: entity.photo || entity.image || null,
       };
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       return {
         success: false,
         verifiedName: null,
@@ -121,7 +122,8 @@ export class DojahProvider implements IIdentityVerificationProvider {
         referenceId: entity.bvn || bvn,
         photoUrl: entity.photo || entity.image || null,
       };
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       return {
         success: false,
         verifiedName: null,
@@ -166,7 +168,8 @@ export class DojahProvider implements IIdentityVerificationProvider {
       const match = entity.match === true || confidence >= 70;
 
       return { match, confidence };
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       return {
         match: false,
         confidence: 0,

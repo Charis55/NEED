@@ -35,9 +35,9 @@ export default function AdminLogin() {
         await auth.signOut();
         setError("Access Denied. You do not have administrator privileges.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || "Invalid credentials. Please try again.");
+      setError((err as Error).message || "Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
     }

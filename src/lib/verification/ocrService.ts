@@ -109,7 +109,8 @@ export async function extractDocumentText(
       fullText: fullTextAnnotation.text || "",
       confidence: blockCount > 0 ? totalConfidence / blockCount : 0.5,
     };
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const err = error as Error;
     return {
       fullText: "",
       confidence: 0,

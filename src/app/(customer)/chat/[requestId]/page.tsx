@@ -9,7 +9,7 @@ import { JobRequest, ArtisanProfile, Review } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import UserAvatar from "@/components/UserAvatar";
-import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert } from "lucide-react";
+import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
@@ -22,6 +22,8 @@ interface Message {
   imageUrl?: string;
   audioUrl?: string;
   waveform?: number[];
+  read?: boolean;
+  deletedBy?: string[];
 }
 
 export default function ChatPage() {
@@ -41,6 +43,7 @@ export default function ChatPage() {
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [showPhotoWarning, setShowPhotoWarning] = useState(true);
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
+  const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
   
   const { showAlert } = useAlert();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -55,9 +58,13 @@ export default function ChatPage() {
 
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
+  const [isRecordingFinished, setIsRecordingFinished] = useState(false);
+  const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
+  const [recordedWaveform, setRecordedWaveform] = useState<number[]>([]);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -100,6 +107,9 @@ export default function ChatPage() {
       
       mediaRecorder.start(200);
       setIsRecording(true);
+      setIsRecordingFinished(false);
+      setRecordedAudioBlob(null);
+      setRecordedWaveform([]);
       setRecordingSeconds(0);
       drawWaveform();
       
@@ -109,7 +119,7 @@ export default function ChatPage() {
       
       // Auto-stop after 1 minute (60,000ms)
       maxDurationTimerRef.current = setTimeout(() => {
-        stopRecording();
+        finishRecording();
       }, 60000);
       
     } catch (err) {
@@ -123,23 +133,51 @@ export default function ChatPage() {
     if (secondsIntervalRef.current) clearInterval(secondsIntervalRef.current);
     
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContextRef.current) audioContextRef.current.close();
+    
+    setIsRecording(false);
+    setIsRecordingFinished(false);
+    setRecordedAudioBlob(null);
+    setRecordedWaveform([]);
+    setRecordingSeconds(0);
+  };
+
+  const finishRecording = () => {
+    if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+    if (secondsIntervalRef.current) clearInterval(secondsIntervalRef.current);
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.onstop = async () => {
-        setIsRecording(false);
-        setRecordingSeconds(0);
+        setIsRecordingFinished(true);
         mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
         if (audioContextRef.current) await audioContextRef.current.close();
+        
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioBlob.size > 0) {
+          setRecordedAudioBlob(audioBlob);
+          setRecordedWaveform([...waveformRef.current]);
+        } else {
+          cancelRecording();
+          showAlert("Voice note was empty", "error");
+        }
       };
       mediaRecorderRef.current.stop();
     }
   };
-
-  const stopRecording = () => {
+  
+  const stopAndSendRecording = () => {
     if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
     if (secondsIntervalRef.current) clearInterval(secondsIntervalRef.current);
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.onstop = async () => {
         setIsRecording(false);
+        setIsRecordingFinished(false);
         setRecordingSeconds(0);
         mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
         if (audioContextRef.current) await audioContextRef.current.close();
@@ -154,6 +192,20 @@ export default function ChatPage() {
       };
       mediaRecorderRef.current.stop();
     }
+  };
+  
+  const sendRecordedVoiceNote = async () => {
+    if (!recordedAudioBlob) return;
+    const blob = recordedAudioBlob;
+    const wave = [...recordedWaveform];
+    
+    setIsRecording(false);
+    setIsRecordingFinished(false);
+    setRecordedAudioBlob(null);
+    setRecordedWaveform([]);
+    setRecordingSeconds(0);
+    
+    await sendVoiceNote(blob, wave);
   };
   
   const sendVoiceNote = async (audioBlob: Blob, rawWaveform: number[]) => {
@@ -262,6 +314,16 @@ export default function ChatPage() {
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
+      
+      // Mark incoming messages as read
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        msgs.forEach(msg => {
+          if (msg.senderId !== currentUser.uid && !msg.read) {
+            updateDoc(doc(db, "jobRequests", requestId, "messages", msg.id), { read: true }).catch(err => console.error("Failed to mark read:", err));
+          }
+        });
+      }
     });
     
     return () => unsubscribe();
@@ -306,6 +368,30 @@ export default function ChatPage() {
       showAlert("Failed to send message", "error");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDeleteMessage = async (msg: Message, forEveryone: boolean) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+      if (forEveryone) {
+        if (msg.read) {
+          showAlert("Message has already been read, you can only delete for yourself.", "error");
+          return;
+        }
+        await updateDoc(doc(db, "jobRequests", requestId, "messages", msg.id), {
+          deletedBy: ["everyone"]
+        });
+      } else {
+        await updateDoc(doc(db, "jobRequests", requestId, "messages", msg.id), {
+          deletedBy: arrayUnion(user.uid)
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      showAlert("Failed to delete message", "error");
     }
   };
   
@@ -546,6 +632,16 @@ export default function ChatPage() {
               <span className="hidden md:inline">REVIEW</span>
             </button>
           )}
+          {job?.status === "completed" && (
+            <button 
+              onClick={() => setShowReceiptModal(true)}
+              className={`border-2 border-black px-2 md:px-3 py-1 md:py-1.5 font-black uppercase text-[10px] md:text-sm shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-transform flex items-center gap-1 ${job.proofOfPaymentUrl ? 'bg-[var(--color-brutal-green)] text-black' : 'bg-[var(--color-brutal-pink)] text-black'}`}
+            >
+              <span className="hidden md:inline">RECEIPT</span>
+              <span className="md:hidden">RECEIPT</span>
+              {job.proofOfPaymentUrl && <div className="w-4 h-4 bg-white border-2 border-black rounded-full flex items-center justify-center"><Check className="w-3 h-3 stroke-[4]" /></div>}
+            </button>
+          )}
           <button 
             onClick={handleBlockUser}
             className="bg-black text-white border-2 border-white p-1.5 md:px-2 md:py-1.5 font-black uppercase text-xs hover:scale-105 transition-transform flex items-center justify-center"
@@ -555,64 +651,7 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
-      
-      {/* Liability Disclaimer */}
-      {job?.status === "completed" && (
-        <div className="bg-[var(--color-brutal-pink)] border-b-4 border-black p-2 md:p-3 text-center shrink-0 z-0 flex items-center justify-between shadow-[0_4px_0_0_#000]">
-          <p className="font-bold text-black text-[10px] md:text-xs uppercase leading-tight text-left flex-1 mr-2 flex items-center gap-1">
-            <AlertTriangle className="w-4 h-4 shrink-0" /> Upload Proof of Payment (receipt) to avoid liability.
-          </p>
-        
-        {job?.proofOfPaymentUrl ? (
-          <a 
-            href={job.proofOfPaymentUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            download={`Receipt_${job.requestId}.jpg`}
-            className="shrink-0 inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-[10px] border-2 border-black px-3 py-1.5 brutal-shadow-sm hover:-translate-y-0.5 transition-transform"
-          >
-            DOWNLOAD PROOF
-          </a>
-        ) : (
-          <div className="shrink-0">
-            <input 
-              type="file" 
-              accept="image/*" 
-              id="pop-upload" 
-              className="hidden" 
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                
-                try {
-                  showAlert("Uploading Proof of Payment...", "success");
-                  // Compress to 2MB max
-                  const compressed = await compressImage(file, 2);
-                  const url = await uploadFileToR2(compressed, file.name);
-                  
-                  await updateDoc(doc(db, "jobRequests", requestId), {
-                    proofOfPaymentUrl: url,
-                    proofOfPaymentAt: Date.now()
-                  });
-                  
-                  setJob(prev => prev ? { ...prev, proofOfPaymentUrl: url, proofOfPaymentAt: Date.now() } : prev);
-                  showAlert("Proof of Payment uploaded successfully!", "success");
-                } catch (err) {
-                  console.error(err);
-                  showAlert("Failed to upload Proof of Payment", "error");
-                }
-              }}
-            />
-            <label 
-              htmlFor="pop-upload"
-              className="inline-block bg-[var(--color-brutal-green)] text-black font-black uppercase text-[10px] border-2 border-black px-3 py-1.5 cursor-pointer brutal-shadow-sm hover:-translate-y-0.5 transition-transform whitespace-nowrap"
-            >
-              UPLOAD PROOF
-            </label>
-          </div>
-        )}
-      </div>
-      )}
+
 
       {/* Liability Disclaimer */}
       {showPhotoWarning && messages.some(m => !!m.imageUrl) && (
@@ -627,6 +666,15 @@ export default function ChatPage() {
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 relative z-0 pb-6">
+        {job?.proofOfPaymentUrl && (
+          <div className="absolute inset-x-0 bottom-4 pointer-events-none flex justify-center z-[0] opacity-20 mix-blend-multiply px-4 md:px-8">
+            <img 
+              src={job.proofOfPaymentUrl} 
+              alt="Receipt Watermark" 
+              className="max-w-full max-h-[50vh] object-contain grayscale"
+            />
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <div className="bg-white border-4 border-black p-6 brutal-shadow -rotate-2 max-w-xs">
@@ -637,34 +685,63 @@ export default function ChatPage() {
         ) : (
           messages.map((msg) => {
             const isMe = msg.senderId === auth.currentUser?.uid;
+            
+            if (msg.deletedBy?.includes(auth.currentUser?.uid || "")) return null;
+            if (msg.deletedBy?.includes("everyone")) {
+              return (
+                <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                  <div className="p-2 border-2 border-black border-dashed bg-gray-100 italic text-xs font-bold text-gray-500 rounded-xl">
+                    This message was deleted
+                  </div>
+                </div>
+              );
+            }
+
             return (
-              <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+              <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"} relative`}>
                 <div 
-                  className={`max-w-[85%] md:max-w-[80%] p-2.5 md:p-3 border-3 md:border-4 border-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] flex flex-col ${
+                  className={`max-w-[85%] md:max-w-[80%] p-2.5 md:p-3 border-3 md:border-4 border-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] flex flex-col cursor-pointer ${
                     isMe 
                       ? "bg-[var(--color-brutal-yellow)] rounded-l-xl rounded-tr-xl" 
                       : "bg-white rounded-r-xl rounded-tl-xl"
                   }`}
+                  onClick={() => isMe ? setDeletingMsgId(deletingMsgId === msg.id ? null : msg.id) : null}
                 >
                   {msg.imageUrl && (
                     <img 
                       src={msg.imageUrl} 
                       alt="Chat photo" 
-                      onClick={() => setEnlargedImage(msg.imageUrl!)}
+                      onClick={(e) => { e.stopPropagation(); setEnlargedImage(msg.imageUrl!); }}
                       className="w-full max-w-[250px] object-cover brutal-border mb-2 cursor-pointer hover:opacity-90 transition-opacity"
                     />
                   )}
                   {msg.audioUrl && (
-                    <div className="mb-2">
+                    <div className="mb-2" onClick={(e) => e.stopPropagation()}>
                       <VoiceNotePlayer audioUrl={msg.audioUrl} waveform={msg.waveform} />
                     </div>
                   )}
                   {msg.text && (
                     <p className="font-bold text-black break-words text-sm md:text-base">{msg.text}</p>
                   )}
-                  <p className="text-[10px] font-black mt-1 text-black/50 text-right">
-                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  <div className="flex justify-end items-center gap-1 mt-1">
+                    <p className="text-[10px] font-black text-black/50 text-right">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {isMe && (
+                      <span className={`text-[10px] font-black ${msg.read ? "text-[var(--color-brutal-teal)]" : "text-black/50"}`}>
+                        {msg.read ? "✓✓" : "✓"}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {deletingMsgId === msg.id && isMe && (
+                    <div className="absolute top-full right-0 mt-2 bg-white border-4 border-black p-2 flex flex-col gap-2 shadow-[4px_4px_0_0_#000] z-20 min-w-[150px]" onClick={e => e.stopPropagation()}>
+                       <button onClick={() => { handleDeleteMessage(msg, false); setDeletingMsgId(null); }} className="text-xs font-black uppercase text-left bg-gray-100 hover:bg-gray-200 p-2 border-2 border-black transition-colors">Delete for me</button>
+                       {!msg.read && (
+                         <button onClick={() => { handleDeleteMessage(msg, true); setDeletingMsgId(null); }} className="text-xs font-black uppercase text-left bg-[var(--color-brutal-red)] text-white hover:bg-red-600 p-2 border-2 border-black transition-colors">Delete for everyone</button>
+                       )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -675,7 +752,7 @@ export default function ChatPage() {
 
       {/* Input Area */}
       <div className="bg-white border-t-4 md:border-t-8 border-black p-2.5 md:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-[calc(1rem+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
-        {isRecording ? (
+        {isRecording || isRecordingFinished ? (
           <div className="flex gap-2 items-center">
             <button
               type="button"
@@ -685,7 +762,7 @@ export default function ChatPage() {
               <X className="w-6 h-6 stroke-[3]" />
             </button>
             
-            <div className="flex-1 bg-[var(--color-brutal-yellow)] border-4 border-black p-3 flex items-center justify-center gap-4 animate-pulse brutal-shadow">
+            <div className={`flex-1 bg-[var(--color-brutal-yellow)] border-4 border-black p-3 flex items-center justify-center gap-4 brutal-shadow ${isRecordingFinished ? 'bg-[var(--color-brutal-yellow)]' : 'animate-pulse'}`}>
               <Mic className="w-6 h-6 stroke-[3] text-black" />
               <span className="font-black text-black">
                 {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
@@ -694,7 +771,7 @@ export default function ChatPage() {
             
             <button
               type="button"
-              onClick={stopRecording}
+              onClick={isRecordingFinished ? sendRecordedVoiceNote : stopAndSendRecording}
               disabled={sending}
               className="bg-[var(--color-brutal-pink)] border-4 border-black p-3 flex items-center justify-center hover:-translate-y-1 brutal-shadow disabled:opacity-50 transition-all"
             >
@@ -878,6 +955,85 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+      {/* Receipt Modal */}
+      {showReceiptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-white border-8 border-black max-w-lg w-full brutal-shadow p-6 relative">
+            <button 
+              onClick={() => setShowReceiptModal(false)}
+              className="absolute top-4 right-4 w-10 h-10 bg-[var(--color-brutal-red)] border-4 border-black flex justify-center items-center text-black brutal-shadow hover:-translate-y-1 transition-transform"
+            >
+              <X className="w-6 h-6 stroke-[3]" />
+            </button>
+            
+            <h2 className="text-3xl font-black text-black uppercase mb-6 tracking-tighter">Proof of Payment</h2>
+            
+            <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-4 mb-6 brutal-shadow-sm">
+              <p className="font-bold text-black text-sm uppercase leading-tight">
+                To protect both parties and avoid liability, please upload your proof of payment. This ensures the technician is properly credited and your payment is securely documented in our records.
+              </p>
+            </div>
+            
+            {job?.proofOfPaymentUrl ? (
+              <div className="space-y-4">
+                <div className="bg-gray-100 border-4 border-black p-2 brutal-shadow-sm">
+                  <img src={job.proofOfPaymentUrl} alt="Uploaded Receipt" className="w-full h-48 object-contain" />
+                </div>
+                <a 
+                  href={job.proofOfPaymentUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  download={`Receipt_${job.requestId}.jpg`}
+                  className="block w-full py-4 text-center bg-[var(--color-brutal-green)] border-4 border-black font-black uppercase text-black text-xl hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all"
+                >
+                  DOWNLOAD RECEIPT
+                </a>
+              </div>
+            ) : (
+              <div>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  id="modal-pop-upload" 
+                  className="hidden" 
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    try {
+                      setSending(true);
+                      showAlert("Uploading Proof of Payment...", "success");
+                      const compressed = await compressImage(file, 2);
+                      const url = await uploadFileToR2(compressed, file.name);
+                      
+                      await updateDoc(doc(db, "jobRequests", requestId), {
+                        proofOfPaymentUrl: url,
+                        proofOfPaymentAt: Date.now()
+                      });
+                      
+                      setJob(prev => prev ? { ...prev, proofOfPaymentUrl: url, proofOfPaymentAt: Date.now() } : prev);
+                      showAlert("Proof of Payment uploaded successfully!", "success");
+                    } catch (err) {
+                      console.error("Proof of payment upload failed:", err);
+                      showAlert("Failed to upload proof of payment", "error");
+                    } finally {
+                      setSending(false);
+                    }
+                  }}
+                  disabled={sending}
+                />
+                <label 
+                  htmlFor="modal-pop-upload"
+                  className={`block w-full text-center py-4 bg-[var(--color-brutal-teal)] border-4 border-black font-black uppercase text-black text-xl hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer ${sending ? 'opacity-50 pointer-events-none' : ''}`}
+                >
+                  {sending ? "UPLOADING..." : "UPLOAD RECEIPT"}
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

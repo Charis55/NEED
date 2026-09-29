@@ -210,7 +210,8 @@ export default function AuthForm() {
           router.push("/explore");
         }
       }
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       console.error(err);
       setError(err.message || "Google Sign-In failed.");
       setLoading(false);
@@ -272,7 +273,8 @@ export default function AuthForm() {
         result = await signInWithEmailAndPassword(auth, email, password);
         await handlePostLogin(result.user, fullName);
       }
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
       console.error("Auth error:", err.code, err.message);
       const code = err.code || "";
       if (code === "auth/email-already-in-use") {
@@ -342,8 +344,8 @@ export default function AuthForm() {
       } else {
         router.push("/explore");
       }
-    } catch (err: any) {
-      console.error(err);
+    } catch (error: unknown) {
+      console.error(error);
       setError("Failed to create profile.");
       setLoading(false);
     }

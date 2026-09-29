@@ -109,7 +109,8 @@ async function databaseValidation(
       referenceId: idNumber,
       photoUrl: entity.photo || entity.image || entity.portrait || null,
     };
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const err = error as Error;
     return {
       success: false,
       verifiedName: null,

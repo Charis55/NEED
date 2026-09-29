@@ -128,7 +128,8 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       }
 
       showAlert("Profile settings saved successfully!", "success");
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
       if (err.code === "auth/requires-recent-login") {
         showAlert("Changing your email requires recent authentication. Please sign out and sign in again.", "error");
       } else {
@@ -264,7 +265,8 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       
       await auth.signOut();
       router.push("/");
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
       if (err.code === "auth/requires-recent-login") {
         showAlert("Deleting your account requires recent authentication. Please sign out and sign in again.", "error");
       } else {
@@ -443,8 +445,8 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               try {
                 await sendPasswordResetEmail(auth, authUser.email);
                 showAlert(`Password reset email sent to ${authUser.email}.`, "success");
-              } catch (error: any) {
-                showAlert(error.message || "Failed to send password reset email.", "error");
+              } catch (error: unknown) {
+                showAlert((error as Error).message || "Failed to send password reset email.", "error");
               }
             }}
             disabled={loading}

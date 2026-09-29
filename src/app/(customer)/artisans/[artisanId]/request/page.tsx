@@ -244,7 +244,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
 
       clearDraft(); // Clear the saved draft on successful submission
       router.push("/?requested=true");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setError("Failed to submit request.");
     } finally {
@@ -277,7 +277,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
           <div className="mb-8 bg-white brutal-card p-4 flex gap-4 items-center">
             <div className="w-16 h-16 bg-gray-200 border-2 border-black flex-shrink-0 shadow-[2px_2px_0_0_#000]">
               <img 
-                src={artisan.portfolioPhotoUrls?.[0] || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
+                src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
                 alt={artisan.name} 
                 className="w-full h-full object-cover"
               />
