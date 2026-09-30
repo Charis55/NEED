@@ -111,10 +111,8 @@ export default function AuthForm() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("role") === "artisan") {
         setRole("artisan");
-        setLockRole(true);
       } else if (params.get("role") === "customer") {
         setRole("customer");
-        setLockRole(true);
       }
       if (params.get("mode") === "signup") {
         setIsLogin(false);

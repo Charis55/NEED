@@ -20,16 +20,16 @@ export default function ContactPage() {
             <p className="font-medium text-lg mb-4">
               For any issues regarding your account, job requests, or disputes, please reach out to our dedicated support team:
             </p>
-            <p className="text-2xl font-black bg-[var(--color-brutal-pink)] inline-block px-4 py-2 brutal-border">
-              support@needapp.com
+            <p className="text-2xl sm:text-lg md:text-2xl font-black bg-[var(--color-brutal-pink)] inline-block px-4 py-2 brutal-border break-all">
+              support@needmarketplace.com
             </p>
 
             <h2 className="text-3xl mt-12 mb-4 text-[var(--color-brutal-teal)]">Business Inquiries</h2>
             <p className="font-medium text-lg mb-4">
               For partnerships, press, or investment inquiries:
             </p>
-            <p className="text-2xl font-black bg-[var(--color-brutal-yellow)] inline-block px-4 py-2 brutal-border">
-              hello@needapp.com
+            <p className="text-2xl sm:text-lg md:text-2xl font-black bg-[var(--color-brutal-yellow)] inline-block px-4 py-2 brutal-border break-all">
+              hello@needmarketplace.com
             </p>
           </div>
         </div>

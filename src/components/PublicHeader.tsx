@@ -1,6 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function PublicHeader() {
+  const router = useRouter();
+
   return (
     <nav className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full py-8 flex justify-between items-center bg-[var(--color-brutal-bg)]">
       <Link href="/" className="flex items-center gap-3">
@@ -10,9 +16,13 @@ export default function PublicHeader() {
         </div>
       </Link>
       <div className="flex items-center gap-4">
-        <Link href="/blog" className="hidden sm:block font-black uppercase text-black hover:text-[var(--color-brutal-teal)] tracking-widest transition-colors mr-4">
-          Articles
-        </Link>
+        <button 
+          onClick={() => router.back()} 
+          className="hidden sm:flex items-center font-black uppercase text-black hover:text-[var(--color-brutal-teal)] tracking-widest transition-colors mr-4"
+        >
+          <ArrowLeft className="w-5 h-5 mr-2 stroke-[3]" />
+          Go Back
+        </button>
         <Link href="/login?mode=signin" className="bg-[var(--color-brutal-yellow)] px-8 py-3 text-lg brutal-btn">
           Sign In
         </Link>
