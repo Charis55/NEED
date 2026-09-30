@@ -4,10 +4,8 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
       {
         headers: {
-          "Accept-Language": "en",
-          // Nominatim requires a User-Agent identifying the app
-          "User-Agent": "NeedArtisanMarketplace/1.0",
-        },
+          "Accept-Language": "en"
+        }
       }
     );
     
@@ -44,9 +42,8 @@ export async function geocode(address: string): Promise<{lat: number, lng: numbe
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
       {
         headers: {
-          "Accept-Language": "en",
-          "User-Agent": "NeedArtisanMarketplace/1.0",
-        },
+          "Accept-Language": "en"
+        }
       }
     );
     
