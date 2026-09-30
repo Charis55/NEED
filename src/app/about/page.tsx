@@ -21,26 +21,26 @@ export default function AboutPage() {
             </p>
           </div>
 
-          <div className="bg-black text-white p-8 md:p-12 brutal-card -rotate-1 hover:rotate-0 transition-transform shadow-[8px_8px_0_0_#FFCC00]">
-            <h2 className="text-3xl md:text-5xl font-black uppercase mb-8 tracking-tight text-[var(--color-brutal-pink)]">
+          <div className="p-8 md:p-12 brutal-card -rotate-1 hover:rotate-0 transition-transform shadow-[8px_8px_0_0_#FFCC00]">
+            <h2 className="text-3xl md:text-5xl font-black uppercase mb-8 tracking-tight text-[var(--color-brutal-pink)]" style={{ textShadow: '2px 2px 0px #000' }}>
               Why Choose Us?
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="border-l-4 border-[var(--color-brutal-teal)] pl-6">
-                <h3 className="text-2xl font-black uppercase mb-2">Strict Verification</h3>
-                <p className="font-medium text-lg text-gray-300">Every artisan on our platform has passed a rigorous identity and background check. No exceptions.</p>
+              <div className="border-l-8 border-[var(--color-brutal-teal)] pl-6">
+                <h3 className="text-2xl font-black uppercase mb-2 text-black">Strict Verification</h3>
+                <p className="font-bold text-xl text-black leading-relaxed">Every artisan on our platform has passed a rigorous identity and background check. No exceptions.</p>
               </div>
-              <div className="border-l-4 border-[var(--color-brutal-yellow)] pl-6">
-                <h3 className="text-2xl font-black uppercase mb-2">Real Reviews</h3>
-                <p className="font-medium text-lg text-gray-300">Our reviews are tied directly to completed jobs. No fake testimonials, just real feedback from your neighbors.</p>
+              <div className="border-l-8 border-[var(--color-brutal-yellow)] pl-6">
+                <h3 className="text-2xl font-black uppercase mb-2 text-black">Real Reviews</h3>
+                <p className="font-bold text-xl text-black leading-relaxed">Our reviews are tied directly to completed jobs. No fake testimonials, just real feedback from your neighbors.</p>
               </div>
-              <div className="border-l-4 border-[var(--color-brutal-pink)] pl-6">
-                <h3 className="text-2xl font-black uppercase mb-2">Location-Based</h3>
-                <p className="font-medium text-lg text-gray-300">When an emergency strikes, you need someone fast. Our map-based matching ensures you find the closest available professional.</p>
+              <div className="border-l-8 border-[var(--color-brutal-pink)] pl-6">
+                <h3 className="text-2xl font-black uppercase mb-2 text-black">Location-Based</h3>
+                <p className="font-bold text-xl text-black leading-relaxed">When an emergency strikes, you need someone fast. Our map-based matching ensures you find the closest available professional.</p>
               </div>
-              <div className="border-l-4 border-white pl-6">
-                <h3 className="text-2xl font-black uppercase mb-2">Transparent Portfolios</h3>
-                <p className="font-medium text-lg text-gray-300">See exactly what an artisan has built or repaired before you ever send a message.</p>
+              <div className="border-l-8 border-black pl-6">
+                <h3 className="text-2xl font-black uppercase mb-2 text-black">Transparent Portfolios</h3>
+                <p className="font-bold text-xl text-black leading-relaxed">See exactly what an artisan has built or repaired before you ever send a message.</p>
               </div>
             </div>
           </div>
