@@ -15,7 +15,7 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
         if (requiredRole === "artisan") {
-          router.push("/auth/login?role=artisan");
+          router.push("/login?role=artisan");
         } else {
           setAuthorized(true);
         }
@@ -39,7 +39,7 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
               router.push("/explore");
             }
           } else if (requiredRole === "customer") {
-            if (role === "artisan" && pathname !== "/auth/login" && !pathname.startsWith("/chat/")) {
+            if (role === "artisan" && pathname !== "/login" && !pathname.startsWith("/chat/")) {
               // If an artisan tries to access customer routes (except shared chat), redirect them
               router.push("/technician/dashboard");
             } else {
@@ -50,7 +50,7 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
           // If a Firebase user exists but NO userDoc exists,
           // they haven't completed the signup flow (missing name, phone, etc).
           // Force them back to the auth page to finish it.
-          router.push(`/auth/login?role=${requiredRole}`);
+          router.push(`/login?role=${requiredRole}`);
         }
       } catch (err) {
         console.error("RoleGuard error:", err);

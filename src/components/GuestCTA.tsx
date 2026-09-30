@@ -29,7 +29,7 @@ export default function GuestCTA({
         href="/login?mode=signup"
         className="bg-black text-white px-4 py-2 font-black text-xs uppercase border-2 border-black hover:-translate-y-1 hover:shadow-[3px_3px_0_0_#000] transition-all flex-shrink-0"
       >
-        JOIN FREE
+        JOIN FOR FREE
       </Link>
     </div>
   );

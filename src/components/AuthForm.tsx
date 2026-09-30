@@ -106,8 +106,10 @@ export default function AuthForm() {
     return user.photoURL || "";
   };
 
+  const urlParsedRef = useRef(false);
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !urlParsedRef.current) {
       const params = new URLSearchParams(window.location.search);
       if (params.get("role") === "artisan") {
         setRole("artisan");
@@ -116,7 +118,10 @@ export default function AuthForm() {
       }
       if (params.get("mode") === "signup") {
         setIsLogin(false);
+      } else if (params.get("mode") === "signin") {
+        setIsLogin(true);
       }
+      urlParsedRef.current = true;
     }
 
     const checkRedirectResult = async () => {
@@ -140,14 +145,14 @@ export default function AuthForm() {
               await setDoc(userDocRef, newUser);
               
               if (role === "artisan") {
-                router.push("/onboarding");
+                window.location.assign("/onboarding");
               } else {
                 fetch('/api/emails/welcome-customer', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ userId: result.user.uid }),
                 }).catch(e => console.error("Failed to send welcome email:", e));
-                router.push("/explore");
+                window.location.assign("/explore");
               }
             } else {
               setStep("role");
@@ -158,15 +163,15 @@ export default function AuthForm() {
               const artisanDoc = await getDoc(doc(db, "artisans", result.user.uid));
               if (artisanDoc.exists()) {
                 if (artisanDoc.data()?.onboardingStep !== 6) {
-                  router.push("/onboarding");
+                  window.location.assign("/onboarding");
                 } else {
-                  router.push("/technician/dashboard");
+                  window.location.assign("/technician/dashboard");
                 }
               } else {
                 setStep("role");
               }
             } else {
-              router.push("/explore");
+              window.location.assign("/explore");
             }
           }
         }
@@ -192,15 +197,15 @@ export default function AuthForm() {
         const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
         if (artisanDoc.exists()) {
           if (artisanDoc.data()?.onboardingStep !== 6) {
-            router.push("/onboarding");
+            window.location.assign("/onboarding");
           } else {
-            router.push("/technician/dashboard");
+            window.location.assign("/technician/dashboard");
           }
         } else {
           setStep("role");
         }
       } else {
-        router.push("/explore");
+        window.location.assign("/explore");
       }
     } else {
       // If we just signed up with email, we passed nameToSave
@@ -802,7 +807,10 @@ export default function AuthForm() {
             <button
               type="button"
               onClick={() => {
-                router.push(isLogin ? `/login?mode=signup&role=${role}` : `/login?mode=signin`);
+                const newMode = isLogin ? "signup" : "signin";
+                const url = new URL(window.location.href);
+                url.searchParams.set("mode", newMode);
+                window.history.replaceState(null, "", url.toString());
                 setIsLogin(!isLogin);
               }}
               className="text-lg font-black text-black hover:text-[var(--color-brutal-blue)] underline decoration-4 underline-offset-4 uppercase transition-colors"
