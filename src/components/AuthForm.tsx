@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { 
-  GoogleAuthProvider, signInWithRedirect, getRedirectResult,
+  GoogleAuthProvider, signInWithPopup, getRedirectResult,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User,
   sendEmailVerification, signOut
@@ -123,68 +123,6 @@ export default function AuthForm() {
       }
       urlParsedRef.current = true;
     }
-
-    const checkRedirectResult = async () => {
-      try {
-        setLoading(true);
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const userDocRef = doc(db, "users", result.user.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          if (!userDoc.exists()) {
-            if (!isLogin) {
-              const newUser: UserAccount = {
-                userId: result.user.uid,
-                phone: result.user.phoneNumber || "",
-                email: result.user.email || undefined,
-                displayName: result.user.displayName || "User",
-                role: role,
-                createdAt: Date.now(),
-              };
-              await setDoc(userDocRef, newUser);
-              
-              if (role === "artisan") {
-                window.location.assign("/onboarding");
-              } else {
-                fetch('/api/emails/welcome-customer', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ userId: result.user.uid }),
-                }).catch(e => console.error("Failed to send welcome email:", e));
-                window.location.assign("/explore");
-              }
-            } else {
-              setStep("role");
-            }
-          } else {
-            const userData = userDoc.data() as UserAccount;
-            if (userData.role === "artisan") {
-              const artisanDoc = await getDoc(doc(db, "artisans", result.user.uid));
-              if (artisanDoc.exists()) {
-                if (artisanDoc.data()?.onboardingStep !== 6) {
-                  window.location.assign("/onboarding");
-                } else {
-                  window.location.assign("/technician/dashboard");
-                }
-              } else {
-                setStep("role");
-              }
-            } else {
-              window.location.assign("/explore");
-            }
-          }
-        }
-      } catch (error: unknown) {
-        const err = error as Error;
-        console.warn("Redirect result error:", err);
-        setError(err.message || "Google Sign-In failed.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkRedirectResult();
   }, [router, isLogin, role]);
 
   const handlePostLogin = async (user: User, nameToSave?: string) => {
@@ -222,7 +160,55 @@ export default function AuthForm() {
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      
+      if (result && result.user) {
+        const userDocRef = doc(db, "users", result.user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+          if (!isLogin) {
+            const newUser: UserAccount = {
+              userId: result.user.uid,
+              phone: result.user.phoneNumber || "",
+              email: result.user.email || undefined,
+              displayName: result.user.displayName || "User",
+              role: role,
+              createdAt: Date.now(),
+            };
+            await setDoc(userDocRef, newUser);
+            
+            if (role === "artisan") {
+              window.location.assign("/onboarding");
+            } else {
+              fetch('/api/emails/welcome-customer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: result.user.uid }),
+              }).catch(e => console.error("Failed to send welcome email:", e));
+              window.location.assign("/explore");
+            }
+          } else {
+            setStep("role");
+          }
+        } else {
+          const userData = userDoc.data() as UserAccount;
+          if (userData.role === "artisan") {
+            const artisanDoc = await getDoc(doc(db, "artisans", result.user.uid));
+            if (artisanDoc.exists()) {
+              if (artisanDoc.data()?.onboardingStep !== 6) {
+                window.location.assign("/onboarding");
+              } else {
+                window.location.assign("/technician/dashboard");
+              }
+            } else {
+              setStep("role");
+            }
+          } else {
+            window.location.assign("/explore");
+          }
+        }
+      }
     } catch (error: unknown) {
       const err = error as Error;
       console.warn(err);
