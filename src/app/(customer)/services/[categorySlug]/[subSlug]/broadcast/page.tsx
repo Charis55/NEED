@@ -123,6 +123,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
         subcategory: subcategory,
         description,
         neighborhood: locationData.name,
+        locationCoords: { lat: locationData.lat, lng: locationData.lng },
         preferredTime: `${preferredDate} at ${preferredTime}`,
         offerAmount: parsedAmount,
         counterOfferAmount: null,

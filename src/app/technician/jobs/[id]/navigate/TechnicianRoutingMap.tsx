@@ -102,6 +102,12 @@ export default function TechnicianRoutingMap({
     return L.divIcon({
       html: `
         <div class="relative w-12 h-12 flex items-center justify-center">
+          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
+            <div class="bg-[var(--color-brutal-teal)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap">
+              YOU
+            </div>
+            <div class="w-1.5 h-3 bg-black"></div>
+          </div>
           <div class="absolute inset-2 bg-[var(--color-brutal-teal)] rounded-full animate-ping opacity-60"></div>
           <div class="relative w-8 h-8 bg-[var(--color-brutal-teal)] border-4 border-black rounded-full shadow-[2px_2px_0_rgba(0,0,0,1)] z-10 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
@@ -118,6 +124,12 @@ export default function TechnicianRoutingMap({
     return L.divIcon({
       html: `
         <div class="relative flex items-center justify-center w-12 h-12">
+          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
+            <div class="bg-[var(--color-brutal-yellow)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap">
+              CUSTOMER
+            </div>
+            <div class="w-1.5 h-3 bg-black"></div>
+          </div>
           <div class="absolute inset-2 bg-[var(--color-brutal-yellow)] rounded-full animate-ping opacity-60"></div>
           <div class="relative w-6 h-6 bg-[var(--color-brutal-yellow)] border-4 border-black rounded-full shadow-[2px_2px_0_rgba(0,0,0,1)] z-10"></div>
         </div>
@@ -159,22 +171,10 @@ export default function TechnicianRoutingMap({
         <RoutingControl startCoords={currentLocation} destCoords={destCoords} />
 
         {/* Technician Marker */}
-        <Marker position={[currentLocation.lat, currentLocation.lng]} icon={createTechIcon()}>
-          <Popup className="custom-popup">
-            <div className="p-2 bg-[var(--color-brutal-teal)] text-black border-4 border-black font-black uppercase text-center w-24">
-              <p>You</p>
-            </div>
-          </Popup>
-        </Marker>
+        <Marker position={[currentLocation.lat, currentLocation.lng]} icon={createTechIcon()} />
 
         {/* Destination Marker */}
-        <Marker position={[destCoords.lat, destCoords.lng]} icon={createDestIcon()}>
-          <Popup className="custom-popup">
-            <div className="p-2 bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center w-24">
-              <p>Customer</p>
-            </div>
-          </Popup>
-        </Marker>
+        <Marker position={[destCoords.lat, destCoords.lng]} icon={createDestIcon()} />
       </MapContainer>
 
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[400] pointer-events-none">

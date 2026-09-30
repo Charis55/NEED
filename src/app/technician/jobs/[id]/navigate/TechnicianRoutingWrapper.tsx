@@ -33,15 +33,19 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
           }
         }
         
-        // Find lat/lng for customer's neighborhood if not already known
-        if (jobData.neighborhood && !destCoords) {
-          try {
-            const coords = await geocode(jobData.neighborhood);
-            setDestCoords(coords);
-          } catch (e) {
-            console.error("Geocoding failed for destination", e);
-            // Default fallback coords (Lagos)
-            setDestCoords({ lat: 6.5244, lng: 3.3792 });
+        // Find lat/lng for customer's location
+        if (!destCoords) {
+          if (jobData.locationCoords) {
+            setDestCoords(jobData.locationCoords);
+          } else if (jobData.neighborhood) {
+            try {
+              const coords = await geocode(jobData.neighborhood);
+              setDestCoords(coords);
+            } catch (e) {
+              console.error("Geocoding failed for destination", e);
+              // Default fallback coords (Lagos)
+              setDestCoords({ lat: 6.5244, lng: 3.3792 });
+            }
           }
         }
         

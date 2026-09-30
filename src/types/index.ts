@@ -138,6 +138,10 @@ export interface JobRequest {
   subcategory: string;
   description: string;
   neighborhood: string;
+  locationCoords?: {
+    lat: number;
+    lng: number;
+  };
   preferredTime: string;
   offerAmount: number;
   counterOfferAmount: number | null;

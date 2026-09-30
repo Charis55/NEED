@@ -45,7 +45,14 @@ export default function TrackingMap({
   const createTechIcon = () => {
     return L.divIcon({
       html: `
-        <div class="relative w-12 h-12 group cursor-pointer hover:-translate-y-1 transition-transform">
+        <div class="relative w-12 h-12 flex flex-col items-center justify-center">
+          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
+            <div class="bg-[var(--color-brutal-teal)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap text-center">
+              <div>TECHNICIAN</div>
+              <div class="text-[10px] leading-tight">En Route</div>
+            </div>
+            <div class="w-1.5 h-3 bg-black"></div>
+          </div>
           <div class="w-12 h-12 bg-white border-4 border-black flex items-center justify-center z-20 overflow-hidden relative shadow-[4px_4px_0_0_#000]">
             <img src="/LOGO.png" alt="Need" class="w-8 h-8 object-contain" />
           </div>
@@ -53,8 +60,7 @@ export default function TrackingMap({
       `,
       className: 'bg-transparent border-none bg-none outline-none',
       iconSize: [48, 48],
-      iconAnchor: [24, 24],
-      popupAnchor: [0, -28]
+      iconAnchor: [24, 24]
     });
   };
 
@@ -62,6 +68,12 @@ export default function TrackingMap({
     return L.divIcon({
       html: `
         <div class="relative flex items-center justify-center w-12 h-12">
+          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
+            <div class="bg-[var(--color-brutal-yellow)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap text-center">
+              YOUR LOCATION
+            </div>
+            <div class="w-1.5 h-3 bg-black"></div>
+          </div>
           <!-- Pulsing background -->
           <div class="absolute inset-2 bg-[var(--color-brutal-blue)] rounded-full animate-ping opacity-60"></div>
           <!-- Core dot -->
@@ -70,8 +82,7 @@ export default function TrackingMap({
       `,
       className: 'bg-transparent border-none bg-none outline-none',
       iconSize: [48, 48],
-      iconAnchor: [24, 24],
-      popupAnchor: [0, -12]
+      iconAnchor: [24, 24]
     });
   };
 
@@ -96,26 +107,13 @@ export default function TrackingMap({
         <Marker
           position={[techLocation.lat, techLocation.lng]}
           icon={createTechIcon()}
-        >
-          <Popup className="custom-popup">
-            <div className="p-2 bg-[var(--color-brutal-teal)] text-black border-4 border-black font-black uppercase text-center w-32">
-              <p>Technician</p>
-              <p className="text-xs">En Route</p>
-            </div>
-          </Popup>
-        </Marker>
+        />
 
-        {/* Destination Marker (Mocked offset from technician for demo purposes) */}
+        {/* Destination Marker */}
         <Marker
-          position={[techLocation.lat + 0.01, techLocation.lng + 0.01]}
+          position={job.locationCoords ? [job.locationCoords.lat, job.locationCoords.lng] : [techLocation.lat + 0.01, techLocation.lng + 0.01]}
           icon={createDestIcon()}
-        >
-          <Popup className="custom-popup">
-            <div className="p-2 bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center w-32">
-              <p>Your Location</p>
-            </div>
-          </Popup>
-        </Marker>
+        />
 
         <ChangeView center={center} zoom={14} />
         <RecenterButton center={center} />

@@ -206,6 +206,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         subcategory: artisan.services?.[selectedServiceIndex]?.subcategory || artisan.subcategory || "Unknown",
         description: draft.description,
         neighborhood: locationData.name,
+        locationCoords: { lat: locationData.lat, lng: locationData.lng },
         preferredTime: `${draft.preferredDate} at ${draft.preferredTime}`,
         offerAmount: parsedAmount,
         counterOfferAmount: null,
