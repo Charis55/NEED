@@ -102,11 +102,11 @@ export default function TechnicianRoutingMap({
     return L.divIcon({
       html: `
         <div class="relative w-12 h-12 flex items-center justify-center">
-          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
-            <div class="bg-[var(--color-brutal-teal)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap">
+          <div class="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 z-20">
+            <div class="relative bg-[var(--color-brutal-teal)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap">
               YOU
+              <div class="absolute w-3 h-3 bg-[var(--color-brutal-teal)] border-b-4 border-r-4 border-black transform rotate-45 -bottom-[7px] left-1/2 -translate-x-1/2"></div>
             </div>
-            <div class="w-1.5 h-3 bg-black"></div>
           </div>
           <div class="absolute inset-2 bg-[var(--color-brutal-teal)] rounded-full animate-ping opacity-60"></div>
           <div class="relative w-8 h-8 bg-[var(--color-brutal-teal)] border-4 border-black rounded-full shadow-[2px_2px_0_rgba(0,0,0,1)] z-10 flex items-center justify-center">
@@ -124,11 +124,11 @@ export default function TechnicianRoutingMap({
     return L.divIcon({
       html: `
         <div class="relative flex items-center justify-center w-12 h-12">
-          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
-            <div class="bg-[var(--color-brutal-yellow)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap">
+          <div class="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 z-20">
+            <div class="relative bg-[var(--color-brutal-yellow)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap">
               CUSTOMER
+              <div class="absolute w-3 h-3 bg-[var(--color-brutal-yellow)] border-b-4 border-r-4 border-black transform rotate-45 -bottom-[7px] left-1/2 -translate-x-1/2"></div>
             </div>
-            <div class="w-1.5 h-3 bg-black"></div>
           </div>
           <div class="absolute inset-2 bg-[var(--color-brutal-yellow)] rounded-full animate-ping opacity-60"></div>
           <div class="relative w-6 h-6 bg-[var(--color-brutal-yellow)] border-4 border-black rounded-full shadow-[2px_2px_0_rgba(0,0,0,1)] z-10"></div>

@@ -46,12 +46,12 @@ export default function TrackingMap({
     return L.divIcon({
       html: `
         <div class="relative w-12 h-12 flex flex-col items-center justify-center">
-          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
-            <div class="bg-[var(--color-brutal-teal)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap text-center">
+          <div class="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 z-20">
+            <div class="relative bg-[var(--color-brutal-teal)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap text-center">
               <div>TECHNICIAN</div>
               <div class="text-[10px] leading-tight">En Route</div>
+              <div class="absolute w-3 h-3 bg-[var(--color-brutal-teal)] border-b-4 border-r-4 border-black transform rotate-45 -bottom-[7px] left-1/2 -translate-x-1/2"></div>
             </div>
-            <div class="w-1.5 h-3 bg-black"></div>
           </div>
           <div class="w-12 h-12 bg-white border-4 border-black flex items-center justify-center z-20 overflow-hidden relative shadow-[4px_4px_0_0_#000]">
             <img src="/LOGO.png" alt="Need" class="w-8 h-8 object-contain" />
@@ -68,11 +68,11 @@ export default function TrackingMap({
     return L.divIcon({
       html: `
         <div class="relative flex items-center justify-center w-12 h-12">
-          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-20 flex flex-col items-center">
-            <div class="bg-[var(--color-brutal-yellow)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap text-center">
+          <div class="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 z-20">
+            <div class="relative bg-[var(--color-brutal-yellow)] text-black font-black uppercase text-sm border-4 border-black px-3 py-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] whitespace-nowrap text-center">
               YOUR LOCATION
+              <div class="absolute w-3 h-3 bg-[var(--color-brutal-yellow)] border-b-4 border-r-4 border-black transform rotate-45 -bottom-[7px] left-1/2 -translate-x-1/2"></div>
             </div>
-            <div class="w-1.5 h-3 bg-black"></div>
           </div>
           <!-- Pulsing background -->
           <div class="absolute inset-2 bg-[var(--color-brutal-blue)] rounded-full animate-ping opacity-60"></div>
