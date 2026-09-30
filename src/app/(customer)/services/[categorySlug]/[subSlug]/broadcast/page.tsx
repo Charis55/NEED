@@ -81,7 +81,8 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
       (err) => {
         setLocationError("Location permission denied. Please enable it to continue.");
         setIsLocating(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
@@ -198,8 +199,8 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
             {locationError && <p className="text-[var(--color-brutal-red)] text-xs font-bold mt-2">{locationError}</p>}
           </div>
 
-          <div className="bg-white brutal-card p-6 flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="bg-white brutal-card p-6 flex flex-col md:flex-row gap-4 overflow-hidden">
+            <div className="flex-1 min-w-0">
               <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-1">
                 <Clock className="w-5 h-5 stroke-[3]" /> Date *
               </label>
@@ -208,10 +209,10 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
                 required
                 value={preferredDate}
                 onChange={(e) => setPreferredDate(e.target.value)}
-                className="w-full p-4 brutal-input text-lg font-bold border-4 border-black"
+                className="w-full max-w-full min-w-0 p-4 brutal-input text-lg font-bold border-4 border-black appearance-none"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-1">
                 <Clock className="w-5 h-5 stroke-[3]" /> Time *
               </label>
@@ -220,7 +221,7 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
                 required
                 value={preferredTime}
                 onChange={(e) => setPreferredTime(e.target.value)}
-                className="w-full p-4 brutal-input text-lg font-bold border-4 border-black"
+                className="w-full max-w-full min-w-0 p-4 brutal-input text-lg font-bold border-4 border-black appearance-none"
               />
             </div>
           </div>

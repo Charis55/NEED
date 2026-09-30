@@ -101,7 +101,8 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
       (err) => {
         setLocationError("Location permission denied. Please enable it to continue.");
         setIsLocating(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
   
@@ -396,8 +397,8 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
             )}
           </div>
 
-          <div className="bg-[var(--color-brutal-teal)] brutal-card p-6 flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="bg-[var(--color-brutal-teal)] brutal-card p-6 flex flex-col md:flex-row gap-4 overflow-hidden">
+            <div className="flex-1 min-w-0">
               <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
                 <Clock className="w-5 h-5 stroke-[3]" /> Date
               </label>
@@ -406,10 +407,10 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
                 value={draft.preferredDate}
                 onChange={(e) => setDraft({ preferredDate: e.target.value })}
                 required
-                className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white"
+                className="w-full max-w-full min-w-0 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white appearance-none"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
                 <Clock className="w-5 h-5 stroke-[3]" /> Time
               </label>
@@ -418,7 +419,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
                 value={draft.preferredTime}
                 onChange={(e) => setDraft({ preferredTime: e.target.value })}
                 required
-                className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white"
+                className="w-full max-w-full min-w-0 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white appearance-none"
               />
             </div>
           </div>

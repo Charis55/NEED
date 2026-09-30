@@ -288,7 +288,8 @@ export default function ArtisanOnboarding() {
       (err) => {
         setLocationError("Location permission denied. This is required to proceed.");
         setIsLocating(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 

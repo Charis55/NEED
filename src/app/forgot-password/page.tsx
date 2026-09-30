@@ -19,24 +19,16 @@ export default function ForgotPasswordPage() {
     setMessage("");
 
     try {
-      const res = await fetch("/api/emails/password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to send password reset email.");
-      }
-
+      const { sendPasswordResetEmail } = await import("firebase/auth");
+      await sendPasswordResetEmail(auth, email);
       setMessage("A password reset link has been sent to your email.");
     } catch (err: unknown) {
       console.error(err);
       const errorObj = err as Error & { code?: string, message: string };
-      // Handle the 'auth/user-not-found' string sent back from the API
-      if (errorObj.message === "auth/user-not-found") {
+      if (errorObj.code === "auth/user-not-found") {
         setError("This email is not registered in our system.");
+      } else if (errorObj.code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
       } else {
         setError(errorObj.message || "Failed to send password reset email.");
       }
