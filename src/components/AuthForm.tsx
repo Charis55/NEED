@@ -5,7 +5,8 @@ import { auth, db, storage } from "@/lib/firebase";
 import { 
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User
+  updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User,
+  sendEmailVerification, signOut
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -212,7 +213,7 @@ export default function AuthForm() {
       }
     } catch (error: unknown) {
       const err = error as Error;
-      console.error(err);
+      console.warn(err);
       setError(err.message || "Google Sign-In failed.");
       setLoading(false);
     }
@@ -251,6 +252,9 @@ export default function AuthForm() {
         
         await updateProfile(result.user, { displayName: fullName });
         
+        // Send email verification
+        await sendEmailVerification(result.user);
+        
         const newUser: UserAccount = {
           userId: result.user.uid,
           phone: result.user.phoneNumber || "",
@@ -263,26 +267,35 @@ export default function AuthForm() {
         
         const uploadedPhotoURL = await uploadAndSetPhoto(result.user);
         
-        if (role === "artisan") {
-          router.push("/onboarding");
-        } else {
-          router.push("/explore");
-        }
-        return; // Skip handlePostLogin since we handled it
+        // Sign out and ask them to verify
+        await signOut(auth);
+        setError("");
+        alert("Account created successfully! We've sent a verification email. Please verify your email before logging in.");
+        setIsLogin(true);
+        setLoading(false);
+        return;
       } else {
         result = await signInWithEmailAndPassword(auth, email, password);
+        if (!result.user.emailVerified) {
+          await signOut(auth);
+          setError("Please verify your email address before logging in. Check your inbox for the verification link.");
+          setLoading(false);
+          return;
+        }
         await handlePostLogin(result.user, fullName);
       }
     } catch (error: unknown) {
       const err = error as Error & { code?: string };
-      console.error("Auth error:", err.code, err.message);
+      console.warn("Auth info:", err.code, err.message);
       const code = err.code || "";
       if (code === "auth/email-already-in-use") {
-        setError("An account with this email already exists. Please log in instead.");
-      } else if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
-        setError("No account found with that email/password combination. Check your credentials or sign up.");
+        setError("This email is already in use. Please log in or use a different email address.");
+      } else if (code === "auth/user-not-found") {
+        setError("This email is not registered in our system. Please check for typos or sign up.");
+      } else if (code === "auth/invalid-credential") {
+        setError("Invalid email or incorrect password. Please check your credentials.");
       } else if (code === "auth/wrong-password") {
-        setError("Incorrect password. Please try again or use 'Forgot Password'.");
+        setError("Incorrect password. Please try again or reset it if you've forgotten.");
       } else if (code === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else if (code === "auth/too-many-requests") {

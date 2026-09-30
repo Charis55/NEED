@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
+
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -19,11 +19,27 @@ export default function ForgotPasswordPage() {
     setMessage("");
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      const res = await fetch("/api/emails/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to send password reset email.");
+      }
+
       setMessage("A password reset link has been sent to your email.");
     } catch (err: unknown) {
       console.error(err);
-      setError((err as Error).message || "Failed to send password reset email.");
+      const errorObj = err as Error & { code?: string, message: string };
+      // Handle the 'auth/user-not-found' string sent back from the API
+      if (errorObj.message === "auth/user-not-found") {
+        setError("This email is not registered in our system.");
+      } else {
+        setError(errorObj.message || "Failed to send password reset email.");
+      }
     } finally {
       setLoading(false);
     }
