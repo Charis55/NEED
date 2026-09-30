@@ -10,38 +10,50 @@ import { Navigation } from 'lucide-react';
 
 function RoutingControl({ startCoords, destCoords }: { startCoords: {lat: number, lng: number}, destCoords: {lat: number, lng: number} }) {
   const map = useMap();
+  const routingControlRef = useRef<any>(null);
 
   useEffect(() => {
     if (!map) return;
 
-    // Create a custom icon for the routing waypoints to be invisible or stylized
-    const emptyIcon = L.divIcon({ className: 'hidden' });
-
-    const routingControl = (L as any).Routing.control({
-      waypoints: [
+    if (!routingControlRef.current) {
+      routingControlRef.current = (L as any).Routing.control({
+        waypoints: [
+          L.latLng(startCoords.lat, startCoords.lng),
+          L.latLng(destCoords.lat, destCoords.lng)
+        ],
+        routeWhileDragging: false,
+        addWaypoints: false,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+        lineOptions: {
+          styles: [{ color: '#000000', opacity: 0.8, weight: 6 }]
+        },
+        createMarker: () => null,
+        show: false
+      }).addTo(map);
+    } else {
+      // Only update waypoints to prevent flashing and re-rendering the whole route control
+      routingControlRef.current.setWaypoints([
         L.latLng(startCoords.lat, startCoords.lng),
         L.latLng(destCoords.lat, destCoords.lng)
-      ],
-      routeWhileDragging: false,
-      addWaypoints: false,
-      fitSelectedRoutes: true,
-      showAlternatives: false,
-      lineOptions: {
-        styles: [{ color: '#000000', opacity: 0.8, weight: 6 }]
-      },
-      createMarker: (i: number, wp: Record<string, unknown>, nWps: number) => {
-        // We will render our own markers
-        return null;
-      },
-      show: false // hide the default routing instructions panel
-    }).addTo(map);
+      ]);
+    }
 
+    // We don't remove control on every coords change anymore, 
+    // only on component unmount
     return () => {
-      map.removeControl(routingControl);
+      // Cleanup handled manually or keep it if map unmounts
     };
   }, [map, startCoords, destCoords]);
 
-  return null;
+  // Inject CSS to completely hide the Leaflet Routing Machine text container
+  return (
+    <style>{`
+      .leaflet-routing-container, .leaflet-routing-alternatives-container {
+        display: none !important;
+      }
+    `}</style>
+  );
 }
 
 export default function TechnicianRoutingMap({ 
