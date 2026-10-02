@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRef } from "react";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
 
@@ -12,7 +13,7 @@ interface AgoraCallModalProps {
 }
 
 export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }: AgoraCallModalProps) {
-  const [client] = useState<IAgoraRTCClient>(() => AgoraRTC.createClient({ mode: "rtc", codec: "vp8" }));
+  const clientRef = useRef<IAgoraRTCClient | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
   const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack | null>(null);
@@ -55,6 +56,10 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
     let isMounted = true;
     let localA: IMicrophoneAudioTrack;
     let localV: ICameraVideoTrack;
+    
+    // Create a fresh client for this effect execution
+    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    clientRef.current = client;
 
     const initCall = async () => {
       try {
@@ -78,9 +83,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
 
         client.on("user-unpublished", (user, mediaType) => {
           if (mediaType === "video") {
-            // Stop playing but keep user in list if audio is still there
             user.videoTrack?.stop();
-            // Just force a re-render to handle UI changes
             setRemoteUsers(prev => [...prev]);
           }
         });
@@ -91,20 +94,26 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
 
         // Join channel
         await client.join(appId, channelName, token, uid);
+        if (!isMounted) return;
 
         // Create and publish local tracks
         localA = await AgoraRTC.createMicrophoneAudioTrack();
+        if (!isMounted) return;
+
         if (isVideo) {
           localV = await AgoraRTC.createCameraVideoTrack();
+          if (!isMounted) return;
+          
           await client.publish([localA, localV]);
-          if (isMounted) {
-            setLocalVideoTrack(localV);
-            setTimeout(() => {
-              localV.play("local-video");
-            }, 100);
-          }
+          if (!isMounted) return;
+
+          setLocalVideoTrack(localV);
+          setTimeout(() => {
+            localV.play("local-video");
+          }, 100);
         } else {
           await client.publish([localA]);
+          if (!isMounted) return;
         }
         
         if (isMounted) {
@@ -146,7 +155,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
   const leaveCall = async () => {
     localAudioTrack?.close();
     localVideoTrack?.close();
-    await client.leave();
+    await clientRef.current?.leave();
     onEndCall();
   };
 
