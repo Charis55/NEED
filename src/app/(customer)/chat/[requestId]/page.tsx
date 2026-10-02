@@ -15,6 +15,7 @@ import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
 import AgoraCallModal from "@/components/AgoraCallModal";
 import IncomingCallModal from "@/components/IncomingCallModal";
+import OutgoingCallModal from "@/components/OutgoingCallModal";
 
 interface Message {
   id: string;
@@ -53,6 +54,7 @@ export default function ChatPage() {
   // Agora Call State
   const [showCallModal, setShowCallModal] = useState(false);
   const [showIncomingCall, setShowIncomingCall] = useState(false);
+  const [showOutgoingCall, setShowOutgoingCall] = useState(false);
   const [callType, setCallType] = useState<"audio" | "video">("audio");
   
   // Review Modal State
@@ -309,19 +311,24 @@ export default function ChatPage() {
     const currentUid = auth.currentUser?.uid;
     if (!job || !currentUid) return;
 
-    if (
-      job.activeCall &&
-      job.activeCall.status === "ringing" &&
-      job.activeCall.callerId !== currentUid
-    ) {
+    if (job.activeCall && job.activeCall.status === "ringing") {
       setCallType(job.activeCall.type);
-      setShowIncomingCall(true);
-      setShowCallModal(false);
-    } else if (job.activeCall?.status === "ongoing" && job.activeCall.callerId !== currentUid) {
+      if (job.activeCall.callerId !== currentUid) {
+        setShowIncomingCall(true);
+        setShowOutgoingCall(false);
+        setShowCallModal(false);
+      } else {
+        setShowIncomingCall(false);
+        setShowOutgoingCall(true);
+        setShowCallModal(false);
+      }
+    } else if (job.activeCall?.status === "ongoing") {
       setShowIncomingCall(false);
+      setShowOutgoingCall(false);
       setShowCallModal(true);
-    } else if (job.activeCall?.status === "ended" && job.activeCall.callerId !== currentUid) {
+    } else if (job.activeCall?.status === "ended") {
       setShowIncomingCall(false);
+      setShowOutgoingCall(false);
       setShowCallModal(false);
     }
   }, [job?.activeCall, auth.currentUser?.uid]);
@@ -633,7 +640,7 @@ export default function ChatPage() {
         }
       });
       setCallType(type);
-      setShowCallModal(true);
+      setShowOutgoingCall(true);
       
       // Auto-end call if not picked up in 60s
       setTimeout(async () => {
@@ -645,6 +652,7 @@ export default function ChatPage() {
               await updateDoc(doc(db, "jobRequests", requestId), {
                 "activeCall.status": "ended"
               });
+              setShowOutgoingCall(false);
               setShowCallModal(false);
             }
           }
@@ -679,6 +687,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error("Failed to end call", error);
     }
+    setShowOutgoingCall(false);
     setShowCallModal(false);
   };
 
@@ -713,6 +722,14 @@ export default function ChatPage() {
           jobTitle={job.subcategory}
           onAccept={acceptCall}
           onDecline={declineCall}
+        />
+      )}
+      {showOutgoingCall && (
+        <OutgoingCallModal 
+          calleeName={chatPartnerName}
+          calleePhoto={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL}
+          callType={callType}
+          onCancel={endCall}
         />
       )}
       {showCallModal && auth.currentUser && (
