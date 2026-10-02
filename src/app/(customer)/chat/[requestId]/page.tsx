@@ -292,20 +292,7 @@ export default function ChatPage() {
             });
           }
 
-          // Check for incoming call
-          if (
-            jobData.activeCall &&
-            jobData.activeCall.status === "ringing" &&
-            jobData.activeCall.callerId !== auth.currentUser?.uid
-          ) {
-            // Check if call hasn't timed out (e.g. 60 seconds)
-            if (Date.now() - jobData.activeCall.timestamp < 60000) {
-              setCallType(jobData.activeCall.type);
-              setShowCallModal(true);
-            }
-          } else if (jobData.activeCall?.status === "ended") {
-            setShowCallModal(false);
-          }
+          // Incoming call checking moved to a separate useEffect
         }
       } catch (err) {
         console.error("Error in job snapshot", err);
@@ -314,6 +301,23 @@ export default function ChatPage() {
     
     return () => jobUnsubscribe();
   }, [requestId]);
+
+  // Handle incoming calls reliably based on reactive state
+  useEffect(() => {
+    const currentUid = auth.currentUser?.uid;
+    if (!job || !currentUid) return;
+
+    if (
+      job.activeCall &&
+      job.activeCall.status === "ringing" &&
+      job.activeCall.callerId !== currentUid
+    ) {
+      setCallType(job.activeCall.type);
+      setShowCallModal(true);
+    } else if (job.activeCall?.status === "ended" && job.activeCall.callerId !== currentUid) {
+      setShowCallModal(false);
+    }
+  }, [job?.activeCall, auth.currentUser?.uid]);
 
   useEffect(() => {
     if (!job) return;
@@ -623,6 +627,22 @@ export default function ChatPage() {
       });
       setCallType(type);
       setShowCallModal(true);
+      
+      // Auto-end call if not picked up in 60s
+      setTimeout(async () => {
+        try {
+          const freshDoc = await getDoc(doc(db, "jobRequests", requestId));
+          if (freshDoc.exists()) {
+            const data = freshDoc.data();
+            if (data.activeCall?.status === "ringing") {
+              await updateDoc(doc(db, "jobRequests", requestId), {
+                "activeCall.status": "ended"
+              });
+              setShowCallModal(false);
+            }
+          }
+        } catch (e) {}
+      }, 60000);
 
       const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
       if (partnerId) {
