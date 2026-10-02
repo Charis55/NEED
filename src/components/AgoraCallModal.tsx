@@ -9,10 +9,11 @@ interface AgoraCallModalProps {
   channelName: string;
   uid: string;
   isVideo: boolean;
+  partnerName: string;
   onEndCall: () => void;
 }
 
-export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }: AgoraCallModalProps) {
+export default function AgoraCallModal({ channelName, uid, isVideo, partnerName, onEndCall }: AgoraCallModalProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
@@ -66,11 +67,13 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
         // Listeners for remote users
         client.on("user-published", async (user, mediaType) => {
           await client.subscribe(user, mediaType);
+          
+          setRemoteUsers(prev => {
+            if (prev.find(u => u.uid === user.uid)) return prev;
+            return [...prev, user];
+          });
+
           if (mediaType === "video") {
-            setRemoteUsers(prev => {
-              if (prev.find(u => u.uid === user.uid)) return prev;
-              return [...prev, user];
-            });
             // Delay slightly to ensure DOM element exists before playing
             setTimeout(() => {
               user.videoTrack?.play(`remote-video-${user.uid}`);
@@ -194,7 +197,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
         {joined && remoteUsers.length === 0 && (
           <div className="flex flex-col items-center">
             <div className="w-24 h-24 rounded-full border-4 border-[var(--color-brutal-blue)] border-t-transparent animate-spin mb-4"></div>
-            <div className="text-center font-black uppercase text-xl text-gray-400">Waiting for others to join...</div>
+            <div className="text-center font-black uppercase text-xl text-gray-400">Waiting for {partnerName} to join...</div>
           </div>
         )}
 
@@ -209,7 +212,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
               <div className="text-gray-500 font-bold uppercase">Video Paused</div>
             )}
             <div className="absolute bottom-4 left-4 z-10 bg-[var(--color-brutal-bg)] text-black border-2 border-black px-2 py-1 font-black text-sm uppercase shadow-[4px_4px_0_0_#000]">
-              Remote User
+              {partnerName}
             </div>
           </div>
         ))}

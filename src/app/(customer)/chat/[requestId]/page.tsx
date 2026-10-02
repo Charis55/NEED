@@ -737,6 +737,7 @@ export default function ChatPage() {
           channelName={requestId}
           uid={auth.currentUser.uid}
           isVideo={callType === "video"}
+          partnerName={chatPartnerName}
           onEndCall={endCall}
         />
       )}
