@@ -661,20 +661,8 @@ export default function ChatPage() {
       setShowOutgoingCall(true);
       
       // Auto-end call if not picked up in 60s
-      setTimeout(async () => {
-        try {
-          const freshDoc = await getDoc(doc(db, "jobRequests", requestId));
-          if (freshDoc.exists()) {
-            const data = freshDoc.data();
-            if (data.activeCall?.status === "ringing") {
-              await updateDoc(doc(db, "jobRequests", requestId), {
-                "activeCall.status": "ended"
-              });
-              setShowOutgoingCall(false);
-              setShowCallModal(false);
-            }
-          }
-        } catch (e) {}
+      setTimeout(() => {
+        endCallWithLog();
       }, 60000);
 
       const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
@@ -696,39 +684,77 @@ export default function ChatPage() {
     }
   };
 
-  const endCall = async () => {
-    if (!job) return;
-    try {
-      await updateDoc(doc(db, "jobRequests", requestId), {
-        "activeCall.status": "ended"
-      });
-    } catch (error) {
-      console.error("Failed to end call", error);
+  const endCallWithLog = async () => {
+    if (!job || !job.activeCall) {
+      setShowOutgoingCall(false);
+      setShowCallModal(false);
+      setShowIncomingCall(false);
+      return;
     }
+    
+    try {
+      await runTransaction(db, async (transaction) => {
+        const jobRef = doc(db, "jobRequests", requestId);
+        const jobDoc = await transaction.get(jobRef);
+        if (!jobDoc.exists()) return;
+        
+        const data = jobDoc.data() as JobRequest;
+        if (!data.activeCall || data.activeCall.status === "ended") return;
+        
+        const isVideo = data.activeCall.type === "video";
+        let durationText = "Missed Call";
+        if (data.activeCall.connectedAt) {
+          const durationMs = Date.now() - data.activeCall.connectedAt;
+          const totalSeconds = Math.floor(durationMs / 1000);
+          const m = Math.floor(totalSeconds / 60);
+          const s = totalSeconds % 60;
+          durationText = `${m}:${s.toString().padStart(2, '0')} mins`;
+        } else if (data.activeCall.status === "ringing" && data.activeCall.callerId !== auth.currentUser?.uid) {
+           durationText = "Declined Call";
+        }
+
+        const messageText = `📞 ${isVideo ? 'Video' : 'Voice'} Call • ${durationText}`;
+        const receiverId = data.customerId === data.activeCall.callerId ? data.artisanId : data.customerId;
+
+        transaction.update(jobRef, {
+          "activeCall.status": "ended",
+          lastMessageText: messageText,
+          lastMessageSenderId: data.activeCall.callerId,
+          lastMessageAt: Date.now(),
+          ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
+        });
+
+        const msgRef = doc(collection(db, "jobRequests", requestId, "messages"));
+        transaction.set(msgRef, {
+          text: messageText,
+          senderId: data.activeCall.callerId,
+          createdAt: Date.now()
+        });
+      });
+    } catch (e) {
+      console.error("Failed to end call", e);
+    }
+    
     setShowOutgoingCall(false);
     setShowCallModal(false);
+    setShowIncomingCall(false);
   };
+
+  const endCall = () => endCallWithLog();
 
   const acceptCall = async () => {
     if (!job) return;
     try {
       await updateDoc(doc(db, "jobRequests", requestId), {
-        "activeCall.status": "ongoing"
+        "activeCall.status": "ongoing",
+        "activeCall.connectedAt": Date.now()
       });
       setShowIncomingCall(false);
       setShowCallModal(true);
     } catch (e) {}
   };
 
-  const declineCall = async () => {
-    if (!job) return;
-    try {
-      await updateDoc(doc(db, "jobRequests", requestId), {
-        "activeCall.status": "ended"
-      });
-      setShowIncomingCall(false);
-    } catch (e) {}
-  };
+  const declineCall = () => endCallWithLog();
 
   return (
     <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">

@@ -32,63 +32,73 @@ function InboxContent() {
   const { showAlert } = useAlert();
 
   useEffect(() => {
-    const fetchChats = async () => {
+    let unsubscribe = () => {};
+    const setupListener = () => {
       const user = auth.currentUser;
-      if (!user) return; 
-
-      try {
-        // We only want accepted or completed jobs for the chat list
-        const q = query(
-          collection(db, "jobRequests"), 
-          where("customerId", "==", user.uid)
-        );
-        const snapshot = await getDocs(q);
-        const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
-        
-        // Filter locally because Firestore OR queries are complex
-        const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
-        
-        // Sort by newest first
-        activeJobs.sort((a, b) => b.createdAt - a.createdAt);
-
-        // Fetch artisan info for each job
-        const listItems: ChatListItem[] = [];
-        
-        for (const job of activeJobs) {
-          let artisan: ArtisanProfile | null = null;
-          let artisanUser: UserAccount | null = null;
-          
-          if (job.artisanId) {
-            const artDoc = await getDoc(doc(db, "artisans", job.artisanId));
-            if (artDoc.exists()) {
-              artisan = artDoc.data() as ArtisanProfile;
-            }
-            const userDoc = await getDoc(doc(db, "users", job.artisanId));
-            if (userDoc.exists()) {
-              artisanUser = userDoc.data() as UserAccount;
-            }
-          }
-          
-          listItems.push({
-            job,
-            artisan,
-            artisanUser,
-            unreadCount: job.unreadCount?.[user.uid] || 0
-          });
-        }
-
-        setChatList(listItems);
-      } catch (error) {
-        console.error("Error fetching chats:", error);
-        showAlert("Failed to load your inbox", "error");
-      } finally {
+      if (!user) {
         setLoading(false);
+        return;
       }
+      
+      const q = query(
+        collection(db, "jobRequests"), 
+        where("customerId", "==", user.uid)
+      );
+      
+      unsubscribe = onSnapshot(q, async (snapshot) => {
+        try {
+          const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
+          const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
+          activeJobs.sort((a, b) => b.createdAt - a.createdAt);
+
+          const listItems: ChatListItem[] = [];
+          
+          for (const job of activeJobs) {
+            let artisan: ArtisanProfile | null = null;
+            let artisanUser: UserAccount | null = null;
+            
+            if (job.artisanId) {
+              const artDoc = await getDoc(doc(db, "artisans", job.artisanId));
+              if (artDoc.exists()) {
+                artisan = artDoc.data() as ArtisanProfile;
+              }
+              const userDoc = await getDoc(doc(db, "users", job.artisanId));
+              if (userDoc.exists()) {
+                artisanUser = userDoc.data() as UserAccount;
+              }
+            }
+            
+            listItems.push({
+              job,
+              artisan,
+              artisanUser,
+              unreadCount: job.unreadCount?.[user.uid] || 0
+            });
+          }
+
+          setChatList(listItems);
+        } catch (error) {
+          console.error("Error processing chats:", error);
+          showAlert("Failed to load your inbox", "error");
+        } finally {
+          setLoading(false);
+        }
+      });
     };
 
-    const timer = setTimeout(() => fetchChats(), 500);
-    return () => clearTimeout(timer);
-  }, []);
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setupListener();
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribe();
+    };
+  }, [showAlert]);
 
   return (
     <div className="w-full pt-12 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">

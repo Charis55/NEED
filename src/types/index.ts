@@ -177,6 +177,7 @@ export interface JobRequest {
     type: "audio" | "video";
     status: "ringing" | "ongoing" | "ended";
     timestamp: number;
+    connectedAt?: number;
   };
 }
 

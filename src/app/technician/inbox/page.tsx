@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { JobRequest, UserAccount } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
@@ -22,52 +22,62 @@ export default function InboxPage() {
   const { showAlert } = useAlert();
 
   useEffect(() => {
-    const fetchChats = async () => {
+    let unsubscribe = () => {};
+    const setupListener = () => {
       const user = auth.currentUser;
       if (!user) {
         setLoading(false);
         return;
       }
+      
+      const q = query(
+        collection(db, "jobRequests"), 
+        where("artisanId", "==", user.uid)
+      );
+      
+      unsubscribe = onSnapshot(q, async (snapshot) => {
+        try {
+          const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
+          const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
+          activeJobs.sort((a, b) => b.createdAt - a.createdAt);
 
-      try {
-        const q = query(
-          collection(db, "jobRequests"), 
-          where("artisanId", "==", user.uid)
-        );
-        const snapshot = await getDocs(q);
-        const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
-        
-        const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
-        activeJobs.sort((a, b) => b.createdAt - a.createdAt);
-
-        const listItems: ChatListItem[] = [];
-        
-        for (const job of activeJobs) {
-          let customer: UserAccount | null = null;
-          if (job.customerId) {
-            const cusDoc = await getDoc(doc(db, "users", job.customerId));
-            if (cusDoc.exists()) {
-              customer = cusDoc.data() as UserAccount;
+          const listItems: ChatListItem[] = [];
+          for (const job of activeJobs) {
+            let customer: UserAccount | null = null;
+            if (job.customerId) {
+              const cusDoc = await getDoc(doc(db, "users", job.customerId));
+              if (cusDoc.exists()) {
+                customer = cusDoc.data() as UserAccount;
+              }
             }
+            listItems.push({
+              job,
+              customer,
+              unreadCount: job.unreadCount?.[user.uid] || 0 
+            });
           }
-          
-          listItems.push({
-            job,
-            customer,
-            unreadCount: job.unreadCount?.[user.uid] || 0 
-          });
+          setChatList(listItems);
+        } catch (error) {
+          console.error("Error processing chats:", error);
+          showAlert("Failed to load inbox", "error");
+        } finally {
+          setLoading(false);
         }
-        
-        setChatList(listItems);
-      } catch (error) {
-        console.error("Error fetching chats:", error);
-        showAlert("Failed to load inbox", "error");
-      } finally {
-        setLoading(false);
-      }
+      });
     };
 
-    fetchChats();
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setupListener();
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribe();
+    };
   }, [showAlert]);
 
   if (loading) return <GlobalSpinner />;
