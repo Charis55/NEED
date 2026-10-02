@@ -87,13 +87,13 @@ export default function FavoritesPage() {
     >
       <div className="w-full pt-16 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black min-h-[80vh]">
         <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] mt-4">
-          SAVED ARTISANS
+          SAVED TECHNICIANS
         </h1>
 
         {favorites.length === 0 ? (
           <div className="bg-white brutal-border p-12 text-center shadow-[8px_8px_0_0_#000]">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">No saved artisans</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">No saved technicians</h2>
             <p className="font-bold text-gray-500 mb-6 uppercase text-sm">Save your favorite technicians to book them again quickly.</p>
             <Link href="/explore" className="bg-[var(--color-brutal-teal)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] inline-block hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
               EXPLORE TECHNICIANS

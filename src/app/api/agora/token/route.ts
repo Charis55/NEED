@@ -21,18 +21,16 @@ export async function POST(req: Request) {
 
     // Token expires in 2 hours (7200 seconds)
     const expirationTimeInSeconds = 7200;
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
 
-    // We use buildTokenWithAccount since Firebase UIDs are strings.
-    const token = RtcTokenBuilder.buildTokenWithAccount(
+    // In agora-token v2, expiration is passed in seconds
+    const token = RtcTokenBuilder.buildTokenWithUserAccount(
       appId,
       appCertificate,
       channelName,
       uid, 
       role,
-      privilegeExpiredTs,
-      privilegeExpiredTs
+      expirationTimeInSeconds,
+      expirationTimeInSeconds
     );
 
     return NextResponse.json({ token });
