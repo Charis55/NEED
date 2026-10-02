@@ -213,9 +213,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
             id={`remote-video-${user.uid}`} 
             className={`w-full h-full max-w-3xl bg-gray-900 border-4 border-[var(--color-brutal-blue)] overflow-hidden relative shadow-[8px_8px_0_0_#000] ${!user.hasVideo && isVideo ? 'flex items-center justify-center' : ''}`}
           >
-            {(!user.hasVideo && isVideo) && (
-              <div className="text-gray-500 font-bold uppercase">Video Paused</div>
-            )}
+
             <div className="absolute bottom-4 left-4 z-10 bg-[var(--color-brutal-bg)] text-black border-2 border-black px-2 py-1 font-black text-sm uppercase shadow-[4px_4px_0_0_#000]">
               {partnerName}
             </div>
