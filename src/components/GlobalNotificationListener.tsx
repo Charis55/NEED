@@ -87,9 +87,24 @@ export default function GlobalNotificationListener() {
                   }
 
                   let messagePreview = job.lastMessageText || "New message";
-                  if (messagePreview.length > 30) messagePreview = messagePreview.substring(0, 30) + "...";
+                  let notificationText = "";
 
-                  showAlert(`New message from ${senderName}: "${messagePreview}"`, "info", { 
+                  if (messagePreview.startsWith("[CALL_LOG]:")) {
+                    const parts = messagePreview.split(":");
+                    const callType = parts[1]?.toUpperCase() === "VIDEO" ? "Video" : "Voice";
+                    const callDuration = parts.slice(2).join(":"); 
+                    
+                    if (callDuration.toLowerCase().includes("missed") || callDuration.toLowerCase().includes("declined") || callDuration.toLowerCase().includes("cancelled") || callDuration.includes("-")) {
+                        notificationText = `Missed ${callType} Call from ${senderName}`;
+                    } else {
+                        notificationText = `${callType} Call ended (${callDuration})`;
+                    }
+                  } else {
+                    if (messagePreview.length > 40) messagePreview = messagePreview.substring(0, 40) + "...";
+                    notificationText = `${senderName}: ${messagePreview}`;
+                  }
+
+                  showAlert(notificationText, "info", { 
                     label: "VIEW", 
                     onClick: () => router.push(role === "artisan" ? `/chat/${job.requestId}` : `/chat/${job.requestId}`) 
                   }, senderAvatar);

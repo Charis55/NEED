@@ -120,7 +120,7 @@ export default function GlobalCallManager() {
         const isVideo = data.activeCall.type === "video";
         let durationText = "Missed Call";
         if (data.activeCall.connectedAt) {
-          const durationMs = Date.now() - data.activeCall.connectedAt;
+          const durationMs = Math.max(0, Date.now() - data.activeCall.connectedAt);
           const totalSeconds = Math.floor(durationMs / 1000);
           const m = Math.floor(totalSeconds / 60);
           const s = totalSeconds % 60;
