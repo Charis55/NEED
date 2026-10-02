@@ -87,15 +87,15 @@ export default function GlobalCallManager() {
 
   useEffect(() => {
     if (activeJob && activeJob.activeCall && activeJob.activeCall.status === "ringing") {
-      // Check how long it has been ringing
+      // Tolerate clock drift: If it's wildly in the past (e.g. > 5 mins), treat as stale.
       const elapsed = Date.now() - activeJob.activeCall.timestamp;
-      const remaining = 60000 - elapsed;
-      if (remaining <= 0) {
+      if (elapsed > 5 * 60000) {
         endCallWithLog("timeout");
       } else {
+        // Just ring for 60 seconds from when we observe it, to avoid clock drift ending it instantly
         const timer = setTimeout(() => {
           endCallWithLog("timeout");
-        }, remaining);
+        }, 60000);
         return () => clearTimeout(timer);
       }
     }

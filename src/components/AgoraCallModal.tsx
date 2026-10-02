@@ -66,7 +66,12 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
       try {
         // Listeners for remote users
         client.on("user-published", async (user, mediaType) => {
-          await client.subscribe(user, mediaType);
+          try {
+            await client.subscribe(user, mediaType);
+          } catch (err) {
+            console.error("Agora subscribe error:", err);
+            return;
+          }
           
           setRemoteUsers(prev => {
             if (prev.find(u => u.uid === user.uid)) return prev;
