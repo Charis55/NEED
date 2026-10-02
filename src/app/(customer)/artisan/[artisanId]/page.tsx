@@ -8,6 +8,7 @@ import { ArtisanProfile, Review } from "@/types";
 import { ChevronLeft, Star, MapPin, BadgeCheck, Clock, Calendar, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import GlobalSpinner from "@/components/GlobalSpinner";
+import PortfolioGallery from "@/components/PortfolioGallery";
 
 export default function ArtisanProfilePage({ params }: { params: Promise<{ artisanId: string }> }) {
   const unwrappedParams = use(params);
@@ -176,17 +177,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
             {artisan.portfolioPhotoUrls && artisan.portfolioPhotoUrls.length > 0 && (
               <div className="bg-white border-4 border-black p-5 brutal-shadow-sm">
                 <h2 className="text-xl font-black uppercase mb-4 border-b-2 border-black pb-2">Portfolio</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  {artisan.portfolioPhotoUrls.map((url, i) => (
-                    <div 
-                      key={i} 
-                      className="aspect-square bg-gray-200 border-2 border-black overflow-hidden cursor-pointer hover:scale-105 transition-transform"
-                      onClick={() => setFullscreenImage(url)}
-                    >
-                      <img src={url} alt={`Portfolio ${i}`} className="w-full h-full object-cover" />
-                    </div>
-                  ))}
-                </div>
+                <PortfolioGallery photos={artisan.portfolioPhotoUrls} />
               </div>
             )}
           </div>

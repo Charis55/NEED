@@ -41,8 +41,7 @@ export default function InboxPage() {
           const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
           activeJobs.sort((a, b) => b.createdAt - a.createdAt);
 
-          const listItems: ChatListItem[] = [];
-          for (const job of activeJobs) {
+          const listItems: ChatListItem[] = await Promise.all(activeJobs.map(async (job) => {
             let customer: UserAccount | null = null;
             if (job.customerId) {
               const cusDoc = await getDoc(doc(db, "users", job.customerId));
@@ -50,12 +49,12 @@ export default function InboxPage() {
                 customer = cusDoc.data() as UserAccount;
               }
             }
-            listItems.push({
+            return {
               job,
               customer,
               unreadCount: job.unreadCount?.[user.uid] || 0 
-            });
-          }
+            };
+          }));
           setChatList(listItems);
         } catch (error) {
           console.error("Error processing chats:", error);

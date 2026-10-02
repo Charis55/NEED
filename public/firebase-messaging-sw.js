@@ -31,7 +31,36 @@ messaging.onBackgroundMessage((payload) => {
   const notificationOptions = {
     body: payload.notification.body,
     icon: '/favicon.ico',
+    data: payload.data
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  
+  const payloadData = event.notification.data;
+  let url = '/'; // fallback
+  
+  if (payloadData && payloadData.requestId) {
+    url = '/chat/' + payloadData.requestId;
+  }
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // Check if there is already a window/tab open with the target URL
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        // If so, just focus it and navigate
+        if (client.url.includes(url) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // If not, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
 });

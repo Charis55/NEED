@@ -51,30 +51,26 @@ function InboxContent() {
           const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
           activeJobs.sort((a, b) => b.createdAt - a.createdAt);
 
-          const listItems: ChatListItem[] = [];
-          
-          for (const job of activeJobs) {
+          const listItems: ChatListItem[] = await Promise.all(activeJobs.map(async (job) => {
             let artisan: ArtisanProfile | null = null;
             let artisanUser: UserAccount | null = null;
             
             if (job.artisanId) {
-              const artDoc = await getDoc(doc(db, "artisans", job.artisanId));
-              if (artDoc.exists()) {
-                artisan = artDoc.data() as ArtisanProfile;
-              }
-              const userDoc = await getDoc(doc(db, "users", job.artisanId));
-              if (userDoc.exists()) {
-                artisanUser = userDoc.data() as UserAccount;
-              }
+              const [artDoc, userDoc] = await Promise.all([
+                getDoc(doc(db, "artisans", job.artisanId)),
+                getDoc(doc(db, "users", job.artisanId))
+              ]);
+              if (artDoc.exists()) artisan = artDoc.data() as ArtisanProfile;
+              if (userDoc.exists()) artisanUser = userDoc.data() as UserAccount;
             }
             
-            listItems.push({
+            return {
               job,
               artisan,
               artisanUser,
               unreadCount: job.unreadCount?.[user.uid] || 0
-            });
-          }
+            };
+          }));
 
           setChatList(listItems);
         } catch (error) {

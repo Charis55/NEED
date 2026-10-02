@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { JobRequest } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
@@ -58,78 +58,81 @@ export default function ArtisanDashboard() {
   }, [requests]);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    let unsubs: (() => void)[] = [];
+
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      // Clean up previous listeners if auth changes
+      unsubs.forEach(unsub => unsub());
+      unsubs = [];
+
       if (!user) {
         setLoading(false);
         return;
       }
 
-      const fetchRequests = async () => {
-        try {
-          const directQ = query(
-            collection(db, "jobRequests"),
-            where("artisanId", "==", user.uid)
-          );
-          
-          const broadcastQ = query(
-            collection(db, "jobRequests"),
-            where("isBroadcast", "==", true),
-            where("status", "==", "pending")
-          );
+      const artisanRef = doc(db, "artisans", user.uid);
+      
+      const unsubArtisan = onSnapshot(artisanRef, (artDoc) => {
+        let validServices: { trade: string, subcategory: string }[] = [];
+        let isVerifiedArtisan = false;
 
-          const [directSnapshot, broadcastSnapshot, artisanSnapshot] = await Promise.all([
-            getDocs(directQ),
-            getDocs(broadcastQ),
-            getDocs(query(collection(db, "artisans"), where("artisanId", "==", user.uid)))
-          ]);
-
-          let validServices: { trade: string, subcategory: string }[] = [];
-
-          if (!artisanSnapshot.empty) {
-            const artisanData = artisanSnapshot.docs[0].data();
-            if (artisanData.createdAt) {
-              const createdAtMs = typeof artisanData.createdAt === "number" 
-                ? artisanData.createdAt 
-                : artisanData.createdAt.toMillis?.() || Date.now();
-              const daysSinceSignup = Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24));
-              setPromoDaysLeft(Math.max(0, 30 - daysSinceSignup));
-            }
-
-            if (artisanData.services && artisanData.services.length > 0) {
-              validServices = artisanData.services;
-            } else {
-              validServices = [{ trade: artisanData.trade, subcategory: artisanData.subcategory }];
-            }
-            setIsVerified(artisanData.verified || false);
+        if (artDoc.exists()) {
+          const artisanData = artDoc.data();
+          if (artisanData.createdAt) {
+            const createdAtMs = typeof artisanData.createdAt === "number" 
+              ? artisanData.createdAt 
+              : artisanData.createdAt.toMillis?.() || Date.now();
+            const daysSinceSignup = Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24));
+            setPromoDaysLeft(Math.max(0, 30 - daysSinceSignup));
           }
 
-          const directResults = directSnapshot.docs.map(doc => doc.data() as JobRequest);
-          const allBroadcastResults = broadcastSnapshot.docs.map(doc => doc.data() as JobRequest);
-          
-          // Only show broadcast jobs that match the artisan's services (and only if verified)
-          const matchedBroadcastResults = (artisanSnapshot.empty || !(artisanSnapshot.docs[0].data().verified)) 
-            ? [] 
-            : allBroadcastResults.filter(job => 
-                validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory)
-              );
+          if (artisanData.services && artisanData.services.length > 0) {
+            validServices = artisanData.services;
+          } else {
+            validServices = [{ trade: artisanData.trade, subcategory: artisanData.subcategory }];
+          }
+          isVerifiedArtisan = artisanData.verified || false;
+          setIsVerified(isVerifiedArtisan);
+        }
 
-          // Combine and deduplicate
+        const directQ = query(collection(db, "jobRequests"), where("artisanId", "==", user.uid));
+        const broadcastQ = query(collection(db, "jobRequests"), where("isBroadcast", "==", true), where("status", "==", "pending"));
+
+        let directResults: JobRequest[] = [];
+        let broadcastResults: JobRequest[] = [];
+
+        const updateCombined = () => {
+          const matchedBroadcastResults = isVerifiedArtisan 
+            ? broadcastResults.filter(job => validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory))
+            : [];
+          
           const combined = [...directResults, ...matchedBroadcastResults];
           const uniqueResults = Array.from(new Map(combined.map(item => [item.requestId, item])).values());
-          
           uniqueResults.sort((a, b) => b.createdAt - a.createdAt);
           setRequests(uniqueResults);
-        } catch (error) {
-          console.error("Error fetching requests:", error);
-        } finally {
           setLoading(false);
-        }
-      };
+        };
 
-      fetchRequests();
+        const unsubDirect = onSnapshot(directQ, (snap) => {
+          directResults = snap.docs.map(doc => doc.data() as JobRequest);
+          updateCombined();
+        });
+        unsubs.push(unsubDirect);
+
+        const unsubBroadcast = onSnapshot(broadcastQ, (snap) => {
+          broadcastResults = snap.docs.map(doc => doc.data() as JobRequest);
+          updateCombined();
+        });
+        unsubs.push(unsubBroadcast);
+      });
+
+      unsubs.push(unsubArtisan);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubs.forEach(unsub => unsub());
+      unsubscribeAuth();
+    };
   }, []);
 
   const handleUpdateStatus = async (requestId: string, newStatus: JobRequest['status'], counterAmt: number | null = null) => {

@@ -4,6 +4,7 @@ import { ArtisanProfile } from '@/types';
 import { BadgeCheck, MapPin, Star, Zap, CheckCircle, XCircle } from 'lucide-react';
 import BackButton from '@/components/BackButton';
 import FavoriteButton from '@/components/FavoriteButton';
+import PortfolioGallery from '@/components/PortfolioGallery';
 
 // Fetch artisan data using Firestore REST API for Server-Side Rendering
 async function getArtisan(artisanId: string): Promise<ArtisanProfile | null> {
@@ -161,19 +162,7 @@ export default async function ArtisanProfilePage({ params }: { params: Promise<{
 
         <div className="mb-12">
           <h2 className="text-2xl font-black text-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-2 inline-block">Portfolio</h2>
-          {artisan.portfolioPhotoUrls && artisan.portfolioPhotoUrls.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {artisan.portfolioPhotoUrls.map((url, i) => (
-                <div key={i} className="aspect-square bg-gray-200 brutal-border brutal-shadow-sm overflow-hidden hover:-translate-y-1 transition-transform">
-                  <img src={url} alt={`Portfolio item ${i+1}`} className="w-full h-full object-cover transition-all duration-300" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white p-8 brutal-border text-center">
-              <p className="font-black text-gray-400 uppercase">NO PORTFOLIO PHOTOS YET</p>
-            </div>
-          )}
+          <PortfolioGallery photos={artisan.portfolioPhotoUrls || []} />
         </div>
         
         {/* Reviews Section Placeholder */}

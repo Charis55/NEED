@@ -31,11 +31,17 @@ function JobsContent() {
   const { showAlert } = useAlert();
 
   useEffect(() => {
-    let unsubscribe: () => void;
+    let unsubscribe: (() => void) | undefined;
 
-    const fetchRequests = () => {
-      const user = auth.currentUser;
-      if (!user) return; 
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const q = query(collection(db, "jobRequests"), where("customerId", "==", user.uid));
       
@@ -48,13 +54,11 @@ function JobsContent() {
         console.error("Error fetching requests:", error);
         setLoading(false);
       });
-    };
+    });
 
-    // Minor delay to ensure auth state is loaded in simple client implementations
-    const timer = setTimeout(() => fetchRequests(), 1000);
     return () => {
-      clearTimeout(timer);
       if (unsubscribe) unsubscribe();
+      unsubscribeAuth();
     };
   }, []);
 

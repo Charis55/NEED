@@ -66,11 +66,14 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
           }
 
           const userDoc = await getDoc(doc(db, "users", user.uid));
+          let dbPhotoURL = null;
+          
           if (userDoc.exists()) {
             const data = userDoc.data() as UserAccount;
             if (data.firstName) setFirstName(data.firstName);
             if (data.lastName) setLastName(data.lastName);
             setPhone(data.phone || "");
+            if (data.photoURL) dbPhotoURL = data.photoURL;
             
             if (data.preferences) {
               setPreferences({ inAppNotifications: true, ...data.preferences });
@@ -82,7 +85,14 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             if (artisanDoc.exists()) {
               const data = artisanDoc.data();
               setCertificates(data.certificates || []);
+              if (data.profilePictureUrl) dbPhotoURL = data.profilePictureUrl;
             }
+          }
+          
+          if (dbPhotoURL && !user.photoURL) {
+            setPhotoURL(dbPhotoURL);
+          } else if (dbPhotoURL) {
+            setPhotoURL(dbPhotoURL);
           }
         } catch (e) {
           console.error("Error fetching user data", e);
@@ -189,6 +199,16 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       await updateProfile(user, { photoURL: publicUrl });
       await updateDoc(doc(db, "users", user.uid), { photoURL: publicUrl });
+      
+      try {
+        const artisanRef = doc(db, "artisans", user.uid);
+        const artSnap = await getDoc(artisanRef);
+        if (artSnap.exists()) {
+          await updateDoc(artisanRef, { profilePictureUrl: publicUrl });
+        }
+      } catch (e) {
+        console.error("Failed to update artisan profile picture", e);
+      }
       
       setPhotoURL(publicUrl);
       showAlert("Profile picture updated!", "success");

@@ -13,9 +13,6 @@ import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, Shi
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
-import AgoraCallModal from "@/components/AgoraCallModal";
-import IncomingCallModal from "@/components/IncomingCallModal";
-import OutgoingCallModal from "@/components/OutgoingCallModal";
 
 interface Message {
   id: string;
@@ -50,12 +47,6 @@ export default function ChatPage() {
   
   const { showAlert } = useAlert();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Agora Call State
-  const [showCallModal, setShowCallModal] = useState(false);
-  const [showIncomingCall, setShowIncomingCall] = useState(false);
-  const [showOutgoingCall, setShowOutgoingCall] = useState(false);
-  const [callType, setCallType] = useState<"audio" | "video">("audio");
   
   // Review Modal State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -320,32 +311,6 @@ export default function ChatPage() {
     }
   }, [job?.unreadCount, auth.currentUser?.uid, requestId]);
 
-  // Handle incoming calls reliably based on reactive state
-  useEffect(() => {
-    const currentUid = auth.currentUser?.uid;
-    if (!job || !currentUid) return;
-
-    if (job.activeCall && job.activeCall.status === "ringing") {
-      setCallType(job.activeCall.type);
-      if (job.activeCall.callerId !== currentUid) {
-        setShowIncomingCall(true);
-        setShowOutgoingCall(false);
-        setShowCallModal(false);
-      } else {
-        setShowIncomingCall(false);
-        setShowOutgoingCall(true);
-        setShowCallModal(false);
-      }
-    } else if (job.activeCall?.status === "ongoing") {
-      setShowIncomingCall(false);
-      setShowOutgoingCall(false);
-      setShowCallModal(true);
-    } else if (job.activeCall?.status === "ended") {
-      setShowIncomingCall(false);
-      setShowOutgoingCall(false);
-      setShowCallModal(false);
-    }
-  }, [job?.activeCall, auth.currentUser?.uid]);
 
   useEffect(() => {
     if (!job) return;
@@ -657,13 +622,6 @@ export default function ChatPage() {
           timestamp: Date.now()
         }
       });
-      setCallType(type);
-      setShowOutgoingCall(true);
-      
-      // Auto-end call if not picked up in 60s
-      setTimeout(() => {
-        endCallWithLog();
-      }, 60000);
 
       const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
       if (partnerId) {
@@ -684,107 +642,11 @@ export default function ChatPage() {
     }
   };
 
-  const endCallWithLog = async () => {
-    if (!job || !job.activeCall) {
-      setShowOutgoingCall(false);
-      setShowCallModal(false);
-      setShowIncomingCall(false);
-      return;
-    }
-    
-    try {
-      await runTransaction(db, async (transaction) => {
-        const jobRef = doc(db, "jobRequests", requestId);
-        const jobDoc = await transaction.get(jobRef);
-        if (!jobDoc.exists()) return;
-        
-        const data = jobDoc.data() as JobRequest;
-        if (!data.activeCall || data.activeCall.status === "ended") return;
-        
-        const isVideo = data.activeCall.type === "video";
-        let durationText = "Missed Call";
-        if (data.activeCall.connectedAt) {
-          const durationMs = Date.now() - data.activeCall.connectedAt;
-          const totalSeconds = Math.floor(durationMs / 1000);
-          const m = Math.floor(totalSeconds / 60);
-          const s = totalSeconds % 60;
-          durationText = `${m}:${s.toString().padStart(2, '0')} mins`;
-        } else if (data.activeCall.status === "ringing" && data.activeCall.callerId !== auth.currentUser?.uid) {
-           durationText = "Declined Call";
-        }
-
-        const messageText = `📞 ${isVideo ? 'Video' : 'Voice'} Call • ${durationText}`;
-        const receiverId = data.customerId === data.activeCall.callerId ? data.artisanId : data.customerId;
-
-        transaction.update(jobRef, {
-          "activeCall.status": "ended",
-          lastMessageText: messageText,
-          lastMessageSenderId: data.activeCall.callerId,
-          lastMessageAt: Date.now(),
-          ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
-        });
-
-        const msgRef = doc(collection(db, "jobRequests", requestId, "messages"));
-        transaction.set(msgRef, {
-          text: messageText,
-          senderId: data.activeCall.callerId,
-          createdAt: Date.now()
-        });
-      });
-    } catch (e) {
-      console.error("Failed to end call", e);
-    }
-    
-    setShowOutgoingCall(false);
-    setShowCallModal(false);
-    setShowIncomingCall(false);
-  };
-
-  const endCall = () => endCallWithLog();
-
-  const acceptCall = async () => {
-    if (!job) return;
-    try {
-      await updateDoc(doc(db, "jobRequests", requestId), {
-        "activeCall.status": "ongoing",
-        "activeCall.connectedAt": Date.now()
-      });
-      setShowIncomingCall(false);
-      setShowCallModal(true);
-    } catch (e) {}
-  };
-
-  const declineCall = () => endCallWithLog();
-
   return (
-    <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">
-      {showIncomingCall && (
-        <IncomingCallModal 
-          callerName={chatPartnerName}
-          callerPhoto={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL}
-          callType={callType}
-          jobTitle={job.subcategory}
-          onAccept={acceptCall}
-          onDecline={declineCall}
-        />
-      )}
-      {showOutgoingCall && (
-        <OutgoingCallModal 
-          calleeName={chatPartnerName}
-          calleePhoto={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL}
-          callType={callType}
-          onCancel={endCall}
-        />
-      )}
-      {showCallModal && auth.currentUser && (
-        <AgoraCallModal
-          channelName={requestId}
-          uid={auth.currentUser.uid}
-          isVideo={callType === "video"}
-          partnerName={chatPartnerName}
-          onEndCall={endCall}
-        />
-      )}
+    <div 
+      className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]"
+      onClick={() => setDeletingMsgId(null)}
+    >
       {/* Header */}
       <div className="bg-[var(--color-brutal-blue)] border-b-4 md:border-b-8 border-black pt-[max(env(safe-area-inset-top),0.75rem)] md:pt-10 pb-3 md:pb-4 px-3 md:px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
@@ -915,7 +777,10 @@ export default function ChatPage() {
                       ? "bg-[var(--color-brutal-yellow)] rounded-l-xl rounded-tr-xl" 
                       : "bg-white rounded-r-xl rounded-tl-xl"
                   }`}
-                  onClick={() => isMe ? setDeletingMsgId(deletingMsgId === msg.id ? null : msg.id) : null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isMe) setDeletingMsgId(deletingMsgId === msg.id ? null : msg.id);
+                  }}
                 >
                   {msg.imageUrl && (
                     <img 
@@ -931,7 +796,38 @@ export default function ChatPage() {
                     </div>
                   )}
                   {msg.text && (
-                    <p className="font-bold text-black break-words text-sm md:text-base">{msg.text}</p>
+                    (msg.text.startsWith("[CALL_LOG]:") || msg.text.includes("📞")) ? (() => {
+                      let isVideo = false;
+                      let duration = "";
+                      
+                      if (msg.text.startsWith("[CALL_LOG]:")) {
+                        const [, type, dur] = msg.text.split(":");
+                        isVideo = type === "video";
+                        duration = dur;
+                      } else {
+                        // Legacy support for "📞 Video Call • Missed Call"
+                        isVideo = msg.text.includes("Video");
+                        const parts = msg.text.split("•");
+                        duration = parts.length > 1 ? parts[1].trim() : "Ended";
+                      }
+                      
+                      return (
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`p-1.5 border-2 border-black ${isMe ? 'bg-white' : 'bg-[var(--color-brutal-yellow)]'} shadow-[2px_2px_0_0_#000]`}>
+                            {isVideo ? (
+                              <Video className="w-4 h-4 stroke-[3] text-black" />
+                            ) : (
+                              <Phone className="w-4 h-4 stroke-[3] text-black" />
+                            )}
+                          </div>
+                          <span className="font-black text-black text-sm uppercase">
+                            {isVideo ? 'Video' : 'Voice'} Call • {duration}
+                          </span>
+                        </div>
+                      );
+                    })() : (
+                      <p className="font-bold text-black break-words text-sm md:text-base">{msg.text}</p>
+                    )
                   )}
                   <div className="flex justify-end items-center gap-1 mt-1">
                     <p className="text-[10px] font-black text-black/50 text-right">
