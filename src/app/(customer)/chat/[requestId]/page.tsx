@@ -801,9 +801,9 @@ export default function ChatPage() {
                       let duration = "";
                       
                       if (msg.text.startsWith("[CALL_LOG]:")) {
-                        const [, type, dur] = msg.text.split(":");
-                        isVideo = type === "video";
-                        duration = dur;
+                        const parts = msg.text.split(":");
+                        isVideo = parts[1]?.toLowerCase() === "video";
+                        duration = parts.slice(2).join(":");
                       } else {
                         // Legacy support for "📞 Video Call • Missed Call"
                         isVideo = msg.text.includes("Video");

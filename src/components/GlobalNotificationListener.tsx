@@ -97,7 +97,8 @@ export default function GlobalNotificationListener() {
                     if (callDuration.toLowerCase().includes("missed") || callDuration.toLowerCase().includes("declined") || callDuration.toLowerCase().includes("cancelled") || callDuration.includes("-")) {
                         notificationText = `Missed ${callType} Call from ${senderName}`;
                     } else {
-                        notificationText = `${callType} Call ended (${callDuration})`;
+                        // Do not send an alert if the call just ended normally (was connected)
+                        continue;
                     }
                   } else {
                     if (messagePreview.length > 40) messagePreview = messagePreview.substring(0, 40) + "...";

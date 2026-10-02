@@ -134,12 +134,19 @@ export default function GlobalCallManager() {
         }
 
         const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:${durationText}`;
-        const receiverId = data.customerId === data.activeCall.callerId ? data.artisanId : data.customerId;
+        
+        // If declined, the callee declined it, so the callee is the sender (so the caller gets notified)
+        // Otherwise, it's a missed call (or ended call), so the caller is the sender (so the callee gets notified)
+        const messageSenderId = reason === "declined" 
+          ? (data.customerId === data.activeCall.callerId ? data.artisanId! : data.customerId)
+          : data.activeCall.callerId;
+          
+        const receiverId = data.customerId === messageSenderId ? data.artisanId : data.customerId;
 
         transaction.update(jobRef, {
           "activeCall.status": "ended",
           lastMessageText: messageText,
-          lastMessageSenderId: data.activeCall.callerId,
+          lastMessageSenderId: messageSenderId,
           lastMessageAt: Date.now(),
           ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
         });
@@ -147,7 +154,7 @@ export default function GlobalCallManager() {
         const msgRef = doc(collection(db, "jobRequests", jobToProcess.requestId, "messages"));
         transaction.set(msgRef, {
           text: messageText,
-          senderId: data.activeCall.callerId,
+          senderId: messageSenderId,
           createdAt: Date.now()
         });
       });
