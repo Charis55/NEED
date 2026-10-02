@@ -4,9 +4,6 @@ import { useEffect, useState } from "react";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
 
-// Initialize Agora Client outside component to prevent multiple instances
-const client: IAgoraRTCClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-
 interface AgoraCallModalProps {
   channelName: string;
   uid: string;
@@ -15,6 +12,7 @@ interface AgoraCallModalProps {
 }
 
 export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }: AgoraCallModalProps) {
+  const [client] = useState<IAgoraRTCClient>(() => AgoraRTC.createClient({ mode: "rtc", codec: "vp8" }));
   const [token, setToken] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
   const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack | null>(null);
@@ -113,9 +111,10 @@ export default function AgoraCallModal({ channelName, uid, isVideo, onEndCall }:
           setLocalAudioTrack(localA);
           setJoined(true);
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (!isMounted) return; // Ignore errors if unmounted (e.g., strict mode aborts)
         console.error("Agora Error:", err);
-        if (isMounted) setError("Failed to join call. Please check microphone/camera permissions.");
+        setError("Failed to join call. Please check microphone/camera permissions. " + err?.message);
       }
     };
 

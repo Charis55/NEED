@@ -14,6 +14,7 @@ import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
 import AgoraCallModal from "@/components/AgoraCallModal";
+import IncomingCallModal from "@/components/IncomingCallModal";
 
 interface Message {
   id: string;
@@ -51,6 +52,7 @@ export default function ChatPage() {
   
   // Agora Call State
   const [showCallModal, setShowCallModal] = useState(false);
+  const [showIncomingCall, setShowIncomingCall] = useState(false);
   const [callType, setCallType] = useState<"audio" | "video">("audio");
   
   // Review Modal State
@@ -313,8 +315,13 @@ export default function ChatPage() {
       job.activeCall.callerId !== currentUid
     ) {
       setCallType(job.activeCall.type);
+      setShowIncomingCall(true);
+      setShowCallModal(false);
+    } else if (job.activeCall?.status === "ongoing" && job.activeCall.callerId !== currentUid) {
+      setShowIncomingCall(false);
       setShowCallModal(true);
     } else if (job.activeCall?.status === "ended" && job.activeCall.callerId !== currentUid) {
+      setShowIncomingCall(false);
       setShowCallModal(false);
     }
   }, [job?.activeCall, auth.currentUser?.uid]);
@@ -675,8 +682,39 @@ export default function ChatPage() {
     setShowCallModal(false);
   };
 
+  const acceptCall = async () => {
+    if (!job) return;
+    try {
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        "activeCall.status": "ongoing"
+      });
+      setShowIncomingCall(false);
+      setShowCallModal(true);
+    } catch (e) {}
+  };
+
+  const declineCall = async () => {
+    if (!job) return;
+    try {
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        "activeCall.status": "ended"
+      });
+      setShowIncomingCall(false);
+    } catch (e) {}
+  };
+
   return (
     <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">
+      {showIncomingCall && (
+        <IncomingCallModal 
+          callerName={chatPartnerName}
+          callerPhoto={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL}
+          callType={callType}
+          jobTitle={job.subcategory}
+          onAccept={acceptCall}
+          onDecline={declineCall}
+        />
+      )}
       {showCallModal && auth.currentUser && (
         <AgoraCallModal
           channelName={requestId}
