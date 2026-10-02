@@ -9,10 +9,11 @@ import { JobRequest, ArtisanProfile, Review } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import UserAvatar from "@/components/UserAvatar";
-import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check } from "lucide-react";
+import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check, Phone, Video } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
+import AgoraCallModal from "@/components/AgoraCallModal";
 
 interface Message {
   id: string;
@@ -47,6 +48,10 @@ export default function ChatPage() {
   
   const { showAlert } = useAlert();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Agora Call State
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [callType, setCallType] = useState<"audio" | "video">("audio");
   
   // Review Modal State
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -261,38 +266,53 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    const fetchJob = async () => {
+    let artisanFetched = false;
+    let customerFetched = false;
+
+    const jobUnsubscribe = onSnapshot(doc(db, "jobRequests", requestId), async (jobDoc) => {
       try {
-        const jobDoc = await getDoc(doc(db, "jobRequests", requestId));
         if (jobDoc.exists()) {
           const jobData = jobDoc.data() as JobRequest;
           setJob(jobData);
           
-          if (jobData.artisanId) {
-            const artDoc = await getDoc(doc(db, "artisans", jobData.artisanId));
-            if (artDoc.exists()) {
-              setArtisan(artDoc.data() as ArtisanProfile);
-            }
-            const artUserDoc = await getDoc(doc(db, "users", jobData.artisanId));
-            if (artUserDoc.exists()) {
-              setArtisanUser(artUserDoc.data());
-            }
+          if (jobData.artisanId && !artisanFetched) {
+            artisanFetched = true;
+            getDoc(doc(db, "artisans", jobData.artisanId)).then(artDoc => {
+              if (artDoc.exists()) setArtisan(artDoc.data() as ArtisanProfile);
+            });
+            getDoc(doc(db, "users", jobData.artisanId)).then(artUserDoc => {
+              if (artUserDoc.exists()) setArtisanUser(artUserDoc.data());
+            });
           }
           
-          if (jobData.customerId) {
-            const custDoc = await getDoc(doc(db, "users", jobData.customerId));
-            if (custDoc.exists()) {
-              setCustomer(custDoc.data());
+          if (jobData.customerId && !customerFetched) {
+            customerFetched = true;
+            getDoc(doc(db, "users", jobData.customerId)).then(custDoc => {
+              if (custDoc.exists()) setCustomer(custDoc.data());
+            });
+          }
+
+          // Check for incoming call
+          if (
+            jobData.activeCall &&
+            jobData.activeCall.status === "ringing" &&
+            jobData.activeCall.callerId !== auth.currentUser?.uid
+          ) {
+            // Check if call hasn't timed out (e.g. 60 seconds)
+            if (Date.now() - jobData.activeCall.timestamp < 60000) {
+              setCallType(jobData.activeCall.type);
+              setShowCallModal(true);
             }
+          } else if (jobData.activeCall?.status === "ended") {
+            setShowCallModal(false);
           }
         }
       } catch (err) {
-        console.error("Error fetching job", err);
-        showAlert("Failed to load chat", "error");
+        console.error("Error in job snapshot", err);
       }
-    };
+    });
     
-    fetchJob();
+    return () => jobUnsubscribe();
   }, [requestId]);
 
   useEffect(() => {
@@ -589,8 +609,62 @@ export default function ChatPage() {
     ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || artisanUser?.phone || "Unknown Technician") 
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Unknown Customer");
 
+  const startCall = async (type: "audio" | "video") => {
+    if (!job || !auth.currentUser) return;
+    try {
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        activeCall: {
+          channelName: requestId,
+          callerId: auth.currentUser.uid,
+          type,
+          status: "ringing",
+          timestamp: Date.now()
+        }
+      });
+      setCallType(type);
+      setShowCallModal(true);
+
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+      if (partnerId) {
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: partnerId,
+            title: `Incoming ${type} call`,
+            body: `${auth.currentUser.displayName || 'Someone'} is calling you`,
+            data: { requestId, type: "call" }
+          })
+        }).catch(err => console.error("Push failed:", err));
+      }
+    } catch (error) {
+      console.error("Failed to start call", error);
+      showAlert("Failed to start call", "error");
+    }
+  };
+
+  const endCall = async () => {
+    if (!job) return;
+    try {
+      await updateDoc(doc(db, "jobRequests", requestId), {
+        "activeCall.status": "ended"
+      });
+    } catch (error) {
+      console.error("Failed to end call", error);
+    }
+    setShowCallModal(false);
+  };
+
   return (
     <div className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]">
+      {showCallModal && auth.currentUser && (
+        <AgoraCallModal
+          channelName={requestId}
+          uid={auth.currentUser.uid}
+          isVideo={callType === "video"}
+          onEndCall={endCall}
+        />
+      )}
       {/* Header */}
       <div className="bg-[var(--color-brutal-blue)] border-b-4 md:border-b-8 border-black pt-[max(env(safe-area-inset-top),0.75rem)] md:pt-10 pb-3 md:pb-4 px-3 md:px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
@@ -641,6 +715,22 @@ export default function ChatPage() {
               <span className="md:hidden">RECEIPT</span>
               {job.proofOfPaymentUrl && <div className="w-4 h-4 bg-white border-2 border-black rounded-full flex items-center justify-center"><Check className="w-3 h-3 stroke-[4]" /></div>}
             </button>
+          )}
+          {job?.status !== "completed" && job?.status !== "cancelled" && job?.status !== "declined" && (
+            <>
+              <button 
+                onClick={() => startCall("audio")}
+                className="w-8 h-8 md:w-10 md:h-10 bg-white border-2 md:border-3 border-black flex justify-center items-center shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-transform shrink-0"
+              >
+                <Phone className="w-4 h-4 md:w-5 md:h-5 stroke-[3]" />
+              </button>
+              <button 
+                onClick={() => startCall("video")}
+                className="w-8 h-8 md:w-10 md:h-10 bg-[var(--color-brutal-yellow)] border-2 md:border-3 border-black flex justify-center items-center shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-transform shrink-0"
+              >
+                <Video className="w-4 h-4 md:w-5 md:h-5 stroke-[3]" />
+              </button>
+            </>
           )}
           <button 
             onClick={handleBlockUser}

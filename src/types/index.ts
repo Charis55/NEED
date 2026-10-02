@@ -170,6 +170,13 @@ export interface JobRequest {
   createdAt: number;
   completedAt: number | null;
   reviewed?: boolean;
+  activeCall?: {
+    channelName: string;
+    callerId: string;
+    type: "audio" | "video";
+    status: "ringing" | "ongoing" | "ended";
+    timestamp: number;
+  };
 }
 
 export interface Review {
