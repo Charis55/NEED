@@ -100,18 +100,21 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
         });
 
-        // Join channel
-        await client.join(appId, channelName, token, uid);
-        if (!isMounted) return;
-
-        // Create and publish local tracks
+        // 1. Create local tracks (This prompts for permissions)
         localA = await AgoraRTC.createMicrophoneAudioTrack();
         if (!isMounted) return;
 
         if (isVideo) {
           localV = await AgoraRTC.createCameraVideoTrack();
           if (!isMounted) return;
-          
+        }
+
+        // 2. Join channel AFTER permissions are granted and tracks created
+        await client.join(appId, channelName, token, uid);
+        if (!isMounted) return;
+
+        // 3. Publish tracks
+        if (isVideo) {
           await client.publish([localA, localV]);
           if (!isMounted) return;
 
