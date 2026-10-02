@@ -73,7 +73,7 @@ function InboxContent() {
             job,
             artisan,
             artisanUser,
-            unreadCount: 0 // We will implement real unread counts later in the chat logic
+            unreadCount: job.unreadCount?.[user.uid] || 0
           });
         }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth, db, storage } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, runTransaction, arrayUnion } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, runTransaction, arrayUnion, increment } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { JobRequest, ArtisanProfile, Review } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
@@ -242,13 +242,15 @@ export default function ChatPage() {
         createdAt: Date.now()
       });
 
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+
       await updateDoc(doc(db, "jobRequests", requestId), {
         lastMessageText: "Voice note",
         lastMessageSenderId: user.uid,
-        lastMessageAt: Date.now()
+        lastMessageAt: Date.now(),
+        ...(partnerId ? { [`unreadCount.${partnerId}`]: increment(1) } : {})
       });
 
-      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
       if (partnerId) {
         fetch("/api/send-notification", {
           method: "POST",
@@ -305,6 +307,18 @@ export default function ChatPage() {
     
     return () => jobUnsubscribe();
   }, [requestId]);
+
+  // Reset unread count when viewing chat
+  useEffect(() => {
+    const currentUid = auth.currentUser?.uid;
+    if (job && currentUid && job.unreadCount?.[currentUid]) {
+      if (job.unreadCount[currentUid] > 0) {
+        updateDoc(doc(db, "jobRequests", requestId), {
+          [`unreadCount.${currentUid}`]: 0
+        }).catch(err => console.error("Failed to reset unread count", err));
+      }
+    }
+  }, [job?.unreadCount, auth.currentUser?.uid, requestId]);
 
   // Handle incoming calls reliably based on reactive state
   useEffect(() => {
@@ -381,14 +395,16 @@ export default function ChatPage() {
         senderId: user.uid,
         createdAt: Date.now()
       });
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+
       await updateDoc(doc(db, "jobRequests", requestId), {
         lastMessageText: newMessage,
         lastMessageSenderId: user.uid,
-        lastMessageAt: Date.now()
+        lastMessageAt: Date.now(),
+        ...(partnerId ? { [`unreadCount.${partnerId}`]: increment(1) } : {})
       });
       setNewMessage("");
 
-      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
       if (partnerId) {
         fetch("/api/send-notification", {
           method: "POST",
@@ -517,16 +533,18 @@ export default function ChatPage() {
         senderId: user.uid,
         createdAt: Date.now()
       });
+      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
+
       await updateDoc(doc(db, "jobRequests", requestId), {
         lastMessageText: newMessage || "Image attached",
         lastMessageSenderId: user.uid,
-        lastMessageAt: Date.now()
+        lastMessageAt: Date.now(),
+        ...(partnerId ? { [`unreadCount.${partnerId}`]: increment(1) } : {})
       });
       setNewMessage("");
       setPendingImage(null);
       setPendingImagePreview(null);
 
-      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
       if (partnerId) {
         fetch("/api/send-notification", {
           method: "POST",

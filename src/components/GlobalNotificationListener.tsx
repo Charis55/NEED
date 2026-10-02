@@ -15,6 +15,7 @@ export default function GlobalNotificationListener() {
   const initialArtisanLoad = useRef(true);
   const initialCustomerLoad = useRef(true);
   const lastMessageAtMap = useRef<Record<string, number>>({});
+  const listenerAttachedAt = useRef(Date.now());
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
@@ -57,10 +58,13 @@ export default function GlobalNotificationListener() {
           
           if (change.type === "added" || change.type === "modified") {
             
-            // Check for new messages
             if (job.lastMessageAt && job.lastMessageSenderId !== user.uid) {
               const previousLastMessageAt = lastMessageAtMap.current[job.requestId];
-              if (!previousLastMessageAt || job.lastMessageAt > previousLastMessageAt) {
+              
+              // Only alert if this message is ACTUALLY new (newer than when we loaded the app, or newer than the last one we saw)
+              const isHistorical = job.lastMessageAt < listenerAttachedAt.current;
+              
+              if ((!previousLastMessageAt && !isHistorical) || (previousLastMessageAt && job.lastMessageAt > previousLastMessageAt)) {
                 lastMessageAtMap.current[job.requestId] = job.lastMessageAt;
                 
                 try {

@@ -138,6 +138,7 @@ export interface JobRequest {
   subcategory: string;
   description: string;
   neighborhood: string;
+  unreadCount?: Record<string, number>;
   locationCoords?: {
     lat: number;
     lng: number;

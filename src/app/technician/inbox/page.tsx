@@ -54,7 +54,7 @@ export default function InboxPage() {
           listItems.push({
             job,
             customer,
-            unreadCount: 0 
+            unreadCount: job.unreadCount?.[user.uid] || 0 
           });
         }
         
@@ -95,12 +95,19 @@ export default function InboxPage() {
                 className="block bg-white border-4 border-black p-4 shadow-[4px_4px_0_0_#000] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0_0_#000] transition-all group"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-black flex-shrink-0 bg-[var(--color-brutal-yellow)]">
-                    <UserAvatar 
-                      photoURL={customer?.photoURL} 
-                      name={customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Customer"} 
-                      className="w-full h-full text-xl text-black font-black" 
-                    />
+                  <div className="relative flex-shrink-0">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-black bg-[var(--color-brutal-yellow)]">
+                      <UserAvatar 
+                        photoURL={customer?.photoURL} 
+                        name={customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Customer"} 
+                        className="w-full h-full text-xl text-black font-black" 
+                      />
+                    </div>
+                    {unreadCount > 0 && (
+                      <div className="absolute -top-2 -right-2 bg-[var(--color-brutal-red)] text-white w-6 h-6 flex items-center justify-center border-2 border-black rounded-full font-black text-xs z-10 shadow-[2px_2px_0_0_#000]">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex-1 min-w-0">
@@ -123,11 +130,6 @@ export default function InboxPage() {
                       `}>
                         {job.status}
                       </span>
-                      {unreadCount > 0 && (
-                        <span className="bg-[var(--color-brutal-red)] text-white text-xs font-black px-2 py-0.5 border-2 border-black rounded-full">
-                          {unreadCount} NEW
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
