@@ -81,7 +81,7 @@ export default function PullToRefresh({ children }: { children: React.ReactNode 
       {/* Main Content Wrapper */}
       <div 
         className="transition-transform duration-200 min-h-screen"
-        style={{ transform: `translateY(${refreshing ? THRESHOLD : currentY}px)` }}
+        style={{ transform: (refreshing || currentY > 0) ? `translateY(${refreshing ? THRESHOLD : currentY}px)` : 'none' }}
       >
         {children}
       </div>

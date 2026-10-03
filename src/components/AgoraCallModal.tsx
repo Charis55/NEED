@@ -25,6 +25,23 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   const [videoMuted, setVideoMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
   const [error, setError] = useState("");
+  const [callDuration, setCallDuration] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (joined) {
+      interval = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [joined]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const toggleSpeaker = () => {
     if (typeof window !== 'undefined' && (window as any).AudioToggle) {
@@ -202,8 +219,15 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col bg-black text-white overflow-hidden">
       {/* Header */}
-      <div className="absolute top-0 w-full h-16 bg-gradient-to-b from-black/80 to-transparent z-10 flex items-center px-4">
-        <div className="text-white font-black uppercase text-lg tracking-widest">{isVideo ? "Video Call" : "Audio Call"}</div>
+      <div className="absolute top-0 w-full h-20 bg-gradient-to-b from-black/80 to-transparent z-10 flex items-center justify-center px-4">
+        <div className="text-white font-black uppercase text-lg tracking-widest flex flex-col items-center">
+          <div>{isVideo ? "Video Call" : "Audio Call"}</div>
+          {joined && (
+            <div className="text-xl mt-1 text-[var(--color-brutal-yellow)] font-mono tracking-widest drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
+              {formatTime(callDuration)}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Video / Audio Area */}

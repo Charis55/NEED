@@ -123,12 +123,27 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         emailChanged = true;
       }
 
-      await updateDoc(doc(db, "users", authUser.uid), { 
+      const userUpdatePayload: any = {
         firstName,
         lastName,
         displayName: newDisplayName,
         phone,
-      });
+      };
+
+      if (emailChanged) {
+        userUpdatePayload.email = email;
+      }
+
+      await updateDoc(doc(db, "users", authUser.uid), userUpdatePayload);
+
+      if (isArtisan && emailChanged) {
+        // Also update artisan profile email
+        const artisanRef = doc(db, "artisans", authUser.uid);
+        const artisanSnap = await getDoc(artisanRef);
+        if (artisanSnap.exists()) {
+          await updateDoc(artisanRef, { email });
+        }
+      }
       
       if (emailChanged) {
         showAlert("Email updated successfully. Please sign in again for security.", "success");
