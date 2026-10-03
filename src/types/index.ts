@@ -77,6 +77,7 @@ export interface ArtisanProfile {
   artisanId: string;
   userId: string;
   name?: string;
+  phone?: string;
   
   // deprecated single-service fields (kept for backward compatibility)
   trade: string;
