@@ -1,4 +1,5 @@
 import { Phone, Video, X } from "lucide-react";
+import { useEffect } from "react";
 import UserAvatar from "./UserAvatar";
 
 interface IncomingCallModalProps {
@@ -18,10 +19,30 @@ export default function IncomingCallModal({
   onAccept,
   onDecline
 }: IncomingCallModalProps) {
-  // Try to vibrate if supported
-  if (typeof window !== "undefined" && navigator.vibrate) {
-    navigator.vibrate([500, 500, 500, 500]);
-  }
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (typeof window !== "undefined") {
+      // Try to vibrate
+      if (navigator.vibrate) {
+        navigator.vibrate([500, 1000, 500, 1000]);
+        interval = setInterval(() => {
+          navigator.vibrate([500, 1000, 500, 1000]);
+        }, 3000);
+      }
+
+      // Play audio
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1354/1354-preview.mp3");
+      audio.loop = true;
+      audio.play().catch(e => console.warn("Auto-play prevented", e));
+
+      return () => {
+        audio.pause();
+        audio.currentTime = 0;
+        clearInterval(interval);
+        if (navigator.vibrate) navigator.vibrate(0);
+      };
+    }
+  }, []);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-[200] p-4">
