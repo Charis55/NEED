@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 
 export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
 
   const backgrounds = [
@@ -44,9 +45,9 @@ export default function LandingPage() {
           if (userDoc.exists()) {
             const data = userDoc.data();
             if (data.role === "artisan") {
-              router.push("/technician/dashboard");
+              router.replace("/technician/dashboard");
             } else {
-              router.push("/explore");
+              router.replace("/explore");
             }
             return;
           }
@@ -54,10 +55,19 @@ export default function LandingPage() {
           console.error("Error bypassing landing page", e);
         }
       }
+      setIsCheckingAuth(false);
     });
 
     return () => unsubscribe();
   }, [router]);
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center font-sans">
+        <div className="text-4xl font-black uppercase tracking-tighter animate-pulse">Loading NEED...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col relative overflow-hidden text-black selection:bg-[var(--color-brutal-pink)] selection:text-black">

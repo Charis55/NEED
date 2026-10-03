@@ -16,7 +16,7 @@ export default function PermissionsManager() {
   useEffect(() => {
     // We wait for auth state to ensure we only bother logged in users
     const unsub = auth.onAuthStateChanged((user) => {
-      if (user && !localStorage.getItem("need_permissions_handled")) {
+      if (user && !localStorage.getItem("need_permissions_handled") && Capacitor.isNativePlatform()) {
         // Adding a slight delay so it doesn't flash immediately over login transition
         setTimeout(() => setShow(true), 1500);
       } else {

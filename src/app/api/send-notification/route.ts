@@ -27,6 +27,21 @@ export async function POST(req: NextRequest) {
           token: fcmToken,
           notification: { title, body },
           data: data || {},
+          android: {
+            priority: "high",
+            notification: {
+              sound: "default",
+              channelId: "need_calls"
+            }
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+                contentAvailable: true
+              }
+            }
+          }
         });
         pushSuccess = true;
       } catch (e) {
