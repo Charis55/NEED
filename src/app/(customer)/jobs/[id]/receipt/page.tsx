@@ -6,8 +6,11 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { JobRequest, ArtisanProfile, UserAccount } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
-import { Printer, ArrowLeft, CheckCircle } from "lucide-react";
+import { Printer, ArrowLeft, CheckCircle, Download } from "lucide-react";
 import Link from "next/link";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
+import { useAlert } from "@/components/AlertProvider";
 
 export default function JobReceiptPage() {
   const params = useParams();
@@ -16,6 +19,60 @@ export default function JobReceiptPage() {
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [customer, setCustomer] = useState<UserAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
+
+  const handleDownloadReceipt = async () => {
+    if (!job) return;
+    const price = job.counterOfferAmount || job.offerAmount || 0;
+    const receiptContent = `NEED PLATFORM - JOB RECEIPT
+==============================
+Receipt ID: #${job.requestId.slice(-8).toUpperCase()}
+Date: ${new Date(job.completedAt || job.createdAt).toLocaleDateString()}
+
+BILLED TO:
+${customer?.displayName || "Customer"}
+${customer?.phone || ""}
+${job.neighborhood || ""}
+
+SERVICE BY:
+${artisan?.name || "Technician"}
+${artisan?.phone || ""}
+
+JOB DETAILS:
+${job.subcategory}
+Status: ${job.status.toUpperCase()}
+
+Total Amount: NGN ${price.toLocaleString()}
+==============================
+Thank you for using NEED.`;
+
+    const fileName = `Receipt_NEED_${job.requestId.slice(-8).toUpperCase()}.txt`;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Filesystem.writeFile({
+          path: fileName,
+          data: receiptContent,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        showAlert(`Receipt saved to Documents folder as ${fileName}`, "success");
+      } catch (err) {
+        console.error(err);
+        showAlert("Failed to save receipt to device", "error");
+      }
+    } else {
+      const blob = new Blob([receiptContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
 
   useEffect(() => {
     const fetchReceiptData = async () => {
@@ -69,16 +126,24 @@ export default function JobReceiptPage() {
   return (
     <div className="min-h-screen bg-[#FFF0E5] pt-16 px-6 md:px-12 pb-20">
       <div className="max-w-3xl mx-auto">
-        <div className="flex justify-between items-center mb-8 print:hidden">
+        <div className="flex justify-between items-center mb-8 print:hidden flex-wrap gap-4">
           <Link href="/jobs" className="inline-flex items-center gap-2 bg-white border-2 border-black px-4 py-2 font-black uppercase shadow-[4px_4px_0_0_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_#000] transition-all">
             <ArrowLeft className="w-4 h-4" /> Back
           </Link>
-          <button 
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 bg-[var(--color-brutal-teal)] text-black border-4 border-black px-6 py-2 font-black uppercase shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
-          >
-            <Printer className="w-5 h-5" /> Print Receipt
-          </button>
+          <div className="flex gap-4">
+            <button 
+              onClick={handleDownloadReceipt}
+              className="inline-flex items-center gap-2 bg-[var(--color-brutal-green)] text-black border-4 border-black px-6 py-2 font-black uppercase shadow-[4px_4px_0_0_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_#000] transition-all"
+            >
+              <Download className="w-5 h-5" /> Download
+            </button>
+            <button 
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 bg-[var(--color-brutal-teal)] text-black border-4 border-black px-6 py-2 font-black uppercase shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all hidden md:inline-flex"
+            >
+              <Printer className="w-5 h-5" /> Print
+            </button>
+          </div>
         </div>
 
         <div className="bg-white border-4 border-black shadow-[12px_12px_0_0_#000] p-8 md:p-12 print:shadow-none print:border-none print:p-0">

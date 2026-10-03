@@ -11,6 +11,8 @@ import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 import { reverseGeocode } from "@/utils/location";
 import { ShieldCheck, AlertTriangle, CheckCircle, Loader2, Camera, ExternalLink, UserCheck, Lock, Clock, MapPin } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { pickNativePhoto, pickNativePhotos } from "@/utils/nativeCamera";
 
 const tradeCategories = Object.values(servicesData);
 
@@ -55,7 +57,7 @@ export default function ArtisanOnboarding() {
 
   // --- Step 5: Documents & Portfolio ---
   const [policeClearanceFile, setPoliceClearanceFile] = useState<File | null>(null);
-  const [files, setFiles] = useState<FileList | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   // --- Step 6: Consent ---
   const [consentDataCollection, setConsentDataCollection] = useState(false);
@@ -353,7 +355,7 @@ export default function ArtisanOnboarding() {
 
       // Upload portfolio photos
       const photoUrls: string[] = [];
-      if (files) {
+      if (files && files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           let file = files[i];
           if (file.type.startsWith('image/')) {
@@ -766,24 +768,54 @@ export default function ArtisanOnboarding() {
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase">Portfolio Photos</label>
               <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">Upload photos of your past work to build trust with customers.</p>
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={(e) => setFiles(e.target.files)}
-                className="w-full p-6 bg-[var(--color-brutal-bg)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-blue)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors mb-6"
-              />
+              <div className="relative">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files) setFiles(Array.from(e.target.files));
+                  }}
+                  className={`w-full p-6 bg-[var(--color-brutal-bg)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-blue)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors mb-6 ${Capacitor.isNativePlatform() ? 'hidden' : ''}`}
+                />
+                {Capacitor.isNativePlatform() && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const selected = await pickNativePhotos(10);
+                      if (selected && selected.length > 0) setFiles(selected);
+                    }}
+                    className="w-full p-6 bg-[var(--color-brutal-blue)] brutal-border text-black font-black uppercase text-center mb-6 hover:-translate-y-1 brutal-shadow transition-all"
+                  >
+                    SELECT PORTFOLIO PHOTOS
+                  </button>
+                )}
+              </div>
             </div>
 
             <div>
               <label className="block text-lg font-black text-black mb-2 uppercase text-[var(--color-brutal-red)]">Security & Verification *</label>
               <p className="text-sm font-bold text-black mb-4 border-l-4 border-black pl-2">A valid Police Clearance Certificate is strictly required for platform safety.</p>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => e.target.files && setPoliceClearanceFile(e.target.files[0])}
-                className="w-full p-6 bg-[var(--color-brutal-yellow)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-red)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors"
-              />
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => e.target.files && setPoliceClearanceFile(e.target.files[0])}
+                  className={`w-full p-6 bg-[var(--color-brutal-yellow)] brutal-border text-black file:mr-4 file:py-3 file:px-6 file:border-4 file:border-black file:text-sm file:font-black file:bg-[var(--color-brutal-red)] file:text-black hover:file:bg-white cursor-pointer file:uppercase file:transition-colors ${Capacitor.isNativePlatform() ? 'hidden' : ''}`}
+                />
+                {Capacitor.isNativePlatform() && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const file = await pickNativePhoto();
+                      if (file) setPoliceClearanceFile(file);
+                    }}
+                    className="w-full p-6 bg-[var(--color-brutal-red)] brutal-border text-white font-black uppercase text-center hover:-translate-y-1 brutal-shadow transition-all"
+                  >
+                    SELECT CLEARANCE DOCUMENT
+                  </button>
+                )}
+              </div>
               {policeClearanceFile && (
                 <p className="text-sm font-black text-black mt-2 inline-block px-2 border-2 border-black rotate-1 bg-white">Selected: {policeClearanceFile.name}</p>
               )}

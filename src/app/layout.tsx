@@ -47,6 +47,9 @@ export const metadata: Metadata = {
 import GlobalNotificationListener from "@/components/GlobalNotificationListener";
 import GlobalCallManager from "@/components/GlobalCallManager";
 import OfflineIndicator from "@/components/OfflineIndicator";
+import PullToRefresh from "@/components/PullToRefresh";
+import NativeBackButtonManager from "@/components/NativeBackButtonManager";
+import PermissionsManager from "@/components/PermissionsManager";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -65,14 +68,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <OfflineIndicator />
-        <AlertProvider>
-          <FCMProvider>{children}</FCMProvider>
-          <GlobalNotificationListener />
-          <GlobalCallManager />
-        </AlertProvider>
-        <Analytics />
-        <SpeedInsights />
+        <PullToRefresh>
+          <OfflineIndicator />
+          <AlertProvider>
+            <PermissionsManager />
+            <NativeBackButtonManager />
+            <FCMProvider>{children}</FCMProvider>
+            <GlobalNotificationListener />
+            <GlobalCallManager />
+          </AlertProvider>
+          <Analytics />
+          <SpeedInsights />
+        </PullToRefresh>
       </body>
     </html>
   );

@@ -10,6 +10,8 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import { ChevronLeft, Calendar, DollarSign, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAlert } from "@/components/AlertProvider";
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 import dynamicImport from "next/dynamic";
 const PaymentModal = dynamicImport(() => import("@/components/PaymentModal"), { ssr: false });
 
@@ -186,7 +188,7 @@ export default function EarningsPage() {
     }
   };
 
-  const generateReceipt = (period: EarningPeriod) => {
+  const generateReceipt = async (period: EarningPeriod) => {
     const receiptContent = `NEED PLATFORM - EARNINGS RECEIPT
 ==============================
 Period: ${period.startDate.toLocaleDateString()} to ${period.endDate.toLocaleDateString()}
@@ -200,15 +202,32 @@ Status: SETTLED
 Date: ${new Date().toLocaleDateString()}
 `;
     
-    const blob = new Blob([receiptContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Receipt_NEED_${period.periodKey}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const fileName = `Receipt_NEED_${period.periodKey}.txt`;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Filesystem.writeFile({
+          path: fileName,
+          data: receiptContent,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        showAlert(`Receipt saved to Documents folder as ${fileName}`, "success");
+      } catch (err) {
+        console.error("Filesystem error", err);
+        showAlert("Failed to save receipt to device", "error");
+      }
+    } else {
+      const blob = new Blob([receiptContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   if (loading) return <div className="h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center"><GlobalSpinner text="LOADING EARNINGS" /></div>;

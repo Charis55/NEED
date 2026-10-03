@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRef } from "react";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
-import { PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear } from "lucide-react";
 
 interface AgoraCallModalProps {
   channelName: string;
@@ -23,7 +23,19 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   
   const [micMuted, setMicMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
   const [error, setError] = useState("");
+
+  const toggleSpeaker = () => {
+    if (typeof window !== 'undefined' && (window as any).AudioToggle) {
+      if (speakerOn) {
+        (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.EARPIECE);
+      } else {
+        (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.SPEAKER);
+      }
+    }
+    setSpeakerOn(!speakerOn);
+  };
 
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
 
@@ -253,6 +265,13 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
             {videoMuted ? <VideoOff size={28} /> : <Video size={28} />}
           </button>
         )}
+
+        <button 
+          onClick={toggleSpeaker}
+          className={`w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center rounded-full border-4 border-black shadow-[4px_4px_0_0_#000] transition-transform active:translate-y-1 active:shadow-none ${!speakerOn ? 'bg-[var(--color-brutal-yellow)] text-black' : 'bg-white text-black'}`}
+        >
+          {speakerOn ? <Volume2 size={28} /> : <Ear size={28} />}
+        </button>
 
         <button 
           onClick={leaveCall}

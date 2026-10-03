@@ -6,17 +6,22 @@ import {
   GoogleAuthProvider, signInWithPopup, getRedirectResult,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User,
-  sendEmailVerification, signOut
+  sendEmailVerification, signOut, signInWithCredential
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "@/utils/imageCompression";
+import { Capacitor } from "@capacitor/core";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { UserAccount } from "@/types";
 import ImageCropper from "@/components/ImageCropper";
 import { Eye, EyeOff, ArrowLeft, Upload, X, Check, Mail, Phone as PhoneIcon } from "lucide-react";
 import TermsDisclaimer from "@/components/TermsDisclaimer";
+import { useBackButton } from "@/hooks/useBackButton";
+import { Capacitor } from "@capacitor/core";
+import { pickNativePhoto } from "@/utils/nativeCamera";
 
 
 export default function AuthForm() {
@@ -42,6 +47,12 @@ export default function AuthForm() {
   const [loading, setLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+
+  useBackButton(() => {
+    if (showTerms) {
+      setShowTerms(false);
+    }
+  }, showTerms);
   
   // Profile Image
   const [profileFile, setProfileFile] = useState<File | null>(null);
@@ -159,20 +170,32 @@ export default function AuthForm() {
     setLoading(true);
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
       
-      if (result && result.user) {
-        const userDocRef = doc(db, "users", result.user.uid);
+      let user;
+
+      if (Capacitor.isNativePlatform()) {
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        if (!result.credential?.idToken) throw new Error("Native Google Sign In Failed");
+        const credential = GoogleAuthProvider.credential(result.credential.idToken);
+        const authResult = await signInWithCredential(auth, credential);
+        user = authResult.user;
+      } else {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        user = result.user;
+      }
+      
+      if (user) {
+        const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (!userDoc.exists()) {
           if (!isLogin) {
             const newUser: UserAccount = {
-              userId: result.user.uid,
-              phone: result.user.phoneNumber || "",
-              email: result.user.email || undefined,
-              displayName: result.user.displayName || "User",
+              userId: user.uid,
+              phone: user.phoneNumber || "",
+              email: user.email || undefined,
+              displayName: user.displayName || "User",
               role: role,
               createdAt: Date.now(),
             };
@@ -184,7 +207,7 @@ export default function AuthForm() {
               fetch('/api/emails/welcome-customer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: result.user.uid }),
+                body: JSON.stringify({ userId: user.uid }),
               }).catch(e => console.error("Failed to send welcome email:", e));
               window.location.assign("/explore");
             }
@@ -194,7 +217,7 @@ export default function AuthForm() {
         } else {
           const userData = userDoc.data() as UserAccount;
           if (userData.role === "artisan") {
-            const artisanDoc = await getDoc(doc(db, "artisans", result.user.uid));
+            const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
             if (artisanDoc.exists()) {
               if (artisanDoc.data()?.onboardingStep !== 6) {
                 window.location.assign("/onboarding");
@@ -404,7 +427,17 @@ export default function AuthForm() {
               <div className="flex items-center gap-4">
                 <div 
                   className="w-20 h-20 bg-gray-200 brutal-border brutal-shadow-sm flex items-center justify-center cursor-pointer relative overflow-hidden"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={async () => {
+                    if (Capacitor.isNativePlatform()) {
+                      const file = await pickNativePhoto();
+                      if (file) {
+                        setCropImageSrc(URL.createObjectURL(file));
+                        setShowCropper(true);
+                      }
+                    } else {
+                      fileInputRef.current?.click();
+                    }
+                  }}
                 >
                   {profilePreview ? (
                     <>
@@ -600,7 +633,17 @@ export default function AuthForm() {
                 <div className="flex items-center gap-4">
                   <div 
                     className="w-20 h-20 bg-gray-200 brutal-border brutal-shadow-sm flex items-center justify-center cursor-pointer relative overflow-hidden"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={async () => {
+                      if (Capacitor.isNativePlatform()) {
+                        const file = await pickNativePhoto();
+                        if (file) {
+                          setCropImageSrc(URL.createObjectURL(file));
+                          setShowCropper(true);
+                        }
+                      } else {
+                        fileInputRef.current?.click();
+                      }
+                    }}
                   >
                     {profilePreview ? (
                       <>

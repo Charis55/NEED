@@ -11,6 +11,13 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",
     "@aws-sdk/s3-request-presigner": "^3.1136.0",
+    "@capacitor-firebase/authentication": "^8.5.2",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/camera": "^8.2.5",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/geolocation": "^8.2.3",
     "@didit-protocol/sdk-web": "^0.4.0",
     "@react-email/components": "^1.0.12",
     "@types/leaflet-routing-machine": "^3.2.9",
@@ -20,6 +27,7 @@
     "agora-rtc-sdk-ng": "^4.24.8",
     "agora-token": "^2.0.6",
     "clsx": "^2.1.1",
+    "cordova-plugin-audiotoggle": "^1.0.3",
     "firebase": "^12.19.0",
     "firebase-admin": "^14.4.0",
     "framer-motion": "^13.4.0",
@@ -38,6 +46,8 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.22",
     "@types/ngeohash": "^0.6.8",

@@ -1,7 +1,0 @@
-
-.gradle/
-.idea/
-build/
-app/build/
-*.hprof
-local.properties

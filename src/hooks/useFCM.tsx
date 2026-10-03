@@ -47,7 +47,11 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
     // We wait for auth state to be resolved before requesting permission
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
-        requestPermission();
+        // Only request automatically if permissions have been handled or already granted
+        const handled = localStorage.getItem("need_permissions_handled");
+        if (handled === "true" || Notification.permission === "granted") {
+          requestPermission();
+        }
       }
     });
 

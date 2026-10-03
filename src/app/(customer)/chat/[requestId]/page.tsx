@@ -13,6 +13,9 @@ import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, Shi
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import AdUnit from "@/components/AdUnit";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { pickNativePhoto, pickNativePhotos } from "@/utils/nativeCamera";
 
 interface Message {
   id: string;
@@ -413,6 +416,40 @@ export default function ChatPage() {
       showAlert("Failed to delete message", "error");
     }
   };
+
+  const handleDownloadReceipt = async (url: string, filename: string) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        showAlert("Downloading receipt...", "success");
+        const res = await fetch(url);
+        const blob = await res.blob();
+        
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = async () => {
+          const base64data = reader.result as string;
+          const base64string = base64data.split(',')[1];
+          
+          await Filesystem.writeFile({
+            path: filename,
+            data: base64string,
+            directory: Directory.Documents
+          });
+          showAlert(`Saved to Documents/${filename}`, "success");
+        };
+      } catch (e) {
+        console.error(e);
+        showAlert("Failed to download natively.", "error");
+      }
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
   
   const handleBlockUser = async () => {
     const user = auth.currentUser;
@@ -438,16 +475,19 @@ export default function ChatPage() {
     }
   };
   
+  const processPhotos = (selectedFiles: File[]) => {
+    if (photos.length + selectedFiles.length > 5) {
+      showAlert("You can only upload a maximum of 5 photos.", "error");
+      return;
+    }
+    setPhotos(prev => [...prev, ...selectedFiles]);
+    const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
+    setPhotoPreviews(prev => [...prev, ...newPreviews]);
+  };
+
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      if (photos.length + selectedFiles.length > 5) {
-        showAlert("You can only upload a maximum of 5 photos.", "error");
-        return;
-      }
-      setPhotos(prev => [...prev, ...selectedFiles]);
-      const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
-      setPhotoPreviews(prev => [...prev, ...newPreviews]);
+      processPhotos(Array.from(e.target.files));
     }
   };
 
@@ -472,11 +512,15 @@ export default function ChatPage() {
     return publicUrl;
   };
 
+  const processChatPhoto = (file: File) => {
+    setPendingImage(file);
+    setPendingImagePreview(URL.createObjectURL(file));
+  };
+
   const handleChatPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPendingImage(file);
-    setPendingImagePreview(URL.createObjectURL(file));
+    processChatPhoto(file);
     e.target.value = '';
   };
 
@@ -886,7 +930,16 @@ export default function ChatPage() {
           </div>
         ) : (
           <form onSubmit={handleSendMessage} className="flex gap-2 items-center min-w-0 w-full">
-            <label className={`cursor-pointer border-3 md:border-4 border-black p-2.5 md:p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] shrink-0 hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label 
+              className={`cursor-pointer border-3 md:border-4 border-black p-2.5 md:p-3 flex items-center justify-center transition-all bg-[var(--color-brutal-teal)] text-black shadow-[2px_2px_0_0_#000] md:shadow-[4px_4px_0_0_#000] shrink-0 hover:-translate-y-1 ${sending ? 'opacity-50 pointer-events-none' : ''}`}
+              onClick={async (e) => {
+                if (Capacitor.isNativePlatform()) {
+                  e.preventDefault();
+                  const file = await pickNativePhoto();
+                  if (file) processChatPhoto(file);
+                }
+              }}
+            >
               <ImageIcon className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
               <input type="file" accept="image/*" onChange={handleChatPhotoSelect} className="hidden" disabled={sending} />
             </label>
@@ -1016,7 +1069,16 @@ export default function ChatPage() {
                   ))}
                   
                   {photos.length < 5 && (
-                    <label className="w-24 h-24 border-4 border-black border-dashed flex flex-col justify-center items-center bg-gray-50 cursor-pointer hover:bg-[var(--color-brutal-teal)] transition-colors">
+                    <label 
+                      className="w-24 h-24 border-4 border-black border-dashed flex flex-col justify-center items-center bg-gray-50 cursor-pointer hover:bg-[var(--color-brutal-teal)] transition-colors"
+                      onClick={async (e) => {
+                        if (Capacitor.isNativePlatform()) {
+                          e.preventDefault();
+                          const files = await pickNativePhotos(5 - photos.length);
+                          if (files && files.length > 0) processPhotos(files);
+                        }
+                      }}
+                    >
                       <ImageIcon className="w-8 h-8 mb-1 stroke-[2]" />
                       <span className="text-[10px] font-black uppercase">Add Photo</span>
                       <input type="file" multiple accept="image/*" onChange={handlePhotoSelect} className="hidden" />
@@ -1085,15 +1147,12 @@ export default function ChatPage() {
                 <div className="bg-gray-100 border-4 border-black p-2 brutal-shadow-sm">
                   <img src={job.proofOfPaymentUrl} alt="Uploaded Receipt" className="w-full h-48 object-contain" />
                 </div>
-                <a 
-                  href={job.proofOfPaymentUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  download={`Receipt_${job.requestId}.jpg`}
+                <button 
+                  onClick={() => handleDownloadReceipt(job.proofOfPaymentUrl!, `Receipt_${job.requestId}.jpg`)}
                   className="block w-full py-4 text-center bg-[var(--color-brutal-green)] border-4 border-black font-black uppercase text-black text-xl hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all"
                 >
                   DOWNLOAD RECEIPT
-                </a>
+                </button>
               </div>
             ) : (
               <div>
