@@ -28,6 +28,14 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   const [callDuration, setCallDuration] = useState(0);
 
   useEffect(() => {
+    // Play pickup sound when call connects
+    if (typeof window !== "undefined") {
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3");
+      audio.play().catch(e => console.warn("Audio play failed:", e));
+    }
+  }, []);
+
+  useEffect(() => {
     let interval: NodeJS.Timeout;
     if (joined) {
       interval = setInterval(() => {

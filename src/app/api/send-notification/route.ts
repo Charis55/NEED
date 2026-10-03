@@ -30,8 +30,7 @@ export async function POST(req: NextRequest) {
           android: {
             priority: "high",
             notification: {
-              sound: "default",
-              channelId: "need_calls"
+              sound: "default"
             }
           },
           apns: {

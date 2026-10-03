@@ -8,6 +8,17 @@ import IncomingCallModal from "./IncomingCallModal";
 import OutgoingCallModal from "./OutgoingCallModal";
 import dynamic from "next/dynamic";
 
+const playCallSound = (type: "pickup" | "end") => {
+  if (typeof window !== "undefined") {
+    // Pick up sound (short blip up) and End sound (short blip down)
+    const url = type === "pickup" 
+      ? "https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3" 
+      : "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3";
+    const audio = new Audio(url);
+    audio.play().catch(e => console.warn("Audio play failed:", e));
+  }
+};
+
 const AgoraCallModal = dynamic(() => import("./AgoraCallModal"), { ssr: false });
 export default function GlobalCallManager() {
   const [userUid, setUserUid] = useState<string | null>(null);
@@ -104,6 +115,9 @@ export default function GlobalCallManager() {
   const endCallWithLog = async (reason?: "cancelled" | "declined" | "timeout" | "ended") => {
     if (!activeJob || !activeJob.activeCall || !userUid) return;
     
+    // Play end sound immediately
+    playCallSound("end");
+
     // Optimistically hide UI
     const jobToProcess = activeJob;
     setActiveJob(null);
@@ -165,6 +179,7 @@ export default function GlobalCallManager() {
 
   const acceptCall = async () => {
     if (!activeJob) return;
+
     try {
       await updateDoc(doc(db, "jobRequests", activeJob.requestId), {
         "activeCall.status": "ongoing",
