@@ -15,53 +15,78 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
 
     const requestPermission = async () => {
       try {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-          const token = await getToken(messaging as any, {
-            vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",
+        if (Capacitor.isNativePlatform()) {
+          // Native Push Notifications
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          
+          let permStatus = await PushNotifications.checkPermissions();
+          if (permStatus.receive === 'prompt') {
+            permStatus = await PushNotifications.requestPermissions();
+          }
+
+          if (permStatus.receive !== 'granted') {
+            console.warn("Native push permission denied");
+            return;
+          }
+
+          await PushNotifications.register();
+
+          PushNotifications.addListener('registration', async (token) => {
+            console.log("Native Push Registration Token:", token.value);
+            if (auth.currentUser) {
+              const userRef = doc(db, "users", auth.currentUser.uid);
+              await updateDoc(userRef, { fcmToken: token.value });
+              
+              const artisanRef = doc(db, "artisans", auth.currentUser.uid);
+              try { await updateDoc(artisanRef, { fcmToken: token.value }); } catch(e) {}
+            }
           });
 
-          if (token && auth.currentUser) {
-            // Save token to user profile
-            const userRef = doc(db, "users", auth.currentUser.uid);
-            await updateDoc(userRef, { fcmToken: token });
-            
-            // Note: If artisans are in a separate collection, update there too
-            const artisanRef = doc(db, "artisans", auth.currentUser.uid);
-            try {
-              await updateDoc(artisanRef, { fcmToken: token });
-            } catch (e) {
-              // Ignore if artisan doc doesn't exist
+          PushNotifications.addListener('pushNotificationReceived', (notification) => {
+            console.log("Native Foreground Notification:", notification);
+            showAlert(`${notification.title}: ${notification.body}`, "info");
+          });
+
+        } else {
+          // Web Push Notifications
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            const token = await getToken(messaging as any, {
+              vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",
+            });
+
+            if (token && auth.currentUser) {
+              const userRef = doc(db, "users", auth.currentUser.uid);
+              await updateDoc(userRef, { fcmToken: token });
+              
+              const artisanRef = doc(db, "artisans", auth.currentUser.uid);
+              try { await updateDoc(artisanRef, { fcmToken: token }); } catch (e) {}
             }
           }
         }
       } catch (error: any) {
-        if (error?.code === 'messaging/token-subscribe-failed') {
-          console.warn("FCM Subscription failed: Make sure Cloud Messaging API is enabled in Firebase Console and your VAPID key is correct.");
-        } else {
-          console.warn("FCM Permission denied or failed to get token:", error);
-        }
+        console.warn("FCM setup failed:", error);
       }
     };
 
-    // We wait for auth state to be resolved before requesting permission
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
-        // Only request automatically if permissions have been handled or already granted
         const handled = localStorage.getItem("need_permissions_handled");
-        if (handled === "true" || Notification.permission === "granted") {
+        if (handled === "true" || (!Capacitor.isNativePlatform() && Notification.permission === "granted")) {
           requestPermission();
         }
       }
     });
 
-    // Handle foreground messages
-    const unsubscribeMessage = onMessage(messaging, (payload) => {
-      console.log("Foreground message received:", payload);
-      const title = payload.notification?.title || "New Notification";
-      const body = payload.notification?.body || "";
-      showAlert(`${title}: ${body}`, "info");
-    });
+    let unsubscribeMessage: any = null;
+    if (!Capacitor.isNativePlatform()) {
+      unsubscribeMessage = onMessage(messaging, (payload) => {
+        console.log("Web Foreground message received:", payload);
+        const title = payload.notification?.title || "New Notification";
+        const body = payload.notification?.body || "";
+        showAlert(`${title}: ${body}`, "info");
+      });
+    }
 
     return () => {
       unsubscribeAuth();
