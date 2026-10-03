@@ -118,62 +118,61 @@ export default function GlobalCallManager() {
     // Play end sound immediately
     playCallSound("end");
 
-    // Optimistically hide UI
-    const jobToProcess = activeJob;
-    setActiveJob(null);
-
     try {
-      await runTransaction(db, async (transaction) => {
-        const jobRef = doc(db, "jobRequests", jobToProcess.requestId);
-        const jobDoc = await transaction.get(jobRef);
-        if (!jobDoc.exists()) return;
-        
-        const data = jobDoc.data() as JobRequest;
-        if (!data.activeCall || data.activeCall.status === "ended") return;
-        
-        const isVideo = data.activeCall.type === "video";
-        let durationText = "Missed Call";
-        if (data.activeCall.connectedAt) {
-          const durationMs = Math.max(0, Date.now() - data.activeCall.connectedAt);
-          const totalSeconds = Math.floor(durationMs / 1000);
-          const m = Math.floor(totalSeconds / 60);
-          const s = totalSeconds % 60;
-          durationText = `${m}:${s.toString().padStart(2, '0')} mins`;
-        } else if (reason === "declined") {
-           durationText = "Declined Call";
-        } else if (reason === "cancelled") {
-           durationText = "Cancelled";
-        } else if (reason === "timeout") {
-           durationText = "Missed Call";
-        }
+      const jobToProcess = activeJob;
+      const isVideo = jobToProcess.activeCall.type === "video";
+      
+      let durationText = "Missed Call";
+      if (jobToProcess.activeCall.connectedAt) {
+        const durationMs = Math.max(0, Date.now() - jobToProcess.activeCall.connectedAt);
+        const totalSeconds = Math.floor(durationMs / 1000);
+        const m = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        durationText = `${m}:${s.toString().padStart(2, '0')} mins`;
+      } else if (reason === "declined") {
+         durationText = "Declined Call";
+      } else if (reason === "cancelled") {
+         durationText = "Cancelled";
+      } else if (reason === "timeout") {
+         durationText = "Missed Call";
+      }
 
-        const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:${durationText}`;
+      const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:${durationText}`;
+      
+      const messageSenderId = reason === "declined" 
+        ? (jobToProcess.customerId === jobToProcess.activeCall.callerId ? jobToProcess.artisanId! : jobToProcess.customerId)
+        : jobToProcess.activeCall.callerId;
         
-        // If declined, the callee declined it, so the callee is the sender (so the caller gets notified)
-        // Otherwise, it's a missed call (or ended call), so the caller is the sender (so the callee gets notified)
-        const messageSenderId = reason === "declined" 
-          ? (data.customerId === data.activeCall.callerId ? data.artisanId! : data.customerId)
-          : data.activeCall.callerId;
-          
-        const receiverId = data.customerId === messageSenderId ? data.artisanId : data.customerId;
+      const receiverId = jobToProcess.customerId === messageSenderId ? jobToProcess.artisanId : jobToProcess.customerId;
 
-        transaction.update(jobRef, {
-          "activeCall.status": "ended",
-          lastMessageText: messageText,
-          lastMessageSenderId: messageSenderId,
-          lastMessageAt: Date.now(),
-          ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
-        });
-
-        const msgRef = doc(collection(db, "jobRequests", jobToProcess.requestId, "messages"));
-        transaction.set(msgRef, {
-          text: messageText,
-          senderId: messageSenderId,
-          createdAt: Date.now()
-        });
+      // Use a batch write instead of a transaction to prevent read-conflicts from failing the cancellation
+      const { writeBatch } = await import("firebase/firestore");
+      const batch = writeBatch(db);
+      
+      const jobRef = doc(db, "jobRequests", jobToProcess.requestId);
+      batch.update(jobRef, {
+        "activeCall.status": "ended",
+        lastMessageText: messageText,
+        lastMessageSenderId: messageSenderId || userUid,
+        lastMessageAt: Date.now(),
+        ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
       });
+
+      const msgRef = doc(collection(db, "jobRequests", jobToProcess.requestId, "messages"));
+      batch.set(msgRef, {
+        text: messageText,
+        senderId: messageSenderId || userUid,
+        createdAt: Date.now()
+      });
+
+      await batch.commit();
+      
+      // Optimistically hide UI after successful (or fired) commit
+      setActiveJob(null);
     } catch (e) {
-      console.error("Failed to end call", e);
+      console.error("Failed to end call via batch:", e);
+      // Fallback: just clear it locally anyway
+      setActiveJob(null);
     }
   };
 
