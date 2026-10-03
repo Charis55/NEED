@@ -10,11 +10,12 @@ import dynamic from "next/dynamic";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
-    // Pick up sound (short blip up) and End sound (short blip down)
+    // Very short, minimalist UI blip sounds
     const url = type === "pickup" 
-      ? "https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3" 
-      : "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3";
+      ? "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" // subtle pop up
+      : "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"; // subtle pop down
     const audio = new Audio(url);
+    audio.volume = 0.5; // keep it quiet
     audio.play().catch(e => console.warn("Audio play failed:", e));
   }
 };

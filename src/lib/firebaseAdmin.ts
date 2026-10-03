@@ -30,8 +30,21 @@ function getAdminApp(): App {
       );
       return initAdminApp({ credential: cert(serviceAccount) });
     } catch (e) {
-      console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON, falling back to projectId init.");
+      console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON, falling back...");
     }
+  }
+
+  // Try to load from a local file (for local development)
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const localPath = path.join(process.cwd(), 'serviceAccountKey.json');
+    if (fs.existsSync(localPath)) {
+      const serviceAccount = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+      return initAdminApp({ credential: cert(serviceAccount) });
+    }
+  } catch(e) {
+    console.warn("Could not load local serviceAccountKey.json");
   }
 
   // Minimal init — works for Firestore reads/writes in server context
