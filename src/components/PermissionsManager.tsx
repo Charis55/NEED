@@ -33,6 +33,16 @@ export default function PermissionsManager() {
       if (Capacitor.isNativePlatform()) {
         try { await Camera.requestPermissions(); } catch(e) {}
         try { await Geolocation.requestPermissions(); } catch(e) {}
+        
+        try {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          await PushNotifications.requestPermissions();
+        } catch(e) {}
+
+        try {
+          const { Filesystem } = await import('@capacitor/filesystem');
+          await Filesystem.requestPermissions();
+        } catch(e) {}
       }
       
       // Request WebRTC Mic/Camera
