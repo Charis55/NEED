@@ -5,6 +5,7 @@ import { getToken, onMessage } from "firebase/messaging";
 import { auth, messaging, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useAlert } from "@/components/AlertProvider";
+import { Capacitor } from "@capacitor/core";
 
 export function FCMProvider({ children }: { children: React.ReactNode }) {
   const { showAlert } = useAlert();
