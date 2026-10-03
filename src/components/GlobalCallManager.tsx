@@ -121,11 +121,14 @@ export default function GlobalCallManager() {
 
     try {
       const jobToProcess = activeJob;
-      const isVideo = jobToProcess.activeCall.type === "video";
+      const activeCall = jobToProcess.activeCall;
+      if (!activeCall) return;
+
+      const isVideo = activeCall.type === "video";
       
       let durationText = "Missed Call";
-      if (jobToProcess.activeCall.connectedAt) {
-        const durationMs = Math.max(0, Date.now() - jobToProcess.activeCall.connectedAt);
+      if (activeCall.connectedAt) {
+        const durationMs = Math.max(0, Date.now() - activeCall.connectedAt);
         const totalSeconds = Math.floor(durationMs / 1000);
         const m = Math.floor(totalSeconds / 60);
         const s = totalSeconds % 60;
@@ -141,8 +144,8 @@ export default function GlobalCallManager() {
       const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:${durationText}`;
       
       const messageSenderId = reason === "declined" 
-        ? (jobToProcess.customerId === jobToProcess.activeCall.callerId ? jobToProcess.artisanId! : jobToProcess.customerId)
-        : jobToProcess.activeCall.callerId;
+        ? (jobToProcess.customerId === activeCall.callerId ? jobToProcess.artisanId! : jobToProcess.customerId)
+        : activeCall.callerId;
         
       const receiverId = jobToProcess.customerId === messageSenderId ? jobToProcess.artisanId : jobToProcess.customerId;
 
