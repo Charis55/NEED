@@ -20,7 +20,7 @@ import ImageCropper from "@/components/ImageCropper";
 import { Eye, EyeOff, ArrowLeft, Upload, X, Check, Mail, Phone as PhoneIcon } from "lucide-react";
 import TermsDisclaimer from "@/components/TermsDisclaimer";
 import { useBackButton } from "@/hooks/useBackButton";
-import { Capacitor } from "@capacitor/core";
+
 import { pickNativePhoto } from "@/utils/nativeCamera";
 import { triggerHaptic } from "@/utils/haptics";
 import { ImpactStyle } from "@capacitor/haptics";
