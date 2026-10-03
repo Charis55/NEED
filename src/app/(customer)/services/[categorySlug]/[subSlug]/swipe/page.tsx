@@ -11,6 +11,8 @@ import { ArtisanProfile } from "@/types";
 import { useRouter } from "next/navigation";
 import { servicesData } from "@/data/services";
 import FavoriteButton from "@/components/FavoriteButton";
+import { triggerHaptic } from '@/utils/haptics';
+import { ImpactStyle } from '@capacitor/haptics';
 
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3; // metres
@@ -51,9 +53,11 @@ function SwipeCard({
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const swipeThreshold = 100;
     if (info.offset.x > swipeThreshold) {
+      triggerHaptic(ImpactStyle.Heavy);
       removeCard(artisan.artisanId, "right");
       onAccept(artisan.artisanId);
     } else if (info.offset.x < -swipeThreshold) {
+      triggerHaptic(ImpactStyle.Light);
       removeCard(artisan.artisanId, "left");
     }
   };
@@ -137,6 +141,7 @@ function SwipeCard({
           <button 
             className="flex-1 bg-white brutal-btn text-lg py-3"
             onClick={() => {
+              triggerHaptic(ImpactStyle.Light);
               removeCard(artisan.artisanId, "right");
             }}
           >
@@ -145,6 +150,7 @@ function SwipeCard({
           <button 
             className="flex-[2] bg-[var(--color-brutal-teal)] brutal-btn text-lg py-3"
             onClick={() => {
+              triggerHaptic(ImpactStyle.Heavy);
               removeCard(artisan.artisanId, "left");
               onAccept(artisan.artisanId);
             }}

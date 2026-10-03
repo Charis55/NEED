@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { getActiveBackHandler } from "@/hooks/useBackButton";
+import { triggerHaptic } from "@/utils/haptics";
+import { ImpactStyle } from "@capacitor/haptics";
 
 export default function NativeBackButtonManager() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export default function NativeBackButtonManager() {
     if (!Capacitor.isNativePlatform()) return;
 
     const listener = App.addListener("backButton", ({ canGoBack }) => {
+      triggerHaptic(ImpactStyle.Light);
       const activeHandler = getActiveBackHandler();
       
       if (activeHandler) {

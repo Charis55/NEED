@@ -7,6 +7,7 @@ import 'leaflet-routing-machine';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Navigation } from 'lucide-react';
+import { enableKeepAwake, disableKeepAwake } from '@/utils/keepAwake';
 
 function RoutingControl({ startCoords, destCoords }: { startCoords: {lat: number, lng: number}, destCoords: {lat: number, lng: number} }) {
   const map = useMap();
@@ -67,6 +68,8 @@ export default function TechnicianRoutingMap({
   const [error, setError] = useState("");
 
   useEffect(() => {
+    enableKeepAwake();
+
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
       return;
@@ -95,7 +98,10 @@ export default function TechnicianRoutingMap({
       }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      disableKeepAwake();
+    };
   }, [jobId]);
 
   const createTechIcon = () => {

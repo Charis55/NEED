@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Target } from 'lucide-react';
 import { ArtisanProfile, JobRequest } from '@/types';
+import { enableKeepAwake, disableKeepAwake } from '@/utils/keepAwake';
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
@@ -41,6 +42,11 @@ export default function TrackingMap({
   const techLocation = job.technicianLocation
     ? { lat: job.technicianLocation.lat, lng: job.technicianLocation.lng }
     : { lat: technician.lat, lng: technician.lng };
+
+  useEffect(() => {
+    enableKeepAwake();
+    return () => { disableKeepAwake(); };
+  }, []);
 
   const createTechIcon = () => {
     return L.divIcon({

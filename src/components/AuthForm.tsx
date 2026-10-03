@@ -22,6 +22,8 @@ import TermsDisclaimer from "@/components/TermsDisclaimer";
 import { useBackButton } from "@/hooks/useBackButton";
 import { Capacitor } from "@capacitor/core";
 import { pickNativePhoto } from "@/utils/nativeCamera";
+import { triggerHaptic } from "@/utils/haptics";
+import { ImpactStyle } from "@capacitor/haptics";
 
 
 export default function AuthForm() {
@@ -166,6 +168,7 @@ export default function AuthForm() {
   };
 
   const handleGoogleSignIn = async () => {
+    triggerHaptic(ImpactStyle.Heavy);
     setError("");
     setLoading(true);
     try {
@@ -243,6 +246,7 @@ export default function AuthForm() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic(ImpactStyle.Heavy);
     setError("");
     setLoading(true);
     try {
@@ -337,6 +341,7 @@ export default function AuthForm() {
 
   const handleCompleteProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic(ImpactStyle.Heavy);
     setError("");
     setLoading(true);
 
@@ -474,13 +479,13 @@ export default function AuthForm() {
               <label className="block text-lg font-black text-black mb-3 uppercase">I want to...</label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`brutal-border p-4 cursor-pointer text-center transition-all ${role === 'customer' ? 'bg-[var(--color-brutal-teal)] brutal-shadow-sm translate-x-[-2px] translate-y-[-2px]' : 'bg-white hover:bg-gray-100'}`}>
-                  <input type="radio" name="role" value="customer" checked={role === 'customer'} onChange={() => setRole('customer')} className="sr-only" />
+                  <input type="radio" name="role" value="customer" checked={role === 'customer'} onChange={() => { setRole('customer'); triggerHaptic(ImpactStyle.Light); }} className="sr-only" />
                   <span className="font-black text-xl block mb-1 uppercase">Hire</span>
                   <span className="text-sm font-medium border-t-2 border-black pt-1 block">Find a technician</span>
                 </label>
                 
                 <label className={`brutal-border p-4 cursor-pointer text-center transition-all ${role === 'artisan' ? 'bg-[var(--color-brutal-teal)] brutal-shadow-sm translate-x-[-2px] translate-y-[-2px]' : 'bg-white hover:bg-gray-100'}`}>
-                  <input type="radio" name="role" value="artisan" checked={role === 'artisan'} onChange={() => setRole('artisan')} className="sr-only" />
+                  <input type="radio" name="role" value="artisan" checked={role === 'artisan'} onChange={() => { setRole('artisan'); triggerHaptic(ImpactStyle.Light); }} className="sr-only" />
                   <span className="font-black text-xl block mb-1 uppercase">Work</span>
                   <span className="text-sm font-medium border-t-2 border-black pt-1 block">Offer services</span>
                 </label>
