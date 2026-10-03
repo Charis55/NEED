@@ -7,6 +7,15 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://need-chi.vercel.app',
     cleartext: true
+  },
+  plugins: {
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ["google.com"],
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   }
 };
 
