@@ -14,9 +14,9 @@ export default function PullToRefresh({ children }: { children: React.ReactNode 
   const THRESHOLD = 80;
 
   useEffect(() => {
-    // Only enable if we are near the top of the page
+    // Only enable if we are near the top of the page AND touch starts near the top of the screen
     const handleTouchStart = (e: TouchEvent) => {
-      if (window.scrollY <= 10) {
+      if (window.scrollY <= 10 && e.touches[0].clientY < 180) {
         setStartY(e.touches[0].clientY);
       }
     };
