@@ -36,7 +36,10 @@ export default function PermissionsManager() {
         
         try {
           const { PushNotifications } = await import('@capacitor/push-notifications');
-          await PushNotifications.requestPermissions();
+          const permResult = await PushNotifications.requestPermissions();
+          if (permResult.receive === 'granted') {
+            await PushNotifications.register();
+          }
         } catch(e) {}
 
         try {
