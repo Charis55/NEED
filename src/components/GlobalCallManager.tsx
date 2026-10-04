@@ -8,6 +8,8 @@ import IncomingCallModal from "./IncomingCallModal";
 import OutgoingCallModal from "./OutgoingCallModal";
 import dynamic from "next/dynamic";
 import SocialNotification from "@/lib/SocialNotification";
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Capacitor } from '@capacitor/core';
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -27,6 +29,41 @@ export default function GlobalCallManager() {
   const [activeJob, setActiveJob] = useState<JobRequest | null>(null);
   const [partnerName, setPartnerName] = useState<string>("Someone");
   const [partnerPhoto, setPartnerPhoto] = useState<string | undefined>();
+  const [notifiedCallId, setNotifiedCallId] = useState<string | null>(null);
+
+  const triggerCallNotification = async (job: JobRequest) => {
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      try {
+        const isVideo = job.activeCall?.type === 'video';
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title: "Incoming Call",
+              body: `${isVideo ? 'Video' : 'Audio'} call. Tap to answer.`,
+              id: 1001,
+              schedule: { at: new Date(Date.now() + 100) },
+              sound: undefined, 
+              actionTypeId: "",
+              extra: null
+            }
+          ]
+        });
+      } catch (e) {
+        console.error("Local Notification failed", e);
+      }
+    }
+  };
+
+  const clearCallNotification = async () => {
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      try {
+        await LocalNotifications.cancel({ notifications: [{ id: 1001 }] });
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+  const [partnerPhoto, setPartnerPhoto] = useState<string | undefined>();
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {
@@ -39,8 +76,12 @@ export default function GlobalCallManager() {
     if (!userUid) return;
     
     // Start our custom native bridge service for background notifications
-    if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform()) {
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       SocialNotification.startService({ uid: userUid }).catch(e => console.error("Failed to start service", e));
+      
+      LocalNotifications.requestPermissions().then((status) => {
+        console.log("LocalNotifications perm:", status.display);
+      }).catch(e => console.error(e));
     }
 
     const qCombined = query(
@@ -69,6 +110,25 @@ export default function GlobalCallManager() {
         }
         return foundJob;
       });
+
+      // Handle notification
+      if (
+        foundJob && 
+        foundJob.activeCall?.status === "ringing" && 
+        foundJob.activeCall?.callerId !== userUid
+      ) {
+         setNotifiedCallId((prevNotified) => {
+           if (prevNotified !== foundJob!.requestId) {
+              triggerCallNotification(foundJob!);
+              return foundJob!.requestId;
+           }
+           return prevNotified;
+         });
+      } else {
+         if (!foundJob) {
+           setNotifiedCallId(null);
+         }
+      }
     };
 
     const unsub = onSnapshot(qCombined, handleSnapshot);
@@ -127,6 +187,7 @@ export default function GlobalCallManager() {
     
     // Play end sound immediately
     playCallSound("end");
+    clearCallNotification();
 
     try {
       const jobToProcess = activeJob;
@@ -197,6 +258,7 @@ export default function GlobalCallManager() {
   const acceptCall = async () => {
     if (!activeJob) return;
 
+    clearCallNotification();
     try {
       await updateDoc(doc(db, "jobRequests", activeJob.requestId), {
         "activeCall.status": "ongoing",
