@@ -8,6 +8,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Navigation } from 'lucide-react';
 import { enableKeepAwake, disableKeepAwake } from '@/utils/keepAwake';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 function RoutingControl({ startCoords, destCoords }: { startCoords: {lat: number, lng: number}, destCoords: {lat: number, lng: number} }) {
   const map = useMap();
@@ -70,36 +72,57 @@ export default function TechnicianRoutingMap({
   useEffect(() => {
     enableKeepAwake();
 
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      return;
-    }
+    let watchId: string | null = null;
 
-    // Start watching position
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setCurrentLocation({ lat: latitude, lng: longitude });
+    const startWatching = async () => {
+      try {
+        // Request permissions just in case
+        if (Capacitor.isNativePlatform()) {
+          const permStatus = await Geolocation.checkPermissions();
+          if (permStatus.location !== 'granted') {
+            await Geolocation.requestPermissions();
+          }
+        }
 
-        // Update Firestore
-        updateDoc(doc(db, "jobRequests", jobId), {
-          technicianLocation: { lat: latitude, lng: longitude },
-          lastLocationUpdate: Date.now()
-        }).catch(err => console.error("Failed to sync location:", err));
-      },
-      (err) => {
-        console.error(err);
-        setError("Failed to get your location. Please enable GPS.");
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 5000
+        watchId = await Geolocation.watchPosition(
+          {
+            enableHighAccuracy: true,
+            maximumAge: 10000,
+            timeout: 20000 // Increased timeout to prevent premature failure
+          },
+          (position, err) => {
+            if (err) {
+              console.error("WatchPosition error:", err);
+              // Only set error if we haven't gotten a location yet, or if it's a critical error
+              if (!currentLocation) {
+                setError("Failed to get your location. Please enable GPS.");
+              }
+              return;
+            }
+            if (position) {
+              const { latitude, longitude } = position.coords;
+              setCurrentLocation({ lat: latitude, lng: longitude });
+
+              // Update Firestore
+              updateDoc(doc(db, "jobRequests", jobId), {
+                technicianLocation: { lat: latitude, lng: longitude },
+                lastLocationUpdate: Date.now()
+              }).catch(err => console.error("Failed to sync location:", err));
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Start watching error:", err);
+        setError("Failed to start location tracking. Please check permissions.");
       }
-    );
+    };
+
+    startWatching();
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (watchId) {
+        Geolocation.clearWatch({ id: watchId }).catch(console.error);
+      }
       disableKeepAwake();
     };
   }, [jobId]);
