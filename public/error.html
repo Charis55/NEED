@@ -132,7 +132,7 @@
         <div class="brutal-badge">ERROR</div>
         
         <div class="logo-container">
-            <div class="logo-n">N</div>
+            <img src="LOGO.png" alt="N" style="height: 48px; object-fit: contain; margin-right: 4px;" />
             <div class="logo-eed">EED</div>
         </div>
         
@@ -144,8 +144,8 @@
 
     <script>
         function retryConnection() {
-            // Capacitor will try to reload the server.url
-            window.location.reload();
+            // Re-route to the root of the app to try connecting again
+            window.location.replace('/');
         }
     </script>
 </body>
