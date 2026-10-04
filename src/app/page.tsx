@@ -8,6 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import { Capacitor } from "@capacitor/core";
 
 export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
@@ -62,9 +63,26 @@ export default function LandingPage() {
   }, [router]);
 
   if (isCheckingAuth) {
+    if (typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
+      return <div className="min-h-screen bg-[var(--color-brutal-bg)]"></div>;
+    }
+
     return (
-      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center font-sans">
-        <div className="text-4xl font-black uppercase tracking-tighter animate-pulse">Loading NEED...</div>
+      <div 
+        className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col items-center justify-center font-sans relative overflow-hidden" 
+        style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}
+      >
+        <div className="bg-white flex flex-col items-center p-12 border-8 border-black shadow-[16px_16px_0_0_#000] animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
+          <div className="flex items-center mb-8">
+            <img src="/LOGO.png" alt="N Logo" className="h-24 w-auto" />
+            <span className="text-[96px] font-black text-black leading-none tracking-tighter -ml-4">EED</span>
+          </div>
+          <div className="flex gap-4">
+            <div className="w-8 h-8 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0_0_#000] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-8 h-8 bg-[var(--color-brutal-teal)] border-4 border-black shadow-[4px_4px_0_0_#000] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-8 h-8 bg-[var(--color-brutal-pink)] border-4 border-black shadow-[4px_4px_0_0_#000] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
+        </div>
       </div>
     );
   }

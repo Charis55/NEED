@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'public',
   server: {
     url: 'https://need-chi.vercel.app',
-    cleartext: true
+    cleartext: true,
+    errorPath: 'error.html'
   },
   plugins: {
     FirebaseAuthentication: {
