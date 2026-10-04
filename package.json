@@ -31,6 +31,7 @@
     "agora-rtc-sdk-ng": "^4.24.8",
     "agora-token": "^2.0.6",
     "clsx": "^2.1.1",
+    "cordova-plugin-android-permissions": "^1.1.5",
     "cordova-plugin-audiotoggle": "^1.0.3",
     "firebase": "^12.19.0",
     "firebase-admin": "^14.4.0",
@@ -50,6 +51,7 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@awesome-cordova-plugins/android-permissions": "^9.6.0",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.2",
     "@tailwindcss/postcss": "^4",

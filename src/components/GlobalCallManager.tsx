@@ -79,9 +79,32 @@ export default function GlobalCallManager() {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       SocialNotification.startService({ uid: userUid }).catch(e => console.error("Failed to start service", e));
       
+      // Request all required OS permissions upfront on load
+      import('@capacitor/geolocation').then(({ Geolocation }) => {
+        Geolocation.requestPermissions().catch(e => console.warn(e));
+      });
+      import('@capacitor/camera').then(({ Camera }) => {
+        Camera.requestPermissions().catch(e => console.warn(e));
+      });
+      
       LocalNotifications.requestPermissions().then((status) => {
         console.log("LocalNotifications perm:", status.display);
       }).catch(e => console.error(e));
+      
+      // Request Android-specific dangerous permissions
+      if ((window as any).cordova?.plugins?.permissions) {
+        const permissions = (window as any).cordova.plugins.permissions;
+        const list = [
+          permissions.READ_PHONE_STATE,
+          permissions.CALL_PHONE,
+          permissions.READ_MEDIA_IMAGES,
+          permissions.READ_MEDIA_VIDEO
+        ];
+        permissions.requestPermissions(list, 
+          (status: any) => console.log("Cordova perm status:", status),
+          (error: any) => console.warn("Cordova perm error:", error)
+        );
+      }
     }
 
     const qCombined = query(
