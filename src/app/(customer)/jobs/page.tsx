@@ -48,7 +48,13 @@ function JobsContent() {
       unsubscribe = onSnapshot(q, (snapshot) => {
         const results = snapshot.docs.map(doc => doc.data() as JobRequest);
         results.sort((a, b) => b.createdAt - a.createdAt);
-        setRequests(results);
+
+        setRequests((prev) => {
+          const prevKey = JSON.stringify(prev.map(r => ({ id: r.requestId, s: r.status, lat: r.technicianLocation?.lat, lng: r.technicianLocation?.lng })));
+          const nextKey = JSON.stringify(results.map(r => ({ id: r.requestId, s: r.status, lat: r.technicianLocation?.lat, lng: r.technicianLocation?.lng })));
+          if (prevKey === nextKey) return prev;
+          return results;
+        });
         setLoading(false);
       }, (error) => {
         console.error("Error fetching requests:", error);

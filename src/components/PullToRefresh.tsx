@@ -1,69 +1,80 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 
 export default function PullToRefresh({ children }: { children: React.ReactNode }) {
-  const [startY, setStartY] = useState(0);
   const [currentY, setCurrentY] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+
+  const startYRef = useRef(0);
+  const currentYRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
 
   const MAX_PULL = 120;
   const THRESHOLD = 80;
 
   useEffect(() => {
-    // Only enable if we are near the top of the page AND touch starts near the top of the screen
     const handleTouchStart = (e: TouchEvent) => {
       if (window.scrollY <= 10 && e.touches[0].clientY < 180) {
-        setStartY(e.touches[0].clientY);
+        startYRef.current = e.touches[0].clientY;
+      } else {
+        startYRef.current = 0;
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (window.scrollY <= 10 && startY > 0) {
+      if (window.scrollY <= 10 && startYRef.current > 0) {
         const y = e.touches[0].clientY;
-        const pull = y - startY;
+        const pull = y - startYRef.current;
         
-        // Only pull if pulling downwards
         if (pull > 0) {
-          // Prevent default scrolling when pulling down
           if (e.cancelable) e.preventDefault();
-          setCurrentY(Math.min(pull * 0.4, MAX_PULL));
+          const calculatedY = Math.min(pull * 0.4, MAX_PULL);
+          currentYRef.current = calculatedY;
+
+          if (!rafIdRef.current) {
+            rafIdRef.current = requestAnimationFrame(() => {
+              setCurrentY(currentYRef.current);
+              rafIdRef.current = null;
+            });
+          }
         }
       }
     };
 
     const handleTouchEnd = () => {
-      if (currentY >= THRESHOLD && !refreshing) {
+      if (currentYRef.current >= THRESHOLD && !refreshingRef.current) {
+        refreshingRef.current = true;
         setRefreshing(true);
         setCurrentY(THRESHOLD);
         
-        // Trigger refresh natively
         setTimeout(() => {
           window.location.reload();
         }, 500);
-      } else {
+      } else if (!refreshingRef.current) {
+        currentYRef.current = 0;
+        startYRef.current = 0;
         setCurrentY(0);
-        setStartY(0);
       }
     };
 
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
-    // passive: false is required to call preventDefault
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
-    document.addEventListener("touchend", handleTouchEnd);
+    document.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return () => {
       document.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("touchmove", handleTouchMove);
       document.removeEventListener("touchend", handleTouchEnd);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
     };
-  }, [startY, currentY, refreshing]);
+  }, []);
 
   return (
-    <div ref={containerRef} className="relative w-full min-h-screen">
+    <div className="relative w-full min-h-screen">
       {/* Pull down indicator */}
       <div 
         className="fixed top-0 left-0 w-full flex justify-center items-end pb-4 transition-all duration-200 z-[9999] pointer-events-none bg-yellow-400 border-b-4 border-black"

@@ -78,6 +78,20 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
+      try {
+        await PushNotifications.createChannel({
+          id: "default",
+          name: "General Notifications",
+          description: "Job requests, updates, and messages",
+          importance: 5,
+          sound: "default",
+          vibration: true,
+          visibility: 1
+        });
+      } catch (e) {
+        console.warn("Failed to create notification channel:", e);
+      }
+
       await PushNotifications.register();
     };
 

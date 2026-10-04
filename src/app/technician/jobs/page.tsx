@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { JobRequest } from "@/types";
@@ -10,6 +10,7 @@ import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
 import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
+import { Capacitor } from "@capacitor/core";
 
 export default function ArtisanDashboard() {
   const { showAlert } = useAlert();
@@ -22,46 +23,10 @@ export default function ArtisanDashboard() {
   const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
   const [showPromoOverlay, setShowPromoOverlay] = useState(false);
 
-  // Live Location Tracking
-  useEffect(() => {
-    const hasEnRouteJobs = requests.some(r => r.status === "en_route");
-    let watchId: number;
-
-    if (hasEnRouteJobs && navigator.geolocation) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          
-          // Update location for all en_route jobs
-          requests.forEach(async (req) => {
-            if (req.status === "en_route") {
-              const reqRef = doc(db, "jobRequests", req.requestId);
-              await updateDoc(reqRef, {
-                technicianLocation: {
-                  lat,
-                  lng,
-                  updatedAt: Date.now()
-                }
-              }).catch(e => console.error("Failed to update location", e));
-            }
-          });
-        },
-        (error) => console.error("Geolocation error:", error),
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-      );
-    }
-
-    return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-    };
-  }, [requests]);
-
   useEffect(() => {
     let unsubs: (() => void)[] = [];
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      // Clean up previous listeners if auth changes
       unsubs.forEach(unsub => unsub());
       unsubs = [];
 
@@ -70,12 +35,39 @@ export default function ArtisanDashboard() {
         return;
       }
 
-      const artisanRef = doc(db, "artisans", user.uid);
-      
-      const unsubArtisan = onSnapshot(artisanRef, (artDoc) => {
-        let validServices: { trade: string, subcategory: string }[] = [];
-        let isVerifiedArtisan = false;
+      let validServices: { trade: string, subcategory: string }[] = [];
+      let isVerifiedArtisan = false;
+      let directResults: JobRequest[] = [];
+      let broadcastResults: JobRequest[] = [];
 
+      const updateCombined = () => {
+        const matchedBroadcastResults = isVerifiedArtisan
+          ? broadcastResults.filter(job => validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory))
+          : [];
+
+        const combined = [...directResults, ...matchedBroadcastResults];
+        const uniqueResults = Array.from(new Map(combined.map(item => [item.requestId, item])).values());
+        uniqueResults.sort((a, b) => b.createdAt - a.createdAt);
+
+        setRequests((prev) => {
+          const prevKey = JSON.stringify(prev.map(r => ({ id: r.requestId, s: r.status, lat: r.technicianLocation?.lat, lng: r.technicianLocation?.lng })));
+          const nextKey = JSON.stringify(uniqueResults.map(r => ({ id: r.requestId, s: r.status, lat: r.technicianLocation?.lat, lng: r.technicianLocation?.lng })));
+          if (prevKey === nextKey) return prev;
+          return uniqueResults;
+        });
+        setLoading(false);
+      };
+
+      const handleErr = (err: any) => {
+        console.warn("Artisan jobs listener error:", err?.message || err);
+        setLoading(false);
+      };
+
+      const artisanRef = doc(db, "artisans", user.uid);
+      const directQ = query(collection(db, "jobRequests"), where("artisanId", "==", user.uid));
+      const broadcastQ = query(collection(db, "jobRequests"), where("isBroadcast", "==", true), where("status", "==", "pending"));
+
+      const unsubArtisan = onSnapshot(artisanRef, (artDoc) => {
         if (artDoc.exists()) {
           const artisanData = artDoc.data();
           if (artisanData.createdAt) {
@@ -93,40 +85,21 @@ export default function ArtisanDashboard() {
           }
           isVerifiedArtisan = artisanData.verified || false;
           setIsVerified(isVerifiedArtisan);
+          updateCombined();
         }
+      }, handleErr);
 
-        const directQ = query(collection(db, "jobRequests"), where("artisanId", "==", user.uid));
-        const broadcastQ = query(collection(db, "jobRequests"), where("isBroadcast", "==", true), where("status", "==", "pending"));
+      const unsubDirect = onSnapshot(directQ, (snap) => {
+        directResults = snap.docs.map(doc => doc.data() as JobRequest);
+        updateCombined();
+      }, handleErr);
 
-        let directResults: JobRequest[] = [];
-        let broadcastResults: JobRequest[] = [];
+      const unsubBroadcast = onSnapshot(broadcastQ, (snap) => {
+        broadcastResults = snap.docs.map(doc => doc.data() as JobRequest);
+        updateCombined();
+      }, handleErr);
 
-        const updateCombined = () => {
-          const matchedBroadcastResults = isVerifiedArtisan 
-            ? broadcastResults.filter(job => validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory))
-            : [];
-          
-          const combined = [...directResults, ...matchedBroadcastResults];
-          const uniqueResults = Array.from(new Map(combined.map(item => [item.requestId, item])).values());
-          uniqueResults.sort((a, b) => b.createdAt - a.createdAt);
-          setRequests(uniqueResults);
-          setLoading(false);
-        };
-
-        const unsubDirect = onSnapshot(directQ, (snap) => {
-          directResults = snap.docs.map(doc => doc.data() as JobRequest);
-          updateCombined();
-        });
-        unsubs.push(unsubDirect);
-
-        const unsubBroadcast = onSnapshot(broadcastQ, (snap) => {
-          broadcastResults = snap.docs.map(doc => doc.data() as JobRequest);
-          updateCombined();
-        });
-        unsubs.push(unsubBroadcast);
-      });
-
-      unsubs.push(unsubArtisan);
+      unsubs.push(unsubArtisan, unsubDirect, unsubBroadcast);
     });
 
     return () => {

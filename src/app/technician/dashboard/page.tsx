@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import Link from "next/link";
-import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, PowerOff, Navigation, ArrowRight, MapPin, Zap, Clock, Target, BarChart3 } from "lucide-react";
+import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, PowerOff, Navigation, ArrowRight, MapPin, Zap, Clock, Target, BarChart3, Flame, ThumbsUp, Snail } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { JobRequest, Review } from "@/types";
 import { useAlert } from "@/components/AlertProvider";
@@ -276,7 +276,7 @@ export default function ArtisanDashboard() {
     const hours = ms / (1000 * 60 * 60);
     if (hours < 1) return `${Math.round(ms / (1000 * 60))}m`;
     if (hours < 24) return `${hours.toFixed(1)}h`;
-    return `${(hours / 24).toFixed(1)}d`;
+    return `${(hours / 24).toFixed(1)} days`;
   };
 
   if (loading) {
@@ -455,15 +455,26 @@ export default function ArtisanDashboard() {
                 color="var(--color-brutal-green, #CCFF00)"
                 label="Accepted vs Declined"
               />
-              <p className="text-xs font-bold text-gray-500 mt-2">
-                {perfMetrics.acceptanceRate >= 80
-                  ? "🔥 Excellent — you rarely turn down work"
-                  : perfMetrics.acceptanceRate >= 50
-                    ? "⚡ Good — room to improve"
-                    : perfMetrics.acceptanceRate > 0
-                      ? "⚠️ Low — consider accepting more jobs"
-                      : "No decision data yet"}
-              </p>
+              <div className="flex items-center gap-2 mt-2">
+                {perfMetrics.acceptanceRate >= 80 ? (
+                  <>
+                    <div className="bg-black text-white p-1 border border-black shadow-[2px_2px_0_0_var(--color-brutal-green)]"><Flame className="w-4 h-4 stroke-[3]" /></div>
+                    <span className="text-xs font-bold text-gray-800">Excellent — you rarely turn down work</span>
+                  </>
+                ) : perfMetrics.acceptanceRate >= 50 ? (
+                  <>
+                    <div className="bg-white border border-black p-1 shadow-[2px_2px_0_0_var(--color-brutal-yellow)]"><Zap className="w-4 h-4 stroke-[3]" /></div>
+                    <span className="text-xs font-bold text-gray-800">Good — room to improve</span>
+                  </>
+                ) : perfMetrics.acceptanceRate > 0 ? (
+                  <>
+                    <div className="bg-white border border-black p-1 shadow-[2px_2px_0_0_var(--color-brutal-red)]"><AlertTriangle className="w-4 h-4 stroke-[3]" /></div>
+                    <span className="text-xs font-bold text-gray-800">Low — consider accepting more jobs</span>
+                  </>
+                ) : (
+                  <span className="text-xs font-bold text-gray-500">No decision data yet</span>
+                )}
+              </div>
             </div>
 
             {/* Average Response Time */}
@@ -479,13 +490,26 @@ export default function ArtisanDashboard() {
               </p>
               <div className="border-t-2 border-black pt-2">
                 <p className="text-xs font-bold text-gray-500">
-                  {perfMetrics.avgResponseTimeMs > 0
-                    ? perfMetrics.avgResponseTimeMs < 3600000
-                      ? "⚡ Lightning fast — customers love quick responses"
-                      : perfMetrics.avgResponseTimeMs < 86400000
-                        ? "👍 Decent — try to respond within the hour"
-                        : "🐢 Slow — faster replies get more jobs"
-                    : "Complete jobs to see your response time"}
+                  {perfMetrics.avgResponseTimeMs > 0 ? (
+                    perfMetrics.avgResponseTimeMs < 3600000 ? (
+                      <div className="flex items-center gap-2">
+                        <div className="bg-black text-white p-1 border border-black shadow-[2px_2px_0_0_var(--color-brutal-teal)]"><Zap className="w-4 h-4 stroke-[3]" /></div>
+                        <span className="text-xs font-bold text-gray-800">Lightning fast — customers love quick responses</span>
+                      </div>
+                    ) : perfMetrics.avgResponseTimeMs < 86400000 ? (
+                      <div className="flex items-center gap-2">
+                        <div className="bg-white border border-black p-1 shadow-[2px_2px_0_0_var(--color-brutal-yellow)]"><ThumbsUp className="w-4 h-4 stroke-[3]" /></div>
+                        <span className="text-xs font-bold text-gray-800">Decent — try to respond within the hour</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="bg-white border border-black p-1 shadow-[2px_2px_0_0_var(--color-brutal-red)]"><Snail className="w-4 h-4 stroke-[3]" /></div>
+                        <span className="text-xs font-bold text-gray-800">Slow — faster replies get more jobs</span>
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-xs font-bold text-gray-500">Complete jobs to see your response time</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -503,15 +527,26 @@ export default function ArtisanDashboard() {
                 color="var(--color-brutal-teal, #00D4AA)"
                 label="Finished vs Cancelled"
               />
-              <p className="text-xs font-bold text-gray-500 mt-2">
-                {perfMetrics.completionRate >= 90
-                  ? "💯 Outstanding reliability"
-                  : perfMetrics.completionRate >= 70
-                    ? "👍 Solid — keep finishing what you start"
-                    : perfMetrics.completionRate > 0
-                      ? "⚠️ Too many cancellations hurt your ranking"
-                      : "No completed jobs yet"}
-              </p>
+              <div className="mt-2">
+                {perfMetrics.completionRate >= 90 ? (
+                  <div className="flex items-center gap-2">
+                    <div className="bg-black text-white p-1 border border-black shadow-[2px_2px_0_0_var(--color-brutal-green)]"><CheckCircle className="w-4 h-4 stroke-[3]" /></div>
+                    <span className="text-xs font-bold text-gray-800">Outstanding reliability</span>
+                  </div>
+                ) : perfMetrics.completionRate >= 70 ? (
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white border border-black p-1 shadow-[2px_2px_0_0_var(--color-brutal-yellow)]"><ThumbsUp className="w-4 h-4 stroke-[3]" /></div>
+                    <span className="text-xs font-bold text-gray-800">Solid — keep finishing what you start</span>
+                  </div>
+                ) : perfMetrics.completionRate > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white border border-black p-1 shadow-[2px_2px_0_0_var(--color-brutal-red)]"><AlertTriangle className="w-4 h-4 stroke-[3]" /></div>
+                    <span className="text-xs font-bold text-gray-800">Too many cancellations hurt your ranking</span>
+                  </div>
+                ) : (
+                  <span className="text-xs font-bold text-gray-500">No completed jobs yet</span>
+                )}
+              </div>
             </div>
 
             {/* Rating Trend */}

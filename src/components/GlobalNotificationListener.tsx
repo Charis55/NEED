@@ -146,8 +146,12 @@ export default function GlobalNotificationListener() {
         }
       };
 
-      const unsubArtisan = onSnapshot(qArtisan, (snap) => handleJobChange(snap, "artisan"));
-      const unsubCustomer = onSnapshot(qCustomer, (snap) => handleJobChange(snap, "customer"));
+      const handleSnapError = (err: any) => {
+        console.warn("GlobalNotificationListener Firestore error:", err?.message || err);
+      };
+
+      const unsubArtisan = onSnapshot(qArtisan, (snap) => handleJobChange(snap, "artisan"), handleSnapError);
+      const unsubCustomer = onSnapshot(qCustomer, (snap) => handleJobChange(snap, "customer"), handleSnapError);
 
       return () => {
         unsubArtisan();

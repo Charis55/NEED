@@ -10,20 +10,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Lookup recipient token: check users collection first, fallback to artisans collection
+    let fcmToken: string | undefined = undefined;
+    let pushEnabled = true;
+    let collectionName = "users";
+
     const userDoc = await adminDb.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (userDoc.exists) {
+      const userData = userDoc.data()!;
+      fcmToken = userData.fcmToken;
+      pushEnabled = userData.preferences?.pushNotifications ?? true;
     }
 
-    const userData = userDoc.data()!;
-    const fcmToken = userData.fcmToken;
-    const pushEnabled = userData.preferences?.pushNotifications ?? true;
+    if (!fcmToken) {
+      const artisanDoc = await adminDb.collection("artisans").doc(userId).get();
+      if (artisanDoc.exists) {
+        const artisanData = artisanDoc.data()!;
+        fcmToken = artisanData.fcmToken;
+        collectionName = "artisans";
+      }
+    }
+
+    if (!fcmToken) {
+      return NextResponse.json({ error: "No FCM token registered for recipient" }, { status: 404 });
+    }
 
     let pushSuccess = false;
 
     if (fcmToken && pushEnabled) {
       // FCM requires ALL data values to be strings.
-      // If any value is a number, boolean, or object, the entire send silently fails.
       const stringData: Record<string, string> = {};
       if (data && typeof data === "object") {
         for (const [key, value] of Object.entries(data)) {
@@ -34,9 +49,6 @@ export async function POST(req: NextRequest) {
       try {
         await getMessaging(adminApp_).send({
           token: fcmToken,
-          // The notification block is what makes Android auto-display
-          // a visual banner. Without it, messages are "data-only" and
-          // Android will NOT show anything to the user.
           notification: { title, body },
           data: stringData,
           android: {
@@ -44,8 +56,9 @@ export async function POST(req: NextRequest) {
             notification: {
               sound: "default",
               channelId: "default",
-              // HIGH priority gives heads-up banner on Android
               priority: "high",
+              defaultSound: true,
+              defaultVibrateTimings: true,
             },
           },
           apns: {
@@ -60,12 +73,11 @@ export async function POST(req: NextRequest) {
         pushSuccess = true;
       } catch (e: any) {
         console.error("FCM Send failed:", e?.message || e);
-        // If the token is invalid/expired, clean it up so we don't keep failing
         if (
           e?.code === "messaging/invalid-registration-token" ||
           e?.code === "messaging/registration-token-not-registered"
         ) {
-          await adminDb.collection("users").doc(userId).update({ fcmToken: "" });
+          await adminDb.collection(collectionName).doc(userId).update({ fcmToken: "" });
         }
       }
     }

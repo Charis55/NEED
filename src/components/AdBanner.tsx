@@ -2,23 +2,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 
 export default function AdBanner() {
   const [isVisible, setIsVisible] = useState(true);
   const adRef = useRef<HTMLModElement>(null);
 
   useEffect(() => {
+    // AdSense banners shouldn't run inside native mobile app WebViews or if container has zero width
+    if (Capacitor.isNativePlatform()) return;
+
     try {
-      if (adRef.current && !adRef.current.hasAttribute('data-adsbygoogle-status')) {
+      if (
+        adRef.current &&
+        adRef.current.clientWidth > 0 &&
+        !adRef.current.hasAttribute('data-adsbygoogle-status')
+      ) {
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       }
     } catch (err) {
-      console.error("AdSense error", err);
+      console.warn("AdSense push ignored:", err);
     }
   }, [isVisible]);
 
-  if (!isVisible) return null;
+  if (!isVisible || Capacitor.isNativePlatform()) return null;
 
   return (
     <div className="w-full max-w-sm sm:max-w-md mx-auto mt-2 pointer-events-auto bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative flex items-center p-1 group">

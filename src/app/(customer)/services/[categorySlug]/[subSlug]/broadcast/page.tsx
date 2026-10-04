@@ -8,6 +8,8 @@ import { JobRequest } from "@/types";
 import BackButton from "@/components/BackButton";
 import { ArrowRight, MapPin, Clock, ChevronLeft } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 
 export default function BroadcastJobPage({ params }: { params: Promise<{ categorySlug: string, subSlug: string }> }) {
   const unwrappedParams = use(params);
@@ -57,33 +59,38 @@ export default function BroadcastJobPage({ params }: { params: Promise<{ categor
   const trade = decodeSlug(unwrappedParams.categorySlug);
   const subcategory = decodeSlug(unwrappedParams.subSlug);
 
-  const detectLocation = () => {
+  const detectLocation = async () => {
     setIsLocating(true);
     setLocationError("");
-    if (!("geolocation" in navigator)) {
-      setLocationError("Geolocation is not supported by your browser.");
-      setIsLocating(false);
-      return;
-    }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          const name = await reverseGeocode(latitude, longitude);
-          setLocationData({ lat: latitude, lng: longitude, name });
-        } catch (err) {
-          setLocationError("Failed to determine neighborhood from coordinates.");
-        } finally {
-          setIsLocating(false);
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const permStatus = await Geolocation.checkPermissions();
+        if (permStatus.location !== 'granted') {
+          const reqStatus = await Geolocation.requestPermissions();
+          if (reqStatus.location !== 'granted') {
+            setLocationError("Location permission denied. Please enable it to continue.");
+            setIsLocating(false);
+            return;
+          }
         }
-      },
-      (err) => {
-        setLocationError("Location permission denied. Please enable it to continue.");
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+      }
+
+      const position = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      });
+
+      const { latitude, longitude } = position.coords;
+      const name = await reverseGeocode(latitude, longitude);
+      setLocationData({ lat: latitude, lng: longitude, name });
+    } catch (err: any) {
+      console.error("Location error:", err);
+      setLocationError("Failed to get your location. Please ensure GPS is enabled.");
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

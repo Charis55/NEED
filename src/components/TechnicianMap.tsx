@@ -6,6 +6,8 @@ import L from 'leaflet';
 import { Target, Star, Navigation, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { ArtisanProfile } from '@/types';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
@@ -24,20 +26,43 @@ export default function TechnicianMap({
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
+    let isMounted = true;
+    const fetchLocation = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 10000
           });
-        },
-        (err) => {
-          console.warn("Could not retrieve user location for map:", err.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
+          if (isMounted && pos?.coords) {
+            setUserLocation({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude
+            });
+          }
+        } else if (typeof window !== "undefined" && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (isMounted) {
+                setUserLocation({
+                  lat: pos.coords.latitude,
+                  lng: pos.coords.longitude
+                });
+              }
+            },
+            (err) => {
+              console.warn("Could not retrieve user location for map:", err.message);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+          );
+        }
+      } catch (err: any) {
+        console.warn("Location fetch error for map:", err?.message || err);
+      }
+    };
+
+    fetchLocation();
+    return () => { isMounted = false; };
   }, []);
 
   const createCustomIcon = (trade: string) => {

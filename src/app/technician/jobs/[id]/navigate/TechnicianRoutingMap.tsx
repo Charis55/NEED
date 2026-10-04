@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet-routing-machine';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Navigation } from 'lucide-react';
@@ -11,52 +10,17 @@ import { enableKeepAwake, disableKeepAwake } from '@/utils/keepAwake';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 
-function RoutingControl({ startCoords, destCoords }: { startCoords: {lat: number, lng: number}, destCoords: {lat: number, lng: number} }) {
-  const map = useMap();
-  const routingControlRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (!map) return;
-
-    if (!routingControlRef.current) {
-      routingControlRef.current = (L as any).Routing.control({
-        waypoints: [
-          L.latLng(startCoords.lat, startCoords.lng),
-          L.latLng(destCoords.lat, destCoords.lng)
-        ],
-        routeWhileDragging: false,
-        addWaypoints: false,
-        fitSelectedRoutes: true,
-        showAlternatives: false,
-        lineOptions: {
-          styles: [{ color: '#000000', opacity: 0.8, weight: 6 }]
-        },
-        createMarker: () => null,
-        show: false
-      }).addTo(map);
-    } else {
-      // Only update waypoints to prevent flashing and re-rendering the whole route control
-      routingControlRef.current.setWaypoints([
-        L.latLng(startCoords.lat, startCoords.lng),
-        L.latLng(destCoords.lat, destCoords.lng)
-      ]);
-    }
-
-    // We don't remove control on every coords change anymore, 
-    // only on component unmount
-    return () => {
-      // Cleanup handled manually or keep it if map unmounts
-    };
-  }, [map, startCoords, destCoords]);
-
-  // Inject CSS to completely hide the Leaflet Routing Machine text container
-  return (
-    <style>{`
-      .leaflet-routing-container, .leaflet-routing-alternatives-container {
-        display: none !important;
-      }
-    `}</style>
-  );
+// Helper function to calculate distance between two coordinates in meters
+function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371e3; // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 }
 
 export default function TechnicianRoutingMap({ 
@@ -73,54 +37,77 @@ export default function TechnicianRoutingMap({
     enableKeepAwake();
 
     let watchId: string | null = null;
+    let isMounted = true;
+    
+    // State to throttle updates
+    let lastUpdate = 0;
+    let lastLat = 0;
+    let lastLng = 0;
+    let isSyncing = false;
 
     const startWatching = async () => {
       try {
-        // Request permissions just in case
         if (Capacitor.isNativePlatform()) {
           const permStatus = await Geolocation.checkPermissions();
           if (permStatus.location !== 'granted') {
-            await Geolocation.requestPermissions();
+            const reqStatus = await Geolocation.requestPermissions();
+            if (reqStatus.location !== 'granted') {
+              setError("Location permission denied.");
+              return;
+            }
           }
         }
 
-        watchId = await Geolocation.watchPosition(
-          {
-            enableHighAccuracy: true,
-            maximumAge: 10000,
-            timeout: 20000 // Increased timeout to prevent premature failure
-          },
-          (position, err) => {
-            if (err) {
-              console.error("WatchPosition error:", err);
-              // Only set error if we haven't gotten a location yet, or if it's a critical error
-              if (!currentLocation) {
-                setError("Failed to get your location. Please enable GPS.");
-              }
-              return;
-            }
-            if (position) {
-              const { latitude, longitude } = position.coords;
-              setCurrentLocation({ lat: latitude, lng: longitude });
+        if (!isMounted) return;
 
-              // Update Firestore
-              updateDoc(doc(db, "jobRequests", jobId), {
-                technicianLocation: { lat: latitude, lng: longitude },
-                lastLocationUpdate: Date.now()
-              }).catch(err => console.error("Failed to sync location:", err));
-            }
+        watchId = await Geolocation.watchPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5000
+        }, (position, err) => {
+          if (!isMounted) return;
+          if (err) {
+            console.error("WatchPosition error:", err);
+            return;
           }
-        );
+          if (!position) return;
+
+          const now = Date.now();
+          const { latitude, longitude } = position.coords;
+          
+          const dist = getDistanceInMeters(lastLat, lastLng, latitude, longitude);
+          
+          // Throttle state updates and Firestore writes to every 10 seconds OR > 15 meters moved
+          // Also wait for previous sync to finish to prevent request queue buildup
+          if ((now - lastUpdate > 10000 || dist > 15) && !isSyncing) {
+            lastUpdate = now;
+            lastLat = latitude;
+            lastLng = longitude;
+            
+            setCurrentLocation({ lat: latitude, lng: longitude });
+
+            isSyncing = true;
+            updateDoc(doc(db, "jobRequests", jobId), {
+              technicianLocation: { lat: latitude, lng: longitude },
+              lastLocationUpdate: now
+            }).catch(err => {
+              console.error("Failed to sync location:", err);
+            }).finally(() => {
+              isSyncing = false;
+            });
+          }
+        });
       } catch (err) {
         console.error("Start watching error:", err);
-        setError("Failed to start location tracking. Please check permissions.");
+        if (isMounted) setError("Failed to start location tracking.");
       }
     };
 
     startWatching();
 
     return () => {
-      if (watchId) {
+      isMounted = false;
+      if (watchId !== null) {
         Geolocation.clearWatch({ id: watchId }).catch(console.error);
       }
       disableKeepAwake();
@@ -196,8 +183,14 @@ export default function TechnicianRoutingMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Routing Machine */}
-        <RoutingControl startCoords={currentLocation} destCoords={destCoords} />
+        {/* Direct path Polyline instead of heavy routing-machine */}
+        <Polyline 
+          positions={[
+            [currentLocation.lat, currentLocation.lng], 
+            [destCoords.lat, destCoords.lng]
+          ]} 
+          pathOptions={{ color: '#000000', weight: 6, opacity: 0.8, dashArray: '10, 10' }} 
+        />
 
         {/* Technician Marker */}
         <Marker position={[currentLocation.lat, currentLocation.lng]} icon={createTechIcon()} />
