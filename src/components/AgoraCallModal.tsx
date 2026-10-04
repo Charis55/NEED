@@ -71,7 +71,8 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
       return;
     }
     
-    fetch('/api/agora/token', {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://need-chi.vercel.app';
+    fetch(`${baseUrl}/api/agora/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channelName, uid })
@@ -84,7 +85,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           setError(data.error || "Failed to get token");
         }
       })
-      .catch(e => setError("Failed to fetch token"));
+      .catch(e => setError("Failed to fetch token: " + e.message));
   }, [channelName, uid, appId]);
 
   // 2. Join Call and setup Tracks

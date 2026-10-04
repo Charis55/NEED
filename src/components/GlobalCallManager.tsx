@@ -158,32 +158,37 @@ export default function GlobalCallManager() {
         
       const receiverId = jobToProcess.customerId === messageSenderId ? jobToProcess.artisanId : jobToProcess.customerId;
 
-      // Use a batch write instead of a transaction to prevent read-conflicts from failing the cancellation
-      const { writeBatch } = await import("firebase/firestore");
-      const batch = writeBatch(db);
-      
+      // We use isolated operations instead of a batch to ensure the call ends even if logging fails.
       const jobRef = doc(db, "jobRequests", jobToProcess.requestId);
-      batch.update(jobRef, {
-        "activeCall.status": "ended",
-        lastMessageText: messageText,
-        lastMessageSenderId: messageSenderId || userUid,
-        lastMessageAt: Date.now(),
-        ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
-      });
-
-      const msgRef = doc(collection(db, "jobRequests", jobToProcess.requestId, "messages"));
-      batch.set(msgRef, {
-        text: messageText,
-        senderId: messageSenderId || userUid,
-        createdAt: Date.now()
-      });
-
-      await batch.commit();
       
-      // Optimistically hide UI after successful (or fired) commit
+      try {
+        await updateDoc(jobRef, {
+          "activeCall.status": "ended",
+          lastMessageText: messageText,
+          lastMessageSenderId: messageSenderId || userUid,
+          lastMessageAt: Date.now(),
+          ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
+        });
+      } catch (updateErr) {
+        console.error("Failed to update job request status:", updateErr);
+      }
+
+      try {
+        const msgRef = doc(collection(db, "jobRequests", jobToProcess.requestId, "messages"));
+        const { setDoc } = await import("firebase/firestore");
+        await setDoc(msgRef, {
+          text: messageText,
+          senderId: messageSenderId || userUid,
+          createdAt: Date.now()
+        });
+      } catch (msgErr) {
+        console.error("Failed to append message to history:", msgErr);
+      }
+
+      // Hide UI
       setActiveJob(null);
     } catch (e) {
-      console.error("Failed to end call via batch:", e);
+      console.error("Failed to end call:", e);
       // Fallback: just clear it locally anyway
       setActiveJob(null);
     }
