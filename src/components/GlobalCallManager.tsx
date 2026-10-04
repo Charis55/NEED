@@ -63,7 +63,6 @@ export default function GlobalCallManager() {
       }
     }
   };
-  const [partnerPhoto, setPartnerPhoto] = useState<string | undefined>();
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {
