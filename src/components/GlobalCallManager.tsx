@@ -78,19 +78,12 @@ export default function GlobalCallManager() {
       SocialNotification.startService({ uid: userUid }).catch(e => console.error("Failed to start service", e));
     }
 
-    const qCombined = query(
-      collection(db, "jobRequests"),
-      or(
-        where("artisanId", "==", userUid),
-        where("customerId", "==", userUid)
-      )
-    );
-
-    const handleSnapshot = (snap: any) => {
+    const updateCombined = (artisanJobs: JobRequest[], customerJobs: JobRequest[]) => {
+      const combined = [...artisanJobs, ...customerJobs];
+      
       // Find if there's any active call
       let foundJob: JobRequest | null = null;
-      for (const doc of snap.docs) {
-        const data = doc.data() as JobRequest;
+      for (const data of combined) {
         if (data.activeCall && (data.activeCall.status === "ringing" || data.activeCall.status === "ongoing")) {
           foundJob = data;
           break; // just handle one active call at a time
@@ -129,10 +122,24 @@ export default function GlobalCallManager() {
       console.warn("GlobalCallManager Firestore listener error:", err?.message || err);
     };
 
-    const unsub = onSnapshot(qCombined, handleSnapshot, handleError);
+    let artisanJobs: JobRequest[] = [];
+    let customerJobs: JobRequest[] = [];
+
+    const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", userUid));
+    const unsubArtisan = onSnapshot(qArtisan, (snap) => {
+      artisanJobs = snap.docs.map(d => d.data() as JobRequest);
+      updateCombined(artisanJobs, customerJobs);
+    }, handleError);
+
+    const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", userUid));
+    const unsubCustomer = onSnapshot(qCustomer, (snap) => {
+      customerJobs = snap.docs.map(d => d.data() as JobRequest);
+      updateCombined(artisanJobs, customerJobs);
+    }, handleError);
 
     return () => {
-      unsub();
+      unsubArtisan();
+      unsubCustomer();
     };
   }, [userUid]);
 
