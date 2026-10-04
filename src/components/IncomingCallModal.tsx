@@ -30,14 +30,26 @@ export default function IncomingCallModal({
         }, 3000);
       }
 
-      // Play audio
+      // Play audio safely handling the Promise
       const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1354/1354-preview.mp3");
       audio.loop = true;
-      audio.play().catch(e => console.warn("Auto-play prevented", e));
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => console.warn("Auto-play prevented", e));
+      }
 
       return () => {
-        audio.pause();
-        audio.currentTime = 0;
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.src = "";
+          }).catch(() => {});
+        } else {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.src = "";
+        }
         clearInterval(interval);
         if (navigator.vibrate) navigator.vibrate(0);
       };

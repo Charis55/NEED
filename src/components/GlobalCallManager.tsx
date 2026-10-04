@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, getDoc, doc, updateDoc, runTransaction, increment } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDoc, doc, updateDoc, increment, or } from "firebase/firestore";
 import { JobRequest } from "@/types";
 import IncomingCallModal from "./IncomingCallModal";
 import OutgoingCallModal from "./OutgoingCallModal";
 import dynamic from "next/dynamic";
+import SocialNotification from "@/lib/SocialNotification";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -36,9 +37,19 @@ export default function GlobalCallManager() {
 
   useEffect(() => {
     if (!userUid) return;
+    
+    // Start our custom native bridge service for background notifications
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform()) {
+      SocialNotification.startService({ uid: userUid }).catch(e => console.error("Failed to start service", e));
+    }
 
-    const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", userUid));
-    const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", userUid));
+    const qCombined = query(
+      collection(db, "jobRequests"),
+      or(
+        where("artisanId", "==", userUid),
+        where("customerId", "==", userUid)
+      )
+    );
 
     const handleSnapshot = (snap: any) => {
       // Find if there's any active call
@@ -60,12 +71,10 @@ export default function GlobalCallManager() {
       });
     };
 
-    const unsubArtisan = onSnapshot(qArtisan, handleSnapshot);
-    const unsubCustomer = onSnapshot(qCustomer, handleSnapshot);
+    const unsub = onSnapshot(qCombined, handleSnapshot);
 
     return () => {
-      unsubArtisan();
-      unsubCustomer();
+      unsub();
     };
   }, [userUid]);
 
