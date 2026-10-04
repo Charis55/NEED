@@ -280,7 +280,8 @@ export default function GlobalCallManager() {
   const isCaller = activeCall.callerId === userUid;
 
   return (
-    <div className="fixed z-[9999]">
+    <div className="fixed inset-0 z-[9999] pointer-events-none">
+      <div className="pointer-events-auto">
       {activeCall.status === "ringing" && !isCaller && (
         <IncomingCallModal 
           callerName={partnerName}
@@ -310,6 +311,7 @@ export default function GlobalCallManager() {
           onEndCall={() => endCallWithLog("ended")}
         />
       )}
+      </div>
     </div>
   );
 }

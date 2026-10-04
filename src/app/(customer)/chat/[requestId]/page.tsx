@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth, db, storage } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, runTransaction, arrayUnion, increment } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, runTransaction, arrayUnion, increment, writeBatch } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { JobRequest, ArtisanProfile, Review } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
@@ -335,14 +335,23 @@ export default function ChatPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
       
-      // Mark incoming messages as read
+      // Mark incoming messages as read using a batch to prevent update storms
       const currentUser = auth.currentUser;
       if (currentUser) {
+        const batch = writeBatch(db);
+        let hasUpdates = false;
+
         msgs.forEach(msg => {
           if (msg.senderId !== currentUser.uid && !msg.read) {
-            updateDoc(doc(db, "jobRequests", requestId, "messages", msg.id), { read: true }).catch(err => console.error("Failed to mark read:", err));
+            const msgRef = doc(db, "jobRequests", requestId, "messages", msg.id);
+            batch.update(msgRef, { read: true });
+            hasUpdates = true;
           }
         });
+
+        if (hasUpdates) {
+          batch.commit().catch(err => console.error("Failed to mark read:", err));
+        }
       }
     });
     
@@ -655,7 +664,11 @@ export default function ChatPage() {
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Unknown Customer");
 
   const startCall = async (type: "audio" | "video") => {
-    if (!job || !auth.currentUser) return;
+    if (!job || !auth.currentUser) {
+      showAlert("Cannot start call: Job or user missing", "error");
+      return;
+    }
+    showAlert("Starting call...", "success");
     try {
       await updateDoc(doc(db, "jobRequests", requestId), {
         activeCall: {
