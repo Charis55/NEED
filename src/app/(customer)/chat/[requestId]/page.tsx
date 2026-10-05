@@ -17,6 +17,7 @@ import AdUnit from "@/components/AdUnit";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { pickNativePhoto, pickNativePhotos } from "@/utils/nativeCamera";
+import PublicProfileModal from "@/components/PublicProfileModal";
 
 interface Message {
   id: string;
@@ -735,7 +736,7 @@ export default function ChatPage() {
           className="flex-1 min-w-0 flex flex-col items-start justify-center cursor-pointer"
           onClick={() => {
             if (isCustomerViewing && job?.artisanId) {
-              router.push(`/artisans/${job.artisanId}`);
+              router.push(`/artisan/${job.artisanId}`);
             }
           }}
         >
@@ -746,7 +747,7 @@ export default function ChatPage() {
             )}
           </div>
           <p className="text-black font-bold text-[10px] md:text-sm bg-white border-2 border-black px-1 md:px-1.5 py-0.5 inline-block shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000] truncate max-w-full leading-tight mt-0.5 md:mt-1">
-            {job?.subcategory}
+            {job?.services && job.services.length > 1 ? `${job.services.length} Services` : job?.subcategory}
           </p>
         </div>
 

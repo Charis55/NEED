@@ -6,6 +6,7 @@ import { ChevronLeft, SlidersHorizontal, MapPin, Star, BadgeCheck, X, Check } fr
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { db } from "@/lib/firebase";
+import PublicProfileModal from "@/components/PublicProfileModal";
 import { collection, getDocs, query, limit, where, doc, getDoc } from "firebase/firestore";
 import { ArtisanProfile } from "@/types";
 import { useRouter } from "next/navigation";
@@ -288,53 +289,13 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
           )}
 
           {/* Overlay Card */}
-          <AnimatePresence>
-            {selectedArtisan && (
-              <motion.div 
-                initial={{ y: 200, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 200, opacity: 0 }}
-                className="absolute bottom-4 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[400px] bg-white border-4 border-black shadow-[8px_8px_0_0_#000] z-[1000] flex flex-col overflow-hidden"
-              >
-                <div className="p-4 border-b-4 border-black flex gap-4 bg-[var(--color-brutal-teal)]">
-                  <div className="w-16 h-16 bg-white border-2 border-black flex-shrink-0">
-                    <img 
-                      src={selectedArtisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedArtisan.name || 'Artisan')}&background=random&size=150`} 
-                      alt={selectedArtisan.name} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <h2 className="text-xl font-black text-black uppercase tracking-tighter truncate leading-tight">
-                      {((selectedArtisan as any).firstName && (selectedArtisan as any).lastName) ? `${(selectedArtisan as any).firstName} ${(selectedArtisan as any).lastName}` : (selectedArtisan.name || "Technician")}
-                    </h2>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="inline-flex items-center gap-1 bg-white text-black border-2 border-black px-1.5 py-0.5 font-black text-[10px]">
-                        <Star className="w-3 h-3 fill-[var(--color-brutal-yellow)]" />
-                        <span>{selectedArtisan.ratingAverage > 0 ? selectedArtisan.ratingAverage.toFixed(1) : "NEW"}</span>
-                      </div>
-                      <span className="text-xs font-bold uppercase truncate">{selectedArtisan.neighborhood}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex bg-white">
-                  <button 
-                    className="flex-1 py-4 text-center font-black text-black uppercase border-r-4 border-black hover:bg-[var(--color-brutal-red)] hover:text-white transition-colors"
-                    onClick={() => setSelectedArtisan(null)}
-                  >
-                    BACK
-                  </button>
-                  <button 
-                    className="flex-[2] py-4 text-center font-black text-black uppercase bg-[var(--color-brutal-yellow)] hover:bg-black hover:text-white transition-colors"
-                    onClick={() => handleAccept(selectedArtisan.artisanId)}
-                  >
-                    SELECT
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <PublicProfileModal 
+            artisan={selectedArtisan}
+            isOpen={!!selectedArtisan}
+            onClose={() => setSelectedArtisan(null)}
+            onSelect={(id) => handleAccept(id)}
+            selectLabel="SELECT"
+          />
         </div>
       </div>
     </div>

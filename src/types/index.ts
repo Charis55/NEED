@@ -137,6 +137,7 @@ export interface JobRequest {
   isBroadcast?: boolean;
   trade: string;
   subcategory: string;
+  services?: { trade: string; subcategory: string }[];
   description: string;
   neighborhood: string;
   unreadCount?: Record<string, number>;

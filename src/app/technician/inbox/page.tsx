@@ -8,7 +8,7 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Search, Filter, SlidersHorizontal } from "lucide-react";
 
 interface ChatListItem {
   job: JobRequest;
@@ -19,6 +19,9 @@ interface ChatListItem {
 export default function InboxPage() {
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOption, setSortOption] = useState<"ongoing" | "completed" | "az" | "za">("ongoing");
+  const [isSortOpen, setIsSortOpen] = useState(false);
   const { showAlert } = useAlert();
 
   useEffect(() => {
@@ -81,23 +84,103 @@ export default function InboxPage() {
 
   if (loading) return <GlobalSpinner />;
 
+  const filteredList = chatList.filter(({ job, customer }) => {
+    const name = (customer?.displayName || customer?.firstName || "Customer").toLowerCase();
+    const trade = (job.services ? job.services.map(s => `${s.trade} ${s.subcategory}`).join(" ") : (job.subcategory || job.trade || "")).toLowerCase();
+    const dateStr = new Date(job.createdAt).toLocaleDateString('en-GB').toLowerCase();
+    const q = searchQuery.toLowerCase();
+    if (q && !name.includes(q) && !trade.includes(q) && !dateStr.includes(q)) return false;
+    return true;
+  });
+
+  const sortedList = [...filteredList].sort((a, b) => {
+    const nameA = (a.customer?.displayName || a.customer?.firstName || "").toLowerCase();
+    const nameB = (b.customer?.displayName || b.customer?.firstName || "").toLowerCase();
+    
+    if (sortOption === "az") return nameA.localeCompare(nameB);
+    if (sortOption === "za") return nameB.localeCompare(nameA);
+    if (sortOption === "ongoing") {
+      const aIsOngoing = a.job.status !== "completed" ? 1 : 0;
+      const bIsOngoing = b.job.status !== "completed" ? 1 : 0;
+      return bIsOngoing - aIsOngoing || b.job.createdAt - a.job.createdAt;
+    }
+    if (sortOption === "completed") {
+      const aIsCompleted = a.job.status === "completed" ? 1 : 0;
+      const bIsCompleted = b.job.status === "completed" ? 1 : 0;
+      return bIsCompleted - aIsCompleted || b.job.createdAt - a.job.createdAt;
+    }
+    return 0;
+  });
+
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Inbox</h1>
         <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-teal)] inline-block pr-3 mb-10 -rotate-1 shadow-[2px_2px_0_0_#000]">Chat with your customers.</p>
         
-        {chatList.length === 0 ? (
+        <div className="mb-8 flex flex-col gap-4">
+          <div className="flex justify-end w-full relative z-[60]">
+            <div className="relative">
+              <button 
+                onClick={() => setIsSortOpen(!isSortOpen)}
+                className="flex items-center justify-center w-12 h-12 md:w-auto md:px-4 md:py-3 border-4 border-black bg-[var(--color-brutal-pink)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all cursor-pointer"
+              >
+                <SlidersHorizontal className="w-6 h-6 stroke-[3] md:mr-2" />
+                <span className="hidden md:inline font-black uppercase text-black">Sort</span>
+              </button>
+
+              {isSortOpen && (
+                <div className="absolute top-14 md:top-16 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
+                  <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
+                  {[
+                    { label: "Ongoing", value: "ongoing" },
+                    { label: "Completed", value: "completed" },
+                    { label: "A to Z", value: "az" },
+                    { label: "Z to A", value: "za" },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setSortOption(option.value as any);
+                        setIsSortOpen(false);
+                      }}
+                      className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortOption === option.value ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+              <Search className="w-6 h-6 text-black stroke-[3]" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search by Name, Job or Date..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white border-4 border-black font-bold text-black focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-pink)] brutal-shadow transition-all"
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <GlobalSpinner text="LOADING CHATS" color="bg-[var(--color-brutal-pink)]" />
+        ) : sortedList.length === 0 ? (
           <div className="bg-white p-12 text-center border-4 border-black shadow-[4px_4px_0_0_#000]">
             <div className="w-20 h-20 bg-[var(--color-brutal-yellow)] border-4 border-black flex items-center justify-center mx-auto mb-4 rotate-3">
               <MessageCircle className="w-10 h-10 stroke-[3]" />
             </div>
-            <h3 className="text-2xl font-black text-black mb-2 uppercase">No Active Chats</h3>
-            <p className="text-black font-bold">When you accept jobs, you can chat with customers here.</p>
+            <h3 className="text-2xl font-black text-black mb-2 uppercase">No Results</h3>
+            <p className="text-black font-bold">Try adjusting your search or sort filters.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {chatList.map(({ job, customer, unreadCount }) => (
+            {sortedList.map(({ job, customer, unreadCount }) => (
               <Link 
                 key={job.requestId} 
                 href={`/chat/${job.requestId}`}
@@ -130,7 +213,7 @@ export default function InboxPage() {
                     </div>
                     
                     <p className="text-sm font-bold text-gray-700 truncate">
-                      {job.trade} • {job.neighborhood}
+                      {job.services && job.services.length > 1 ? `${job.services.length} Services` : job.trade} • {job.neighborhood}
                     </p>
                     
                     <div className="mt-2 flex items-center gap-2">

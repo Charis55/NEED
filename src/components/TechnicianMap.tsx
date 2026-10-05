@@ -168,7 +168,7 @@ export default function TechnicianMap({
                     </div>
                     
                     <Link 
-                      href={`/artisans/${tech.artisanId}`}
+                      href={`/artisan/${tech.artisanId}`}
                       className="block w-full text-center bg-black text-white font-black text-sm py-2 px-4 brutal-btn hover:-translate-y-1 transition-transform uppercase"
                     >
                       VIEW PROFILE

@@ -16,7 +16,7 @@ import { Geolocation } from "@capacitor/geolocation";
 export default function RequestArtisanPage({ params }: { params: Promise<{ artisanId: string }> }) {
   const unwrappedParams = use(params);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
-  const [selectedServiceIndex, setSelectedServiceIndex] = useState(0);
+  const [selectedServiceIndices, setSelectedServiceIndices] = useState<number[]>([0]);
   
   // Draft persistence — survives page refreshes and dropped connections
   const [draft, setDraft, clearDraft] = useLocalDraft(`request-${unwrappedParams.artisanId}`, {
@@ -57,7 +57,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
             const subParam = urlParams.get('subcategory');
             if (tradeParam && subParam && artisanData.services) {
                const idx = artisanData.services.findIndex(s => s.trade === tradeParam && s.subcategory === subParam);
-               if (idx !== -1) setSelectedServiceIndex(idx);
+               if (idx !== -1) setSelectedServiceIndices([idx]);
             }
 
             // Pre-fill description if empty
@@ -205,12 +205,16 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
       }
 
       const requestRef = doc(collection(db, "jobRequests"));
+      
+      const selectedServices = selectedServiceIndices.map(idx => artisan.services?.[idx] || { trade: artisan.trade, subcategory: artisan.subcategory });
+      
       const newRequest: JobRequest & { mediaUrl?: string } = {
         requestId: requestRef.id,
         customerId: user.uid,
         artisanId: unwrappedParams.artisanId,
-        trade: artisan.services?.[selectedServiceIndex]?.trade || artisan.trade || "Unknown",
-        subcategory: artisan.services?.[selectedServiceIndex]?.subcategory || artisan.subcategory || "Unknown",
+        trade: selectedServices[0]?.trade || "Unknown",
+        subcategory: selectedServices[0]?.subcategory || "Unknown",
+        services: selectedServices.map(s => ({ trade: s.trade || "Unknown", subcategory: s.subcategory || "Unknown" })),
         description: draft.description,
         neighborhood: locationData.name,
         locationCoords: { lat: locationData.lat, lng: locationData.lng },
@@ -295,15 +299,27 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               <p className="text-sm font-bold uppercase text-gray-500 mb-1">Requesting</p>
               <h2 className="text-xl font-black uppercase tracking-tighter leading-none">{artisan.name}</h2>
               {artisan.services && artisan.services.length > 1 ? (
-                <select 
-                  className="mt-2 text-xs font-bold text-black border-2 border-black p-1 bg-[var(--color-brutal-pink)] outline-none cursor-pointer w-full"
-                  value={selectedServiceIndex}
-                  onChange={(e) => setSelectedServiceIndex(Number(e.target.value))}
-                >
+                <div className="mt-2 space-y-2">
                   {artisan.services.map((svc, i) => (
-                    <option key={i} value={i}>{svc.trade} • {svc.subcategory}</option>
+                    <label key={i} className="flex items-center gap-2 text-xs font-bold text-black border-2 border-black p-2 bg-[var(--color-brutal-pink)] cursor-pointer shadow-[2px_2px_0_0_#000]">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedServiceIndices.includes(i)} 
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedServiceIndices(prev => [...prev, i]);
+                          } else {
+                            if (selectedServiceIndices.length > 1) {
+                              setSelectedServiceIndices(prev => prev.filter(idx => idx !== i));
+                            }
+                          }
+                        }} 
+                        className="w-4 h-4 border-2 border-black accent-black" 
+                      />
+                      <span>{svc.trade} • {svc.subcategory}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               ) : (
                 <p className="text-xs font-bold text-black border-l-2 border-black pl-1 mt-1">
                   {artisan.services?.[0]?.subcategory || artisan.subcategory || artisan.trade}
