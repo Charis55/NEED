@@ -150,7 +150,23 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         }
 
         // 2. Join channel AFTER permissions are granted and tracks created
-        await client.join(appId, channelName, token, uid);
+        let joinSuccess = false;
+        let retries = 3;
+        while (!joinSuccess && retries > 0) {
+          try {
+            await client.join(appId, channelName, token, uid);
+            joinSuccess = true;
+          } catch (err: any) {
+            if (err?.code === 'UID_CONFLICT' || err?.message?.includes('UID_CONFLICT')) {
+              console.warn("UID_CONFLICT detected, retrying in 1s to allow previous connection to close...");
+              await new Promise(r => setTimeout(r, 1000));
+              retries--;
+              if (retries === 0) throw err;
+            } else {
+              throw err;
+            }
+          }
+        }
         if (!isMounted) return;
 
         // 3. Publish tracks
