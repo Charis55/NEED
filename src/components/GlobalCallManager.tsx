@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import SocialNotification from "@/lib/SocialNotification";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
+import { sessionId } from "@/utils/sessionId";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -34,6 +35,16 @@ export default function GlobalCallManager() {
   const triggerCallNotification = async (job: JobRequest) => {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       try {
+        // Create a channel for High Priority notifications (Heads-up)
+        await LocalNotifications.createChannel({
+          id: 'incoming_calls',
+          name: 'Incoming Calls',
+          description: 'Notifications for incoming audio and video calls',
+          importance: 5, // 5 = High importance (Heads-up notification)
+          visibility: 1, // 1 = Public
+          vibration: true,
+        });
+
         const isVideo = job.activeCall?.type === 'video';
         await LocalNotifications.schedule({
           notifications: [
@@ -41,6 +52,9 @@ export default function GlobalCallManager() {
               title: "Incoming Call",
               body: `${isVideo ? 'Video' : 'Audio'} call. Tap to answer.`,
               id: 1001,
+              channelId: 'incoming_calls',
+              smallIcon: 'ic_stat_icon', // Expected transparent silhouette icon
+              iconColor: '#000000', // Brutalist black
               schedule: { at: new Date(Date.now() + 100) },
               sound: undefined, 
               actionTypeId: "",
@@ -267,7 +281,8 @@ export default function GlobalCallManager() {
     try {
       await updateDoc(doc(db, "jobRequests", activeJob.requestId), {
         "activeCall.status": "ongoing",
-        "activeCall.connectedAt": Date.now()
+        "activeCall.connectedAt": Date.now(),
+        "activeCall.acceptedBySession": sessionId
       });
     } catch (e) {
       console.error("Failed to accept call", e);
@@ -278,11 +293,16 @@ export default function GlobalCallManager() {
 
   const { activeCall } = activeJob;
   const isCaller = activeCall.callerId === userUid;
+  const isThisDeviceCaller = isCaller && activeCall.callerSessionId === sessionId;
+  const isThisDeviceReceiver = !isCaller && activeCall.acceptedBySession === sessionId;
+  const isRingingForMe = activeCall.status === "ringing" && !isCaller;
+  const isRingingByMe = activeCall.status === "ringing" && isThisDeviceCaller;
+  const isOngoingForMe = activeCall.status === "ongoing" && (isThisDeviceCaller || isThisDeviceReceiver);
 
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
       <div className="pointer-events-auto">
-      {activeCall.status === "ringing" && !isCaller && (
+      {isRingingForMe && (
         <IncomingCallModal 
           callerName={partnerName}
           callerPhoto={partnerPhoto}
@@ -293,7 +313,7 @@ export default function GlobalCallManager() {
         />
       )}
 
-      {activeCall.status === "ringing" && isCaller && (
+      {isRingingByMe && (
         <OutgoingCallModal 
           calleeName={partnerName}
           calleePhoto={partnerPhoto}
@@ -302,7 +322,7 @@ export default function GlobalCallManager() {
         />
       )}
 
-      {activeCall.status === "ongoing" && (
+      {isOngoingForMe && (
         <AgoraCallModal 
           channelName={activeJob.requestId}
           uid={userUid}

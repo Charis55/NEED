@@ -12,6 +12,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check, Phone, Video } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
+import { sessionId } from "@/utils/sessionId";
 import AdUnit from "@/components/AdUnit";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
@@ -674,6 +675,7 @@ export default function ChatPage() {
         activeCall: {
           channelName: requestId,
           callerId: auth.currentUser.uid,
+          callerSessionId: sessionId,
           type,
           status: "ringing",
           timestamp: Date.now()
@@ -719,13 +721,26 @@ export default function ChatPage() {
           <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
         </button>
         
-        <div className="w-10 h-10 md:w-14 md:h-14 rounded-full border-3 md:border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-2 md:mr-4">
-          <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-lg md:text-2xl font-black text-black" />
+        <div 
+          className="w-10 h-10 md:w-14 md:h-14 rounded-full border-3 md:border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-2 md:mr-4 cursor-pointer hover:scale-105 transition-transform"
+          onClick={() => {
+            const picUrl = isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL;
+            if (picUrl) setEnlargedImage(picUrl);
+          }}
+        >
+          <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-lg md:text-2xl font-black text-black pointer-events-none" />
         </div>
         
-        <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
+        <div 
+          className="flex-1 min-w-0 flex flex-col items-start justify-center cursor-pointer"
+          onClick={() => {
+            if (isCustomerViewing && job?.artisanId) {
+              router.push(`/artisans/${job.artisanId}`);
+            }
+          }}
+        >
           <div className="flex items-center gap-1.5 md:gap-2 w-full flex-wrap">
-            <h2 className="font-black text-black text-base md:text-2xl uppercase leading-tight truncate max-w-[45vw] md:max-w-none">{chatPartnerName}</h2>
+            <h2 className="font-black text-black text-base md:text-2xl uppercase leading-tight truncate max-w-[45vw] md:max-w-none hover:underline">{chatPartnerName}</h2>
             {job?.status === "completed" && (
               <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-[10px] md:text-xs px-2 md:px-3 py-0.5 md:py-1 uppercase font-black shrink-0 shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000]">Done</span>
             )}
@@ -790,6 +805,25 @@ export default function ChatPage() {
           <button onClick={() => setShowPhotoWarning(false)} className="absolute right-4 hover:scale-110 transition-transform">
             <X className="w-5 h-5 stroke-[3] text-black" />
           </button>
+        </div>
+      )}
+
+      {/* Fullscreen Image Lightbox */}
+      {enlargedImage && (
+        <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEnlargedImage(null)}>
+          <button 
+            onClick={() => setEnlargedImage(null)}
+            className="absolute top-6 right-6 w-12 h-12 bg-white border-4 border-black flex items-center justify-center hover:bg-[var(--color-brutal-red)] hover:text-white transition-colors brutal-shadow-sm z-10"
+          >
+            <X className="w-8 h-8 stroke-[3]" />
+          </button>
+          
+          <img 
+            src={enlargedImage} 
+            alt="Fullscreen View" 
+            className="max-w-full max-h-[90vh] object-contain border-4 border-black brutal-shadow bg-white"
+            onClick={(e) => e.stopPropagation()} 
+          />
         </div>
       )}
 

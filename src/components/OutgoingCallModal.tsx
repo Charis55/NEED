@@ -1,4 +1,5 @@
 import { PhoneOff } from "lucide-react";
+import { useEffect } from "react";
 import UserAvatar from "./UserAvatar";
 
 interface OutgoingCallModalProps {
@@ -14,6 +15,24 @@ export default function OutgoingCallModal({
   callType,
   onCancel
 }: OutgoingCallModalProps) {
+
+  useEffect(() => {
+    let audio: HTMLAudioElement;
+    if (typeof window !== "undefined") {
+      // Dial tone / ringing sound for outgoing call
+      audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3");
+      audio.loop = true;
+      audio.play().catch(e => console.warn("Auto-play prevented", e));
+    }
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = "";
+      }
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-[200] p-4">
       <div className="bg-white brutal-border p-8 w-full max-w-sm text-center shadow-[12px_12px_0_0_#000] flex flex-col items-center">
@@ -36,3 +55,4 @@ export default function OutgoingCallModal({
     </div>
   );
 }
+

@@ -23,6 +23,24 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
+function RecenterButton({ center }: { center: [number, number] }) {
+  const map = useMap();
+  return (
+    <div className="absolute top-4 right-4 z-[400]">
+      <button
+        className="w-12 h-12 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all active:translate-x-0 active:translate-y-0 active:shadow-none pointer-events-auto"
+        onClick={(e) => {
+          e.preventDefault();
+          map.setView(center, 15);
+        }}
+        title="Recenter Map"
+      >
+        <Navigation size={24} className="stroke-[3] text-black" />
+      </button>
+    </div>
+  );
+}
+
 export default function TechnicianRoutingMap({ 
   jobId, 
   destCoords 
@@ -197,11 +215,17 @@ export default function TechnicianRoutingMap({
 
         {/* Destination Marker */}
         <Marker position={[destCoords.lat, destCoords.lng]} icon={createDestIcon()} />
+
+        <RecenterButton center={[currentLocation.lat, currentLocation.lng]} />
       </MapContainer>
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[400] pointer-events-none">
-        <div className="bg-black text-white px-6 py-3 font-black uppercase tracking-widest text-sm flex items-center gap-2 brutal-shadow">
-          <Navigation className="w-5 h-5 fill-white" /> Live Tracking Active
+      <div className="absolute top-4 left-4 z-[400] pointer-events-none">
+        <div className="bg-white border-4 border-black px-4 py-2 font-black uppercase tracking-widest text-xs flex items-center gap-3 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-brutal-green)] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--color-brutal-green)] border-2 border-black"></span>
+          </div>
+          <span className="text-black leading-none mt-0.5">LIVE GPS ACTIVE</span>
         </div>
       </div>
     </div>

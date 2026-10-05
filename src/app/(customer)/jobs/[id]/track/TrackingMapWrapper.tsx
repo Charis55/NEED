@@ -7,6 +7,7 @@ import { JobRequest, ArtisanProfile } from "@/types";
 import { Phone, MessageSquare, Bike, Star } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import dynamicImport from "next/dynamic";
+import { sessionId } from "@/utils/sessionId";
 
 const TrackingMap = dynamicImport(() => import("@/components/TrackingMap"), { ssr: false, loading: () => <GlobalSpinner text="LOADING TRACKING MAP" /> });
 
@@ -15,6 +16,51 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
   const [technician, setTechnician] = useState<ArtisanProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in km
+  };
+
+  const startCall = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!job || !technician) return;
+    try {
+      const { auth } = await import("@/lib/firebase");
+      const { updateDoc, doc } = await import("firebase/firestore");
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      
+      await updateDoc(doc(db, "jobRequests", job.requestId), {
+        activeCall: {
+          channelName: job.requestId,
+          callerId: currentUser.uid,
+          callerSessionId: sessionId,
+          type: "audio",
+          status: "ringing",
+          timestamp: Date.now()
+        }
+      });
+      fetch("/api/send-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: technician.userId,
+          title: `Incoming audio call`,
+          body: `${currentUser.displayName || 'Customer'} is calling you`,
+          data: { requestId: job.requestId, type: "call" }
+        })
+      }).catch(err => console.error("Push failed:", err));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     const jobRef = doc(db, "jobRequests", jobId);
@@ -76,21 +122,65 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
             Status
           </h2>
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-[var(--color-brutal-teal)] border-2 border-black flex items-center justify-center text-2xl animate-bounce shadow-[2px_2px_0_0_#000]">
+            <div className="w-12 h-12 bg-[var(--color-brutal-teal)] border-2 border-black flex items-center justify-center text-2xl animate-bounce shadow-[2px_2px_0_0_#000] shrink-0">
               <Bike className="w-6 h-6 stroke-[3]" />
             </div>
-            <div>
-              <p className="font-black text-2xl uppercase tracking-tighter text-black">
+            <div className="min-w-0">
+              <p className="font-black text-2xl uppercase tracking-tighter text-black truncate">
                 {job.status === "en_route" ? "EN ROUTE" : job.status.replace('_', ' ')}
               </p>
-              <p className="text-sm font-bold text-gray-500 uppercase">Estimated arrival: 12 MINS</p>
+              {(() => {
+                const techLoc = job.technicianLocation || (technician ? { lat: technician.lat, lng: technician.lng } : null);
+                const destLoc = job.locationCoords;
+                
+                let distanceText = "-- KM";
+                let etaText = "-- MINS";
+                let progressPercent = 0;
+
+                if (techLoc && destLoc) {
+                  const distKm = calculateDistance(techLoc.lat, techLoc.lng, destLoc.lat, destLoc.lng);
+                  distanceText = distKm < 1 ? `${Math.round(distKm * 1000)} M` : `${distKm.toFixed(1)} KM`;
+                  const timeMins = Math.max(1, Math.round((distKm / 30) * 60));
+                  etaText = `${timeMins} MIN${timeMins !== 1 ? 'S' : ''}`;
+                  progressPercent = Math.max(0, Math.min(100, 100 - (distKm / 10) * 100));
+                }
+                
+                if (job.status === "in_progress") {
+                  distanceText = "0 M";
+                  etaText = "ARRIVED";
+                  progressPercent = 100;
+                }
+
+                return (
+                  <>
+                    <p className="text-sm font-bold text-gray-500 uppercase truncate">
+                      Distance: <span className="text-black">{distanceText}</span> • ETA: <span className="text-black">{etaText}</span>
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
-          <div className="w-full bg-gray-200 h-4 border-2 border-black mb-1 overflow-hidden">
-            <div className="bg-[var(--color-brutal-yellow)] h-full w-2/3 border-r-2 border-black transition-all"></div>
-          </div>
-          <p className="text-xs font-black text-right uppercase mt-2">66% COMPLETED</p>
+          {(() => {
+            const techLoc = job.technicianLocation || (technician ? { lat: technician.lat, lng: technician.lng } : null);
+            const destLoc = job.locationCoords;
+            let progressPercent = 0;
+            if (techLoc && destLoc) {
+              const distKm = calculateDistance(techLoc.lat, techLoc.lng, destLoc.lat, destLoc.lng);
+              progressPercent = Math.max(5, Math.min(100, 100 - (distKm / 10) * 100)); // minimum 5% to show bar
+            }
+            if (job.status === "in_progress") progressPercent = 100;
+
+            return (
+              <>
+                <div className="w-full bg-gray-200 h-4 border-2 border-black mb-1 overflow-hidden">
+                  <div className="bg-[var(--color-brutal-yellow)] h-full border-r-2 border-black transition-all" style={{ width: `${progressPercent}%` }}></div>
+                </div>
+                <p className="text-[10px] font-black text-right uppercase mt-1 tracking-wider text-gray-600">PROGRESS</p>
+              </>
+            );
+          })()}
         </div>
 
         {/* Technician Info */}
@@ -113,12 +203,12 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
           </div>
 
           <div className="flex gap-3 mt-2">
-            <a 
-              href={`tel:${technician.userId}`} // Replace with actual phone if available in profile
+            <button 
+              onClick={startCall}
               className="flex-1 bg-black text-white font-black py-3 px-4 border-2 border-black flex items-center justify-center gap-2 hover:bg-white hover:text-black transition-colors shadow-[4px_4px_0_0_rgba(255,255,255,1)]"
             >
               <Phone className="w-5 h-5" /> CALL
-            </a>
+            </button>
             <a 
               href={`/chat/${job.requestId}`}
               className="flex-1 bg-white text-black font-black py-3 px-4 border-2 border-black flex items-center justify-center gap-2 hover:bg-[var(--color-brutal-blue)] transition-colors shadow-[4px_4px_0_0_rgba(0,0,0,1)]"

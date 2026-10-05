@@ -114,6 +114,18 @@ export default function ArtisanDashboard() {
             }
             
             setIsVerified(artisanData.verified || false);
+            
+            // Persist availability from DB or local storage
+            if (typeof window !== "undefined") {
+              const storedStatus = localStorage.getItem("technician_available");
+              if (storedStatus !== null) {
+                setIsAvailable(storedStatus === "true");
+              } else if (artisanData.available !== undefined) {
+                setIsAvailable(artisanData.available);
+              }
+            } else if (artisanData.available !== undefined) {
+              setIsAvailable(artisanData.available);
+            }
 
             if (artisanData.createdAt) {
               const createdAtMs = typeof artisanData.createdAt === "number" 
@@ -262,6 +274,9 @@ export default function ArtisanDashboard() {
     try {
       const newAvailable = !isAvailable;
       setIsAvailable(newAvailable);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("technician_available", String(newAvailable));
+      }
       const { doc: firestoreDoc, updateDoc } = await import("firebase/firestore");
       await updateDoc(firestoreDoc(db, "artisans", user.uid), { available: newAvailable });
     } catch (e) {

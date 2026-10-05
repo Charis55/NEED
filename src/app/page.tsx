@@ -13,7 +13,12 @@ import { Capacitor } from "@capacitor/core";
 export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const backgrounds = [
     {
@@ -63,7 +68,7 @@ export default function LandingPage() {
   }, [router]);
 
   if (isCheckingAuth) {
-    if (typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
+    if (mounted && !Capacitor.isNativePlatform()) {
       return <div className="min-h-screen bg-[var(--color-brutal-bg)]"></div>;
     }
 
