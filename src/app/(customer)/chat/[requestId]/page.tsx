@@ -53,6 +53,8 @@ export default function ChatPage() {
   const { showAlert } = useAlert();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   // Review Modal State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [rating, setRating] = useState(5);
@@ -741,8 +743,8 @@ export default function ChatPage() {
         <div 
           className="flex-1 min-w-0 flex flex-col items-start justify-center cursor-pointer"
           onClick={() => {
-            if (isCustomerViewing && job?.artisanId) {
-              router.push(`/artisan/${job.artisanId}`);
+            if (isCustomerViewing && artisan) {
+              setShowProfileModal(true);
             }
           }}
         >
@@ -1251,6 +1253,17 @@ export default function ChatPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Public Profile Modal */}
+      {artisan && (
+        <PublicProfileModal 
+          artisan={artisan}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onSelect={() => setShowProfileModal(false)}
+          selectLabel="CLOSE"
+        />
       )}
 
     </div>
