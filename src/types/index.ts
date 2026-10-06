@@ -176,10 +176,12 @@ export interface JobRequest {
   activeCall?: {
     channelName: string;
     callerId: string;
+    callerSessionId?: string;
     type: "audio" | "video";
     status: "ringing" | "ongoing" | "ended";
     timestamp: number;
     connectedAt?: number;
+    acceptedBySession?: string;
   };
 }
 

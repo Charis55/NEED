@@ -53,7 +53,7 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: customer.uid,
+          userId: customer.userId,
           title: `Incoming audio call`,
           body: `${currentUser.displayName || 'Technician'} is calling you`,
           data: { requestId: job.requestId, type: "call" }
