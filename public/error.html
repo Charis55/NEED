@@ -142,23 +142,21 @@
         <div class="brutal-badge">ERROR</div>
         
         <div class="logo-container">
-            <div class="logo-n-box">
-                <span class="logo-n-text">N</span>
-            </div>
+            <img src="/LOGO.png" alt="N" style="width: 44px; height: 44px; border: 4px solid #000; box-shadow: 4px 4px 0 0 #000; z-index: 10; object-fit: contain; background-color: var(--color-brutal-pink);" />
             <span class="logo-eed">EED</span>
         </div>
 
-        <h1>No Connection</h1>
+        <h1>No Internet Connection</h1>
         <p>You seem to be offline.</p>
         
-        <button class="retry-btn" onclick="window.location.reload()">
+        <button class="retry-btn" onclick="window.location.href = '/'">
             TRY AGAIN
         </button>
     </div>
 
     <script>
         window.addEventListener('online', function() {
-            window.location.reload();
+            window.location.href = '/';
         });
     </script>
 </body>

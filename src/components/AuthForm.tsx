@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { 
-  GoogleAuthProvider, signInWithPopup, getRedirectResult,
+  GoogleAuthProvider, signInWithPopup, getRedirectResult, signInWithRedirect,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User,
   sendEmailVerification, signOut, signInWithCredential
@@ -138,6 +138,18 @@ export default function AuthForm() {
     }
   }, [router, isLogin, role]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      getRedirectResult(auth).then(async (result) => {
+        if (result?.user) {
+          await handlePostLogin(result.user);
+        }
+      }).catch(err => {
+        console.error("Redirect sign-in error:", err);
+      });
+    }
+  }, []);
+
   const handlePostLogin = async (user: User, nameToSave?: string) => {
     const userDocRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
@@ -183,9 +195,16 @@ export default function AuthForm() {
         const authResult = await signInWithCredential(auth, credential);
         user = authResult.user;
       } else {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        user = result.user;
+        
+        if (isMobile) {
+          await signInWithRedirect(auth, provider);
+          return; // The page will redirect
+        } else {
+          const result = await signInWithPopup(auth, provider);
+          user = result.user;
+        }
       }
       
       if (user) {

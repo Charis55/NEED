@@ -81,7 +81,12 @@ export default function ChatPage() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      const mimeType = isIOS && MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       waveformRef.current = [];
@@ -227,7 +232,8 @@ export default function ChatPage() {
         }
       }
       
-      const fileName = `audio_${Date.now()}.webm`;
+      const extension = audioBlob.type.includes('mp4') ? 'm4a' : 'webm';
+      const fileName = `audio_${Date.now()}.${extension}`;
       const url = await uploadFileToR2(audioBlob, fileName);
       
       await addDoc(collection(db, "jobRequests", requestId, "messages"), {
