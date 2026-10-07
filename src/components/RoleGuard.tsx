@@ -17,7 +17,12 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
         if (requiredRole === "artisan") {
           router.push("/login?role=artisan");
         } else {
-          setAuthorized(true);
+          // If a customer tries to access protected routes, force them to login
+          if (pathname.startsWith("/chat") || pathname.startsWith("/inbox") || pathname.startsWith("/profile") || pathname.startsWith("/payment")) {
+            router.push("/login?role=customer");
+          } else {
+            setAuthorized(true);
+          }
         }
         return;
       }
