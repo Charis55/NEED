@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { getToken, onMessage } from "firebase/messaging";
 import { auth, messaging, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
@@ -29,6 +30,7 @@ async function persistToken(uid: string, token: string) {
 
 export function FCMProvider({ children }: { children: React.ReactNode }) {
   const { showAlert } = useAlert();
+  const router = useRouter();
 
   // Keep a ref to the latest native token so we can persist it
   // even if the registration listener fires before auth is ready.
@@ -75,6 +77,30 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
 
         PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
           console.log("Notification action:", action);
+          const data = action.notification.data;
+          
+          if (data && data.type) {
+            // Wait slightly to ensure capacitor has foregrounded before routing
+            setTimeout(() => {
+              switch (data.type) {
+                case "chat":
+                case "call":
+                case "job_update":
+                  if (data.requestId) {
+                    router.push(`/chat/${data.requestId}`);
+                  }
+                  break;
+                case "new_request":
+                  router.push("/technician/jobs");
+                  break;
+                default:
+                  if (data.requestId) {
+                    router.push(`/chat/${data.requestId}`);
+                  }
+                  break;
+              }
+            }, 100);
+          }
         });
       }
 

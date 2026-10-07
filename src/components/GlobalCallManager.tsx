@@ -265,6 +265,19 @@ export default function GlobalCallManager() {
         console.error("Failed to append message to history:", msgErr);
       }
 
+      if ((reason === "timeout" || reason === "cancelled") && userUid === activeCall.callerId && receiverId) {
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: receiverId,
+            title: "Missed Call",
+            body: `Missed ${isVideo ? 'video' : 'voice'} call from ${auth.currentUser?.displayName || 'Someone'}`,
+            data: { requestId: jobToProcess.requestId, type: "call" }
+          })
+        }).catch(err => console.error("Push failed:", err));
+      }
+
       // Hide UI
       setActiveJob(null);
     } catch (e) {

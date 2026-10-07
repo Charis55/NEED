@@ -261,8 +261,8 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: partnerId,
-            title: "New Voice Note",
-            body: "Sent an audio message",
+            title: user.displayName || "New Voice Note",
+            body: "🎤 Voice message",
             data: { requestId, type: "chat" }
           })
         }).catch(err => console.error("Push failed:", err));
@@ -398,7 +398,7 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: partnerId,
-            title: "New Message",
+            title: user.displayName || "New Message",
             body: newMessage || "Sent a message",
             data: { requestId, type: "chat" }
           })
