@@ -493,7 +493,7 @@ export default function ArtisanDashboard() {
                 {formatResponseTime(perfMetrics.avgResponseTimeMs)}
               </p>
               <div className="border-t-2 border-black pt-2">
-                <p className="text-xs font-bold text-gray-500">
+                <div className="text-xs font-bold text-gray-500">
                   {perfMetrics.avgResponseTimeMs > 0 ? (
                     perfMetrics.avgResponseTimeMs < 3600000 ? (
                       <div className="flex items-center gap-2">
@@ -514,7 +514,7 @@ export default function ArtisanDashboard() {
                   ) : (
                     <span className="text-xs font-bold text-gray-500">Complete jobs to see your response time</span>
                   )}
-                </p>
+                </div>
               </div>
             </div>
 
