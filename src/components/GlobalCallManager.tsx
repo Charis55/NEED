@@ -127,8 +127,22 @@ export default function GlobalCallManager() {
          setNotifiedCallId((prevNotified) => {
            if (prevNotified !== foundJob!.requestId) {
               triggerCallNotification(foundJob!);
-              if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-                SocialNotification.playRingtone().catch(e => console.warn(e));
+              if (typeof window !== 'undefined') {
+                if (Capacitor.isNativePlatform()) {
+                  SocialNotification.playRingtone().catch(e => console.warn(e));
+                } else {
+                  // Fallback for Vercel / Web Browser testing
+                  const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
+                  audio.loop = true;
+                  audio.id = "web-ringtone";
+                  audio.play().catch(e => console.warn("Web audio play failed:", e));
+                  (window as any).webRingtone = audio;
+                  
+                  // Try to vibrate if the browser supports it
+                  if (navigator.vibrate) {
+                      navigator.vibrate([1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]);
+                  }
+                }
               }
               return foundJob!.requestId;
            }
@@ -136,8 +150,18 @@ export default function GlobalCallManager() {
          });
       } else {
          if (!foundJob || (foundJob && foundJob.activeCall?.status !== "ringing")) {
-           if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-             SocialNotification.stopRingtone().catch(e => console.warn(e));
+           if (typeof window !== 'undefined') {
+             if (Capacitor.isNativePlatform()) {
+               SocialNotification.stopRingtone().catch(e => console.warn(e));
+             } else {
+               if ((window as any).webRingtone) {
+                 ((window as any).webRingtone as HTMLAudioElement).pause();
+                 (window as any).webRingtone = null;
+               }
+               if (navigator.vibrate) {
+                 navigator.vibrate(0);
+               }
+             }
            }
            if (!foundJob) {
              setNotifiedCallId(null);
