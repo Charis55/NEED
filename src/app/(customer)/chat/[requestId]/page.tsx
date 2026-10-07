@@ -80,6 +80,22 @@ export default function ChatPage() {
   const maxDurationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const secondsIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+      if (secondsIntervalRef.current) clearInterval(secondsIntervalRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      if (mediaRecorderRef.current?.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+      }
+    };
+  }, []);
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
