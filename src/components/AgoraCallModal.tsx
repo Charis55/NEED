@@ -11,10 +11,11 @@ interface AgoraCallModalProps {
   uid: string;
   isVideo: boolean;
   partnerName: string;
+  partnerPhoto?: string;
   onEndCall: () => void;
 }
 
-export default function AgoraCallModal({ channelName, uid, isVideo, partnerName, onEndCall }: AgoraCallModalProps) {
+export default function AgoraCallModal({ channelName, uid, isVideo, partnerName, partnerPhoto, onEndCall }: AgoraCallModalProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
@@ -279,7 +280,11 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
             
             <div className="relative z-10 flex flex-col items-center w-full">
               <div className="w-32 h-32 md:w-48 md:h-48 bg-[var(--color-brutal-pink)] border-8 border-black shadow-[16px_16px_0_0_#000] rounded-none flex items-center justify-center overflow-hidden mb-12 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]">
-                <span className="text-6xl md:text-8xl font-black">{partnerName.charAt(0).toUpperCase()}</span>
+                {partnerPhoto ? (
+                  <img src={partnerPhoto} alt={partnerName} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-6xl md:text-8xl font-black">{partnerName.charAt(0).toUpperCase()}</span>
+                )}
               </div>
               <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-4 text-center bg-white px-8 py-3 border-4 border-black shadow-[8px_8px_0_0_#000]">{partnerName}</h1>
               

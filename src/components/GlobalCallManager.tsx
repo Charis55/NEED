@@ -341,6 +341,7 @@ export default function GlobalCallManager() {
           uid={userUid}
           isVideo={activeCall.type === "video"}
           partnerName={partnerName}
+          partnerPhoto={partnerPhoto}
           onEndCall={() => endCallWithLog("ended")}
         />
       )}

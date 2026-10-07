@@ -106,9 +106,9 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
 
       try {
         await PushNotifications.createChannel({
-          id: "default",
-          name: "General Notifications",
-          description: "Job requests, updates, and messages",
+          id: "high_priority_alerts",
+          name: "High Priority Alerts",
+          description: "Important updates that require immediate attention",
           importance: 5,
           sound: "default",
           vibration: true,
