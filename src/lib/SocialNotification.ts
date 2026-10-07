@@ -5,6 +5,7 @@ export interface SocialNotificationPlugin {
   stopService(): Promise<void>;
   playRingtone(): Promise<void>;
   stopRingtone(): Promise<void>;
+  setAudioRoute(options: { route: 'speaker' | 'earpiece' }): Promise<void>;
 }
 
 const SocialNotification = registerPlugin<SocialNotificationPlugin>('SocialNotification');

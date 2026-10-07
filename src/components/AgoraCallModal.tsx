@@ -5,6 +5,7 @@ import { useRef } from "react";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
+import SocialNotification from "@/lib/SocialNotification";
 
 interface AgoraCallModalProps {
   channelName: string;
@@ -53,12 +54,19 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const toggleSpeaker = () => {
-    if (typeof window !== 'undefined' && (window as any).AudioToggle) {
-      if (speakerOn) {
-        (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.EARPIECE);
-      } else {
-        (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.SPEAKER);
+  const toggleSpeaker = async () => {
+    if (typeof window !== 'undefined' && Capacitor.getPlatform() !== "web") {
+      try {
+        await SocialNotification.setAudioRoute({ route: speakerOn ? 'earpiece' : 'speaker' });
+      } catch (err) {
+        console.warn("Native audio routing failed, falling back to cordova plugin:", err);
+        if ((window as any).AudioToggle) {
+          if (speakerOn) {
+            (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.EARPIECE);
+          } else {
+            (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.SPEAKER);
+          }
+        }
       }
     }
     setSpeakerOn(!speakerOn);
@@ -123,7 +131,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           if (mediaType === "video") {
             // Delay slightly to ensure DOM element exists before playing
             setTimeout(() => {
-              user.videoTrack?.play(`remote-video-${user.uid}`);
+              user.videoTrack?.play(`remote-video-${user.uid}`, { fit: "contain" });
             }, 100);
           }
           if (mediaType === "audio") {

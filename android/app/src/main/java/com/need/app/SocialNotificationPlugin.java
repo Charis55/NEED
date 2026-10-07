@@ -133,6 +133,25 @@ public class SocialNotificationPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void setAudioRoute(PluginCall call) {
+        String route = call.getString("route", "speaker");
+        Context context = getContext();
+        AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        
+        try {
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            if ("earpiece".equals(route)) {
+                am.setSpeakerphoneOn(false);
+            } else {
+                am.setSpeakerphoneOn(true);
+            }
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Failed to set audio route", e);
+        }
+    }
+
     public static void stopRingtoneNative() {
         isRingingRequested = false;
         if (mediaPlayer != null) {
