@@ -11,7 +11,7 @@ export default function OnboardingPage() {
         <Link href="/" className="flex items-center justify-center">
           <div className="flex items-center">
             <img src="/LOGO.png" alt="N Logo" className="h-14 w-auto" />
-            <span className="text-[52px] font-medium text-black leading-none tracking-tighter -ml-2.5">EED</span>
+            <span className="text-[52px] font-semibold text-black leading-none tracking-tighter -ml-2.5">EED</span>
           </div>
         </Link>
         <p className="mt-4 bg-[var(--color-brutal-yellow)] inline-block px-3 py-1 font-black tracking-widest uppercase text-sm brutal-border rotate-1">Technician Portal</p>
