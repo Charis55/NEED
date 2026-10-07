@@ -3,7 +3,6 @@ package com.need.app;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
-import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -20,8 +19,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "SocialNotification")
 public class SocialNotificationPlugin extends Plugin {
 
-    private android.media.MediaPlayer mediaPlayer;
-    private Vibrator vibrator;
+    private static android.media.MediaPlayer mediaPlayer;
+    private static Vibrator vibrator;
+    private static boolean isRingingRequested = false;
 
     @PluginMethod
     public void startService(PluginCall call) {
@@ -45,6 +45,7 @@ public class SocialNotificationPlugin extends Plugin {
 
     @PluginMethod
     public void playRingtone(PluginCall call) {
+        isRingingRequested = true;
         Context context = getContext();
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         
@@ -84,7 +85,19 @@ public class SocialNotificationPlugin extends Plugin {
                         mediaPlayer.setOnPreparedListener(new android.media.MediaPlayer.OnPreparedListener() {
                             @Override
                             public void onPrepared(android.media.MediaPlayer mp) {
-                                mp.start();
+                                if (isRingingRequested) {
+                                    try {
+                                        mp.start();
+                                    } catch (Exception e) {
+                                        Log.e("SocialNotification", "Failed to start mp in onPrepared", e);
+                                    }
+                                } else {
+                                    try {
+                                        mp.release();
+                                    } catch (Exception e) {
+                                        Log.e("SocialNotification", "Failed to release mp in onPrepared", e);
+                                    }
+                                }
                             }
                         });
                         mediaPlayer.prepareAsync();
@@ -114,16 +127,45 @@ public class SocialNotificationPlugin extends Plugin {
 
     @PluginMethod
     public void stopRingtone(PluginCall call) {
+        isRingingRequested = false;
         if (mediaPlayer != null) {
-            if (mediaPlayer.isPlaying()) {
-                mediaPlayer.stop();
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+            } catch (Exception e) {
+                Log.e("SocialNotification", "Failed to stop media player", e);
             }
-            mediaPlayer.release();
+            try {
+                mediaPlayer.release();
+            } catch (Exception e) {
+                Log.e("SocialNotification", "Failed to release media player", e);
+            }
             mediaPlayer = null;
         }
         if (vibrator != null) {
             vibrator.cancel();
         }
         call.resolve();
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        isRingingRequested = false;
+        if (mediaPlayer != null) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.release();
+            } catch (Exception e) {
+                Log.e("SocialNotification", "Failed to release in onDestroy", e);
+            }
+            mediaPlayer = null;
+        }
+        if (vibrator != null) {
+            vibrator.cancel();
+        }
     }
 }
