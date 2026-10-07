@@ -143,11 +143,21 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
 
         // 1. Create local tracks (This prompts for permissions)
         localA = await AgoraRTC.createMicrophoneAudioTrack();
-        if (!isMounted) return;
+        if (!isMounted) {
+          localA.stop();
+          localA.close();
+          return;
+        }
 
         if (isVideo) {
           localV = await AgoraRTC.createCameraVideoTrack();
-          if (!isMounted) return;
+          if (!isMounted) {
+            localA.stop();
+            localA.close();
+            localV.stop();
+            localV.close();
+            return;
+          }
         }
 
         // 2. Join channel AFTER permissions are granted and tracks created
@@ -168,12 +178,20 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
             }
           }
         }
-        if (!isMounted) return;
+        if (!isMounted) {
+          if (localA) { localA.stop(); localA.close(); }
+          if (localV) { localV.stop(); localV.close(); }
+          return;
+        }
 
         // 3. Publish tracks
         if (isVideo) {
           await client.publish([localA, localV]);
-          if (!isMounted) return;
+          if (!isMounted) {
+            if (localA) { localA.stop(); localA.close(); }
+            if (localV) { localV.stop(); localV.close(); }
+            return;
+          }
 
           setLocalVideoTrack(localV);
           setTimeout(() => {
@@ -181,7 +199,11 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           }, 100);
         } else {
           await client.publish([localA]);
-          if (!isMounted) return;
+          if (!isMounted) {
+            if (localA) { localA.stop(); localA.close(); }
+            if (localV) { localV.stop(); localV.close(); }
+            return;
+          }
         }
         
         if (isMounted) {
