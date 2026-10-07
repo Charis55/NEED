@@ -29,7 +29,7 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
-        <service android:name=".SocialNotificationService" android:exported="false" />
+        <service android:name=".SocialNotificationService" android:exported="false" android:foregroundServiceType="dataSync" />
 
         <!-- Firebase Cloud Messaging Default Notification Metadata -->
         <meta-data
@@ -52,6 +52,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Storage & Media -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />

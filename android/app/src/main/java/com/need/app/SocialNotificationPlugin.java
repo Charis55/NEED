@@ -45,8 +45,12 @@ public class SocialNotificationPlugin extends Plugin {
 
     @PluginMethod
     public void playRingtone(PluginCall call) {
+        startRingtoneNative(getContext());
+        call.resolve();
+    }
+
+    public static void startRingtoneNative(Context context) {
         isRingingRequested = true;
-        Context context = getContext();
         AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         
         if (vibrator == null) {
@@ -121,12 +125,15 @@ public class SocialNotificationPlugin extends Plugin {
                 }
             }
         }
-        
-        call.resolve();
     }
 
     @PluginMethod
     public void stopRingtone(PluginCall call) {
+        stopRingtoneNative();
+        call.resolve();
+    }
+
+    public static void stopRingtoneNative() {
         isRingingRequested = false;
         if (mediaPlayer != null) {
             try {
@@ -146,26 +153,11 @@ public class SocialNotificationPlugin extends Plugin {
         if (vibrator != null) {
             vibrator.cancel();
         }
-        call.resolve();
     }
 
     @Override
     protected void handleOnDestroy() {
         super.handleOnDestroy();
-        isRingingRequested = false;
-        if (mediaPlayer != null) {
-            try {
-                if (mediaPlayer.isPlaying()) {
-                    mediaPlayer.stop();
-                }
-                mediaPlayer.release();
-            } catch (Exception e) {
-                Log.e("SocialNotification", "Failed to release in onDestroy", e);
-            }
-            mediaPlayer = null;
-        }
-        if (vibrator != null) {
-            vibrator.cancel();
-        }
+        stopRingtoneNative();
     }
 }

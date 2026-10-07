@@ -65,6 +65,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   };
 
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
+  const mountUid = useRef(`${uid}_${Math.random().toString(36).slice(2, 7)}`).current;
 
   // 1. Fetch token
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
     fetch(`${baseUrl}/api/agora/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelName, uid })
+      body: JSON.stringify({ channelName, uid: mountUid })
     })
       .then(res => res.json())
       .then(data => {
@@ -88,7 +89,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         }
       })
       .catch(e => setError("Failed to fetch token: " + e.message));
-  }, [channelName, uid, appId]);
+  }, [channelName, mountUid, appId]);
 
   // 2. Join Call and setup Tracks
   useEffect(() => {
@@ -165,7 +166,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         let retries = 3;
         while (!joinSuccess && retries > 0) {
           try {
-            await client.join(appId, channelName, token, uid);
+            await client.join(appId, channelName, token, mountUid);
             joinSuccess = true;
           } catch (err: any) {
             if (err?.code === 'UID_CONFLICT' || err?.message?.includes('UID_CONFLICT')) {
@@ -239,7 +240,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         client.leave().catch(console.error);
       }
     };
-  }, [token, appId, channelName, uid, isVideo]);
+  }, [token, appId, channelName, mountUid, isVideo]);
 
   const toggleMic = async () => {
     if (localAudioTrack) {
