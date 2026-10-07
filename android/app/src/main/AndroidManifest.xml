@@ -34,10 +34,12 @@
         <!-- Firebase Cloud Messaging Default Notification Metadata -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="default" />
+            android:value="default"
+        />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_stat_icon" />
+            android:resource="@drawable/ic_stat_icon"
+        />
     </application>
 
     <!-- Permissions -->
@@ -60,12 +62,12 @@
     <!-- Location -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    
+
     <!-- Phone / Calls -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
-    
+
     <!-- Notifications & Misc -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />

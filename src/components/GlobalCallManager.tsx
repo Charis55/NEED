@@ -72,6 +72,7 @@ export default function GlobalCallManager() {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       try {
         await LocalNotifications.cancel({ notifications: [{ id: 1001 }] });
+        SocialNotification.stopRingtone().catch(e => console.warn(e));
       } catch (e) {
         // ignore
       }
@@ -82,7 +83,12 @@ export default function GlobalCallManager() {
     const unsub = auth.onAuthStateChanged((user) => {
       setUserUid(user ? user.uid : null);
     });
-    return () => unsub();
+    return () => {
+      unsub();
+      if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+         SocialNotification.stopRingtone().catch(() => {});
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -121,13 +127,21 @@ export default function GlobalCallManager() {
          setNotifiedCallId((prevNotified) => {
            if (prevNotified !== foundJob!.requestId) {
               triggerCallNotification(foundJob!);
+              if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+                SocialNotification.playRingtone().catch(e => console.warn(e));
+              }
               return foundJob!.requestId;
            }
            return prevNotified;
          });
       } else {
-         if (!foundJob) {
-           setNotifiedCallId(null);
+         if (!foundJob || (foundJob && foundJob.activeCall?.status !== "ringing")) {
+           if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+             SocialNotification.stopRingtone().catch(e => console.warn(e));
+           }
+           if (!foundJob) {
+             setNotifiedCallId(null);
+           }
          }
       }
     };

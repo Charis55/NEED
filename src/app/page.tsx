@@ -81,7 +81,7 @@ export default function LandingPage() {
           <div className="flex items-center mb-8">
             {/* ADJUST LOGO ALIGNMENT HERE: Change translate-y-[-4px] to move the 'N' up or down */}
             <img src="/LOGO.png" alt="N Logo" className="h-24 w-auto transform translate-y-[-4px]" />
-            <span className="text-[96px] font-black text-black leading-none tracking-tighter -ml-4">EED</span>
+            <span className="text-[96px] font-medium text-black leading-none tracking-tighter -ml-4">EED</span>
           </div>
           <div className="flex gap-4">
             <div className="w-8 h-8 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0_0_#000] animate-bounce" style={{ animationDelay: '0ms' }}></div>

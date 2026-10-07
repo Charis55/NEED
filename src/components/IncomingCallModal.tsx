@@ -20,41 +20,10 @@ export default function IncomingCallModal({
   onDecline
 }: IncomingCallModalProps) {
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (typeof window !== "undefined") {
-      // Try to vibrate
-      if (navigator.vibrate) {
-        navigator.vibrate([500, 1000, 500, 1000]);
-        interval = setInterval(() => {
-          navigator.vibrate([500, 1000, 500, 1000]);
-        }, 3000);
-      }
-
-      // Play audio safely handling the Promise
-      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1354/1354-preview.mp3");
-      audio.loop = true;
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(e => console.warn("Auto-play prevented", e));
-      }
-
-      return () => {
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            audio.pause();
-            audio.currentTime = 0;
-            audio.src = "";
-          }).catch(() => {});
-        } else {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.src = "";
-        }
-        clearInterval(interval);
-        if (navigator.vibrate) navigator.vibrate(0);
-      };
-    }
+    // We now handle ringing and vibrating natively via SocialNotificationPlugin
+    // This allows it to obey the device's ringer mode correctly.
   }, []);
+
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-[200] p-4">

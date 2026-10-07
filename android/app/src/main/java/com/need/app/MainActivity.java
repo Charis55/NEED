@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(SocialNotificationPlugin.class);
         super.onCreate(savedInstanceState);
         createNotificationChannel();
     }
