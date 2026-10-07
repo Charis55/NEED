@@ -11,7 +11,8 @@ export default function PublicHeader() {
     <nav className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full py-8 flex justify-between items-center bg-[var(--color-brutal-bg)]">
       <Link href="/" className="flex items-center gap-3">
         <div className="flex items-center">
-          <img src="/LOGO.png" alt="N Logo" className="h-12 w-auto" />
+          {/* ADJUST LOGO ALIGNMENT HERE: Change translate-y-[-2px] to move the 'N' up or down */}
+          <img src="/LOGO.png" alt="N Logo" className="h-12 w-auto transform translate-y-[-2px]" />
           <span className="text-[44px] font-bold text-black leading-none tracking-tighter -ml-2">EED</span>
         </div>
       </Link>

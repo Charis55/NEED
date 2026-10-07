@@ -79,7 +79,8 @@ export default function LandingPage() {
       >
         <div className="bg-white flex flex-col items-center p-12 border-8 border-black shadow-[16px_16px_0_0_#000] animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
           <div className="flex items-center mb-8">
-            <img src="/LOGO.png" alt="N Logo" className="h-24 w-auto" />
+            {/* ADJUST LOGO ALIGNMENT HERE: Change translate-y-[-4px] to move the 'N' up or down */}
+            <img src="/LOGO.png" alt="N Logo" className="h-24 w-auto transform translate-y-[-4px]" />
             <span className="text-[96px] font-black text-black leading-none tracking-tighter -ml-4">EED</span>
           </div>
           <div className="flex gap-4">
@@ -122,7 +123,8 @@ export default function LandingPage() {
       <nav className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full py-8 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="flex items-center">
-            <img src="/LOGO.png" alt="N Logo" className="h-12 w-auto" />
+            {/* ADJUST LOGO ALIGNMENT HERE: Change translate-y-[-2px] to move the 'N' up or down (e.g. -4px for higher, 2px for lower) */}
+            <img src="/LOGO.png" alt="N Logo" className="h-12 w-auto transform translate-y-[-2px]" />
             <span className="text-[44px] font-bold text-black leading-none tracking-tighter -ml-2">EED</span>
           </div>
         </div>
