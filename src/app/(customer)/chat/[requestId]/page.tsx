@@ -42,6 +42,7 @@ export default function ChatPage() {
   const [customer, setCustomer] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
@@ -94,6 +95,13 @@ export default function ChatPage() {
         audioContextRef.current.close().catch(console.error);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => {
+      setCurrentUser(u);
+    });
+    return () => unsub();
   }, []);
 
   const startRecording = async () => {
@@ -237,7 +245,7 @@ export default function ChatPage() {
   };
   
   const sendVoiceNote = async (audioBlob: Blob, rawWaveform: number[]) => {
-    const user = auth.currentUser;
+    const user = currentUser;
     if (!user) return;
     
     setSending(true);
@@ -330,7 +338,7 @@ export default function ChatPage() {
 
   // Reset unread count when viewing chat
   useEffect(() => {
-    const currentUid = auth.currentUser?.uid;
+    const currentUid = currentUser?.uid;
     if (job && currentUid && job.unreadCount?.[currentUid]) {
       if (job.unreadCount[currentUid] > 0) {
         updateDoc(doc(db, "jobRequests", requestId), {
@@ -338,7 +346,7 @@ export default function ChatPage() {
         }).catch(err => console.error("Failed to reset unread count", err));
       }
     }
-  }, [job?.unreadCount, auth.currentUser?.uid, requestId]);
+  }, [job?.unreadCount, currentUser?.uid, requestId]);
 
 
   useEffect(() => {
@@ -362,7 +370,6 @@ export default function ChatPage() {
       }, 100);
       
       // Mark incoming messages as read using a batch to prevent update storms
-      const currentUser = auth.currentUser;
       if (currentUser) {
         const batch = writeBatch(db);
         let hasUpdates = false;
@@ -388,7 +395,7 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || sending) return;
     
-    const user = auth.currentUser;
+    const user = currentUser;
     if (!user) return;
     
     setSending(true);
@@ -429,7 +436,7 @@ export default function ChatPage() {
   };
 
   const handleDeleteMessage = async (msg: Message, forEveryone: boolean) => {
-    const user = auth.currentUser;
+    const user = currentUser;
     if (!user) return;
     
     try {
@@ -487,7 +494,7 @@ export default function ChatPage() {
   };
   
   const handleBlockUser = async () => {
-    const user = auth.currentUser;
+    const user = currentUser;
     if (!user || !job) return;
     
     const partnerId = isCustomerViewing ? job.artisanId : job.customerId;
@@ -563,7 +570,7 @@ export default function ChatPage() {
     if (e) e.preventDefault();
     if (!pendingImage) return;
 
-    const user = auth.currentUser;
+    const user = currentUser;
     if (!user) return;
 
     setSending(true);
@@ -614,7 +621,7 @@ export default function ChatPage() {
     if (!job || rating === 0) return;
     
     setSubmittingReview(true);
-    const user = auth.currentUser;
+    const user = currentUser;
     if (!user) return;
 
     try {
@@ -684,13 +691,13 @@ export default function ChatPage() {
     );
   }
 
-  const isCustomerViewing = auth.currentUser?.uid === job?.customerId;
+  const isCustomerViewing = currentUser?.uid === job?.customerId;
   const chatPartnerName = isCustomerViewing 
     ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || artisanUser?.phone || "Unknown Technician") 
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Unknown Customer");
 
   const startCall = async (type: "audio" | "video") => {
-    if (!job || !auth.currentUser) {
+    if (!job || !currentUser) {
       showAlert("Cannot start call: Job or user missing", "error");
       return;
     }
@@ -699,7 +706,7 @@ export default function ChatPage() {
       await updateDoc(doc(db, "jobRequests", requestId), {
         activeCall: {
           channelName: requestId,
-          callerId: auth.currentUser.uid,
+          callerId: currentUser.uid,
           callerSessionId: sessionId,
           type,
           status: "ringing",
@@ -715,7 +722,7 @@ export default function ChatPage() {
           body: JSON.stringify({
             userId: partnerId,
             title: `Incoming ${type} call`,
-            body: `${auth.currentUser.displayName || 'Someone'} is calling you`,
+            body: `${currentUser.displayName || 'Someone'} is calling you`,
             data: { requestId, type: "call" }
           })
         }).catch(err => console.error("Push failed:", err));
@@ -872,9 +879,9 @@ export default function ChatPage() {
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe = msg.senderId === auth.currentUser?.uid;
+            const isMe = msg.senderId === currentUser?.uid;
             
-            if (msg.deletedBy?.includes(auth.currentUser?.uid || "")) return null;
+            if (msg.deletedBy?.includes(currentUser?.uid || "")) return null;
             if (msg.deletedBy?.includes("everyone")) {
               return (
                 <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
