@@ -55,9 +55,9 @@ export async function POST(req: NextRequest) {
             priority: "high",
             notification: {
               sound: "default",
-              channelId: "high_priority_alerts",
+              channelId: "incoming_calls_v3",
               priority: "high",
-              defaultSound: true,
+              defaultSound: false,
               defaultVibrateTimings: true,
             },
           },

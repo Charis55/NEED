@@ -58,12 +58,12 @@ export default function PublicProfileModal({ artisan, onClose, onSelect, selectL
               </div>
             </div>
             
-            <div className="flex bg-white">
+            <div className="flex bg-white pb-[env(safe-area-inset-bottom,1.5rem)]">
               <button 
                 className="flex-1 py-4 text-center font-black text-black uppercase border-r-4 border-black hover:bg-[var(--color-brutal-red)] hover:text-white transition-colors"
                 onClick={onClose}
               >
-                BACK
+                CLOSE
               </button>
               {onSelect && (
                 <button 

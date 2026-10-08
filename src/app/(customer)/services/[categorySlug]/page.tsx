@@ -251,7 +251,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       </div>
 
       {selectedSubServices.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-[var(--color-brutal-bg)] border-t-4 border-black z-50 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_-4px_0_0_#000]">
+        <div className="fixed bottom-[110px] md:bottom-[90px] left-0 right-0 p-4 md:p-6 bg-[var(--color-brutal-bg)] border-t-4 border-black z-40 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_-4px_0_0_#000]">
           <div className="flex flex-col">
             <span className="text-xl font-black uppercase text-black">{selectedSubServices.length} Service{selectedSubServices.length > 1 ? 's' : ''} Selected</span>
             <span className="text-sm font-bold text-gray-700">Find technicians offering these services</span>

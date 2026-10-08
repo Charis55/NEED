@@ -108,6 +108,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
           vibration: true,
           visibility: 1
         });
+
       } catch (e) {
         console.warn("Failed to create notification channel:", e);
       }
@@ -142,6 +143,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
           vibration: true,
           visibility: 1,
         }).catch((e) => console.warn("Channel creation error:", e));
+
       });
     }
 

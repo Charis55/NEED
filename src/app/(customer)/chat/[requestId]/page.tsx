@@ -1284,8 +1284,11 @@ export default function ChatPage() {
           artisan={artisan}
           isOpen={showProfileModal}
           onClose={() => setShowProfileModal(false)}
-          onSelect={() => setShowProfileModal(false)}
-          selectLabel="CLOSE"
+          onSelect={() => {
+            setShowProfileModal(false);
+            router.push(`/artisans/${artisan.artisanId}`);
+          }}
+          selectLabel="VIEW PROFILE"
         />
       )}
 
