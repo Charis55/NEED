@@ -19,10 +19,6 @@ export default function IncomingCallModal({
   onAccept,
   onDecline
 }: IncomingCallModalProps) {
-  useEffect(() => {
-    // We now handle ringing and vibrating natively via SocialNotificationPlugin
-    // This allows it to obey the device's ringer mode correctly.
-  }, []);
 
 
   return (
