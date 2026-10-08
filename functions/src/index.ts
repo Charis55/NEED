@@ -18,7 +18,20 @@ async function sendPush(userId: string, title: string, body: string, data: any =
       await admin.messaging().send({
         token: fcmToken,
         notification: { title, body },
-        data
+        data,
+        android: {
+          notification: {
+            channelId: "high_priority_alerts",
+            sound: "default",
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: "default",
+            },
+          },
+        },
       });
       console.log(`Push notification sent to ${userId}`);
     }

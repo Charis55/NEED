@@ -70,10 +70,6 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
           console.error("Native push registration failed:", err);
         });
 
-        PushNotifications.addListener("pushNotificationReceived", (notification) => {
-          console.log("Native foreground notification:", notification);
-          showAlert(`${notification.title}: ${notification.body}`, "info");
-        });
 
         PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
           console.log("Notification action:", action);
@@ -161,20 +157,8 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Web foreground message listener (safe no-op on native)
-    let unsubscribeMessage: (() => void) | null = null;
-    if (!Capacitor.isNativePlatform()) {
-      unsubscribeMessage = onMessage(messaging, (payload) => {
-        console.log("Web foreground message:", payload);
-        const title = payload.notification?.title || "New Notification";
-        const body = payload.notification?.body || "";
-        showAlert(`${title}: ${body}`, "info");
-      });
-    }
-
     return () => {
       unsubscribeAuth();
-      if (unsubscribeMessage) unsubscribeMessage();
     };
   }, []);
 
