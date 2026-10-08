@@ -6,7 +6,7 @@ import { collection, doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { JobRequest, ArtisanProfile } from "@/types";
 import BackButton from "@/components/BackButton";
-import { ArrowRight, MapPin, Clock, Info, Image as ImageIcon, X } from "lucide-react";
+import { ArrowRight, MapPin, Clock, Info, Image as ImageIcon, X, Check } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
 import { compressImage } from "@/utils/imageCompression";
@@ -55,7 +55,15 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
             // Pre-fill service selection
             const tradeParam = urlParams.get('trade');
             const subParam = urlParams.get('subcategory');
-            if (tradeParam && subParam && artisanData.services) {
+            const servicesParam = urlParams.get('services');
+            
+            if (servicesParam && artisanData.services) {
+               const requestedServices = servicesParam.split(',').map(s => decodeURIComponent(s).replace(/-/g, ' ').toLowerCase());
+               const indices = artisanData.services
+                 .map((s, index) => requestedServices.includes(s.subcategory.toLowerCase()) ? index : -1)
+                 .filter(index => index !== -1);
+               if (indices.length > 0) setSelectedServiceIndices(indices);
+            } else if (tradeParam && subParam && artisanData.services) {
                const idx = artisanData.services.findIndex(s => s.trade === tradeParam && s.subcategory === subParam);
                if (idx !== -1) setSelectedServiceIndices([idx]);
             }
@@ -299,29 +307,35 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               <p className="text-sm font-bold uppercase text-gray-500 mb-1">Requesting</p>
               <h2 className="text-xl font-black uppercase tracking-tighter leading-none">{artisan.name}</h2>
               {artisan.services && artisan.services.length > 1 ? (
-                <div className="mt-2 space-y-2">
-                  {artisan.services.map((svc, i) => (
-                    <label key={i} className="flex items-center gap-2 text-xs font-bold text-black border-2 border-black p-2 bg-[var(--color-brutal-pink)] cursor-pointer shadow-[2px_2px_0_0_#000]">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedServiceIndices.includes(i)} 
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedServiceIndices(prev => [...prev, i]);
-                          } else {
-                            if (selectedServiceIndices.length > 1) {
-                              setSelectedServiceIndices(prev => prev.filter(idx => idx !== i));
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {artisan.services.map((svc, i) => {
+                    const isSelected = selectedServiceIndices.includes(i);
+                    return (
+                      <label key={i} className={`flex items-center gap-3 p-3 brutal-border cursor-pointer transition-all ${isSelected ? 'bg-[var(--color-brutal-yellow)] shadow-[4px_4px_0_0_#000] -translate-y-1' : 'bg-white hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[2px_2px_0_0_#000]'}`}>
+                        <div className={`w-6 h-6 border-4 border-black flex items-center justify-center shrink-0 ${isSelected ? 'bg-[var(--color-brutal-pink)]' : 'bg-white'}`}>
+                          {isSelected && <Check className="w-4 h-4 stroke-[4] text-black" />}
+                        </div>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedServiceIndices(prev => [...prev, i]);
+                            } else {
+                              if (selectedServiceIndices.length > 1) {
+                                setSelectedServiceIndices(prev => prev.filter(idx => idx !== i));
+                              }
                             }
-                          }
-                        }} 
-                        className="w-4 h-4 border-2 border-black accent-black" 
-                      />
-                      <span>{svc.trade} • {svc.subcategory}</span>
-                    </label>
-                  ))}
+                          }} 
+                          className="hidden" 
+                        />
+                        <span className="font-black text-sm uppercase leading-tight tracking-tight">{svc.trade}<br/><span className="text-xs font-bold text-gray-700">{svc.subcategory}</span></span>
+                      </label>
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-xs font-bold text-black border-l-2 border-black pl-1 mt-1">
+                <p className="text-sm font-black uppercase text-black bg-[var(--color-brutal-pink)] inline-block px-3 py-1 brutal-border shadow-[2px_2px_0_0_#000] mt-3 -rotate-1">
                   {artisan.services?.[0]?.subcategory || artisan.subcategory || artisan.trade}
                 </p>
               )}

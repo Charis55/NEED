@@ -19,6 +19,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
   const category = servicesData[unwrappedParams.categorySlug];
   const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedSubServices, setSelectedSubServices] = useState<string[]>([]);
   
   // Search and Sort state
   const [searchQuery, setSearchQuery] = useState("");
@@ -190,8 +191,23 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
               return (
                 <div 
                   key={service.id} 
-                  className={`p-6 brutal-card flex flex-col relative transition-transform ${isAvailable ? 'bg-white hover:-translate-y-1' : 'bg-gray-200 opacity-80'}`}
+                  className={`p-6 brutal-card flex flex-col relative transition-transform ${isAvailable ? 'bg-white hover:-translate-y-1' : 'bg-gray-200 opacity-80'} ${selectedSubServices.includes(service.id) ? 'ring-4 ring-black border-black bg-[var(--color-brutal-pink)]' : ''}`}
                 >
+                  <label className="absolute top-4 right-4 flex items-center justify-center w-8 h-8 border-4 border-black bg-white cursor-pointer shadow-[2px_2px_0_0_#000]">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 accent-black cursor-pointer"
+                      checked={selectedSubServices.includes(service.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSubServices([...selectedSubServices, service.id]);
+                        } else {
+                          setSelectedSubServices(selectedSubServices.filter(id => id !== service.id));
+                        }
+                      }}
+                      disabled={!isAvailable}
+                    />
+                  </label>
                   <h2 className="text-3xl font-black text-black mb-2 uppercase tracking-tighter">{service.title}</h2>
                   <p className="text-black font-bold text-sm leading-relaxed mb-6 border-l-4 border-black pl-3">
                     {service.description}
@@ -233,6 +249,21 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
           )}
         </div>
       </div>
+
+      {selectedSubServices.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-[var(--color-brutal-bg)] border-t-4 border-black z-50 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_-4px_0_0_#000]">
+          <div className="flex flex-col">
+            <span className="text-xl font-black uppercase text-black">{selectedSubServices.length} Service{selectedSubServices.length > 1 ? 's' : ''} Selected</span>
+            <span className="text-sm font-bold text-gray-700">Find technicians offering these services</span>
+          </div>
+          <Link 
+            href={`/services/${unwrappedParams.categorySlug}/swipe-multi?services=${selectedSubServices.join(',')}`}
+            className="w-full md:w-auto bg-black text-white px-8 py-4 font-black uppercase tracking-widest hover:-translate-y-1 hover:shadow-[4px_4px_0_0_var(--color-brutal-yellow)] transition-all flex items-center justify-center gap-3"
+          >
+            FIND TECHNICIANS <ArrowRight className="w-6 h-6 stroke-[3]" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
