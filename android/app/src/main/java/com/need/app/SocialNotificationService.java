@@ -3,7 +3,9 @@ package com.need.app;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
@@ -88,9 +90,11 @@ public class SocialNotificationService extends Service {
             if (shouldRing && !isCurrentlyRinging) {
                 isCurrentlyRinging = true;
                 SocialNotificationPlugin.startRingtoneNative(getApplicationContext());
+                showCallNotification();
             } else if (!shouldRing && isCurrentlyRinging) {
                 isCurrentlyRinging = false;
                 SocialNotificationPlugin.stopRingtoneNative();
+                hideCallNotification();
             }
         };
 
@@ -118,5 +122,46 @@ public class SocialNotificationService extends Service {
         if (artisanListener != null) artisanListener.remove();
         if (customerListener != null) customerListener.remove();
         SocialNotificationPlugin.stopRingtoneNative();
+        hideCallNotification();
+    }
+
+    private void showCallNotification() {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "incoming_calls_native",
+                    "Incoming Calls",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            manager.createNotificationChannel(channel);
+        }
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Notification notification = new NotificationCompat.Builder(this, "incoming_calls_native")
+                .setContentTitle("Incoming Call")
+                .setContentText("Tap to answer")
+                .setSmallIcon(R.drawable.ic_stat_icon)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setFullScreenIntent(pendingIntent, true)
+                .setAutoCancel(true)
+                .setOngoing(true)
+                .build();
+
+        manager.notify(2001, notification);
+    }
+
+    private void hideCallNotification() {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.cancel(2001);
+        }
     }
 }
