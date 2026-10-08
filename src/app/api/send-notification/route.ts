@@ -49,21 +49,26 @@ export async function POST(req: NextRequest) {
       try {
         await getMessaging(adminApp_).send({
           token: fcmToken,
-          notification: { title, body },
+          ...(data?.type !== "call" && {
+            notification: { title, body },
+          }),
           data: stringData,
           android: {
             priority: "high",
-            notification: {
-              sound: "default",
-              channelId: "incoming_calls_v3",
-              priority: "high",
-              defaultSound: false,
-              defaultVibrateTimings: true,
-            },
+            ...(data?.type !== "call" && {
+              notification: {
+                sound: "default",
+                channelId: "high_priority_alerts",
+                priority: "high",
+                defaultSound: true,
+                defaultVibrateTimings: true,
+              },
+            }),
           },
           apns: {
             payload: {
               aps: {
+                alert: data?.type === "call" ? { title, body } : undefined,
                 sound: "default",
                 contentAvailable: true,
               },

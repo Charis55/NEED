@@ -7,8 +7,6 @@ import { JobRequest } from "@/types";
 import IncomingCallModal from "./IncomingCallModal";
 import OutgoingCallModal from "./OutgoingCallModal";
 import dynamic from "next/dynamic";
-
-import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { sessionId } from "@/utils/sessionId";
 
@@ -32,47 +30,11 @@ export default function GlobalCallManager() {
   const [partnerPhoto, setPartnerPhoto] = useState<string | undefined>();
   const [notifiedCallId, setNotifiedCallId] = useState<string | null>(null);
 
-  const triggerCallNotification = async (job: JobRequest) => {
-    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-      try {
-        // Create a channel for High Priority notifications (Heads-up)
-        await LocalNotifications.createChannel({
-          id: 'incoming_calls',
-          name: 'Incoming Calls',
-          description: 'Notifications for incoming audio and video calls',
-          importance: 5, // 5 = High importance (Heads-up notification)
-          visibility: 1, // 1 = Public
-          vibration: true,
-        });
-
-        const isVideo = job.activeCall?.type === 'video';
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              title: "Incoming Call",
-              body: `${isVideo ? 'Video' : 'Audio'} call. Tap to answer.`,
-              id: 1001,
-              channelId: 'incoming_calls',
-              smallIcon: 'ic_stat_icon', // Expected transparent silhouette icon
-              iconColor: '#000000', // Brutalist black
-              schedule: { at: new Date(Date.now() + 100) },
-              sound: undefined, 
-              actionTypeId: "",
-              extra: null
-            }
-          ]
-        });
-      } catch (e) {
-        console.error("Local Notification failed", e);
-      }
-    }
-  };
-
   const clearCallNotification = async () => {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       try {
-        await LocalNotifications.cancel({ notifications: [{ id: 1001 }] });
-
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        await PushNotifications.removeAllDeliveredNotifications();
       } catch (e) {
         // ignore
       }
@@ -121,39 +83,14 @@ export default function GlobalCallManager() {
         foundJob.activeCall?.status === "ringing" && 
         foundJob.activeCall?.callerId !== userUid
       ) {
-         setNotifiedCallId((prevNotified) => {
+          setNotifiedCallId((prevNotified) => {
            if (prevNotified !== foundJob!.requestId) {
-              triggerCallNotification(foundJob!);
-              if (typeof window !== 'undefined') {
-                  // Native ringtone is handled by push notification sound, but we trigger vibration and fallback here
-                  const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
-                  audio.loop = true;
-                  audio.id = "web-ringtone";
-                  audio.play().catch(e => console.warn("Web audio play failed:", e));
-                  (window as any).webRingtone = audio;
-                  
-                  // Try to vibrate if the browser supports it
-                  if (navigator.vibrate) {
-                      navigator.vibrate([1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]);
-                  }
-                }
               return foundJob!.requestId;
            }
            return prevNotified;
          });
       } else {
          if (!foundJob || (foundJob && foundJob.activeCall?.status !== "ringing")) {
-           if (typeof window !== 'undefined') {
-
-               if ((window as any).webRingtone) {
-                 ((window as any).webRingtone as HTMLAudioElement).pause();
-                 (window as any).webRingtone = null;
-               }
-               if (navigator.vibrate) {
-                 navigator.vibrate(0);
-               }
-
-           }
            if (!foundJob) {
              setNotifiedCallId(null);
            }
