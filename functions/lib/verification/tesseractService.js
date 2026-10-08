@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.extractDocumentTextLocal = extractDocumentTextLocal;
-const tesseract_js_1 = require("tesseract.js");
+const Tesseract = require("tesseract.js");
 /**
  * Extract text from a document image using Tesseract.js.
  * This runs entirely within the Node.js process.
@@ -10,7 +10,7 @@ const tesseract_js_1 = require("tesseract.js");
  */
 async function extractDocumentTextLocal(imageUrl) {
     try {
-        const worker = await tesseract_js_1.default.createWorker("eng");
+        const worker = await Tesseract.createWorker("eng");
         const { data: { text, confidence } } = await worker.recognize(imageUrl);
         await worker.terminate();
         return {

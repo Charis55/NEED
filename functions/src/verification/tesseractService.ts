@@ -1,4 +1,4 @@
-import Tesseract from "tesseract.js";
+import * as Tesseract from "tesseract.js";
 
 export interface OCRResult {
   fullText: string;
