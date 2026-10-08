@@ -52,6 +52,17 @@ public class CustomMessagingService extends MessagingService {
         }
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 1001, intent, flags);
+        
+        // Answer Intent
+        Intent answerIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("needapp://call/answer?requestId=" + data.get("requestId")));
+        answerIntent.setPackage(getPackageName());
+        PendingIntent answerPendingIntent = PendingIntent.getActivity(this, 1002, answerIntent, flags);
+        
+        // Decline Intent
+        Intent declineIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("needapp://call/decline?requestId=" + data.get("requestId")));
+        declineIntent.setPackage(getPackageName());
+        PendingIntent declinePendingIntent = PendingIntent.getActivity(this, 1003, declineIntent, flags);
+
         Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
@@ -65,7 +76,9 @@ public class CustomMessagingService extends MessagingService {
                 .setSound(ringtoneUri)
                 .setVibrate(new long[]{0, 1000, 1000, 1000, 1000, 1000, 1000, 1000})
                 .setFullScreenIntent(pendingIntent, true)
-                .setContentIntent(pendingIntent);
+                .setContentIntent(pendingIntent)
+                .addAction(0, "Answer", answerPendingIntent)
+                .addAction(0, "Decline", declinePendingIntent);
 
         // Explicitly set ic_stat_icon if available
         int resId = getResources().getIdentifier("ic_stat_icon", "drawable", getPackageName());
