@@ -481,16 +481,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         >
           Profile
         </button>
-        {isArtisan && (
-          <button 
-            onClick={() => setActiveTab("services")}
-            className={`flex-1 py-4 font-black uppercase text-sm md:text-lg border-r-4 border-black transition-colors ${
-              activeTab === "services" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
-            }`}
-          >
-            Services
-          </button>
-        )}
         <button 
           onClick={() => setActiveTab("account")}
           className={`flex-1 py-4 font-black uppercase text-sm md:text-lg border-r-4 border-black transition-colors ${
@@ -624,159 +614,158 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               {loading ? "SAVING..." : "SAVE PROFILE"}
             </button>
           </form>
-        </div>
-      )}
 
-      {activeTab === "services" && isArtisan && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-[var(--color-brutal-bg)] p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-            <h2 className="text-2xl font-black uppercase text-black mb-4">Manage Services</h2>
-            <p className="text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
-              You can add new services or remove existing ones. Note that adding highly specific services improves your chances of being matched with customers.
-            </p>
+          {/* Manage Services (Appended to Profile Tab) */}
+          {isArtisan && (
+            <div className="bg-[var(--color-brutal-bg)] p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mt-8">
+              <h2 className="text-2xl font-black uppercase text-black mb-4">Manage Services</h2>
+              <p className="text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
+                You can add new services or remove existing ones. Note that adding highly specific services improves your chances of being matched with customers.
+              </p>
 
-            <form onSubmit={handleSaveServices}>
-              {/* Existing Services List */}
-              <div className="mb-8">
-                <h3 className="text-lg font-black uppercase text-black border-b-4 border-black pb-2 mb-4">Your Active Services</h3>
-                
-                {artisanServices.length === 0 ? (
-                  <p className="p-4 bg-gray-100 border-4 border-black font-bold text-sm uppercase">You have no services added. Add one below!</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {artisanServices.map((svc, index) => (
-                      <div key={index} className="bg-white border-4 border-black p-4 relative flex flex-col hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all">
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveService(index)} 
-                          className="absolute -top-3 -right-3 w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center font-black text-white hover:scale-110 transition-transform shadow-[2px_2px_0_0_#000] z-10"
+              <form onSubmit={handleSaveServices}>
+                {/* Existing Services List */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-black uppercase text-black border-b-4 border-black pb-2 mb-4">Your Active Services</h3>
+                  
+                  {artisanServices.length === 0 ? (
+                    <p className="p-4 bg-gray-100 border-4 border-black font-bold text-sm uppercase">You have no services added. Add one below!</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {artisanServices.map((svc, index) => (
+                        <div key={index} className="bg-white border-4 border-black p-4 relative flex flex-col hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all">
+                          <button 
+                            type="button" 
+                            onClick={() => handleRemoveService(index)} 
+                            className="absolute -top-3 -right-3 w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center font-black text-white hover:scale-110 transition-transform shadow-[2px_2px_0_0_#000] z-10"
+                          >
+                            X
+                          </button>
+                          <h4 className="font-black text-lg uppercase leading-tight mb-1">{svc.trade}</h4>
+                          <p className="font-bold text-gray-600 text-xs uppercase mb-3 border-l-2 border-black pl-2">{svc.subcategory}</p>
+                          
+                          <div className="mt-auto pt-2 border-t-2 border-dashed border-gray-300 flex items-center justify-between">
+                            {svc.isCertificateVerified ? (
+                              <span className="bg-[var(--color-brutal-green)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Verified</span>
+                            ) : svc.certificateUrl || svc.certificateFile ? (
+                              <span className="bg-[var(--color-brutal-yellow)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Pending</span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-400 uppercase">No Cert</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add New Service Form */}
+                {showAddForm ? (
+                  <div className="p-6 bg-[var(--color-brutal-teal)] border-4 border-black mb-6 shadow-[4px_4px_0_0_#000]">
+                    <h3 className="text-lg font-black uppercase text-black mb-4">Add a New Service</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-black text-black mb-1 uppercase">Primary Trade</label>
+                        <select
+                          value={newServiceForm.trade}
+                          onChange={(e) => handleUpdateNewService('trade', e.target.value)}
+                          className="w-full p-3 bg-white border-4 border-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-bold transition-colors uppercase"
                         >
-                          X
-                        </button>
-                        <h4 className="font-black text-lg uppercase leading-tight mb-1">{svc.trade}</h4>
-                        <p className="font-bold text-gray-600 text-xs uppercase mb-3 border-l-2 border-black pl-2">{svc.subcategory}</p>
-                        
-                        <div className="mt-auto pt-2 border-t-2 border-dashed border-gray-300 flex items-center justify-between">
-                          {svc.isCertificateVerified ? (
-                            <span className="bg-[var(--color-brutal-green)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Verified</span>
-                          ) : svc.certificateUrl || svc.certificateFile ? (
-                            <span className="bg-[var(--color-brutal-yellow)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Pending</span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">No Cert</span>
+                          {Object.values(servicesData).map((c) => {
+                            const uniqueCategories = new Set(artisanServices.map(s => s.trade));
+                            const isAtLimit = uniqueCategories.size >= 5;
+                            const isAlreadySelected = uniqueCategories.has(c.title);
+                            const disabled = isAtLimit && !isAlreadySelected;
+                            
+                            return (
+                              <option key={c.id} value={c.title} disabled={disabled}>
+                                {c.title} {disabled ? '(Limit Reached)' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-black text-black mb-1 uppercase">Specific Service (Subcategory)</label>
+                        <select
+                          value={newServiceForm.subcategory}
+                          onChange={(e) => handleUpdateNewService('subcategory', e.target.value)}
+                          className="w-full p-3 bg-white border-4 border-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-bold transition-colors uppercase"
+                        >
+                          {Object.values(servicesData).find(c => c.title === newServiceForm.trade)?.subServices.map((sub) => (
+                            <option key={sub.id} value={sub.title}>{sub.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="flex items-start gap-2 p-3 bg-white border-4 border-black cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-transform mt-2">
+                          <input
+                            type="checkbox"
+                            checked={newServiceForm.hasCertification}
+                            onChange={(e) => handleUpdateNewService('hasCertification', e.target.checked)}
+                            className="w-5 h-5 border-2 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-0.5"
+                          />
+                          <span className="text-sm font-black text-black leading-tight uppercase">I have certification for this service</span>
+                        </label>
+                      </div>
+                      
+                      {newServiceForm.hasCertification && (
+                        <div className="p-4 bg-[var(--color-brutal-blue)] border-4 border-black mt-2">
+                          <label className="block text-sm font-black text-black uppercase mb-2">Upload Certificate</label>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) => {
+                              if (e.target.files) handleUpdateNewService('certificateFile', e.target.files[0]);
+                            }}
+                            className="w-full text-xs text-black file:mr-2 file:py-1 file:px-2 file:border-2 file:border-black file:font-black file:bg-[var(--color-brutal-yellow)] file:text-black cursor-pointer uppercase bg-white p-1 border-2 border-black"
+                          />
+                          {newServiceForm.certificateFile && (
+                            <p className="text-xs font-black mt-2 bg-white inline-block px-1 border-2 border-black uppercase">Selected: {newServiceForm.certificateFile.name}</p>
                           )}
                         </div>
+                      )}
+                      
+                      <div className="flex gap-4 pt-2">
+                        <button 
+                          type="button" 
+                          onClick={() => setShowAddForm(false)}
+                          className="flex-1 py-3 bg-white border-4 border-black text-black font-black uppercase shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={handleAddService}
+                          className="flex-[2] py-3 bg-[var(--color-brutal-pink)] border-4 border-black text-black font-black uppercase shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-all"
+                        >
+                          Add to List
+                        </button>
                       </div>
-                    ))}
+                    </div>
                   </div>
+                ) : (
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddForm(true)} 
+                    className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black text-black font-black uppercase tracking-widest mb-6 shadow-[4px_4px_0_0_#000] hover:-translate-y-1 transition-all"
+                  >
+                    + Add New Service
+                  </button>
                 )}
-              </div>
-
-              {/* Add New Service Form */}
-              {showAddForm ? (
-                <div className="p-6 bg-[var(--color-brutal-teal)] border-4 border-black mb-6 shadow-[4px_4px_0_0_#000]">
-                  <h3 className="text-lg font-black uppercase text-black mb-4">Add a New Service</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-black text-black mb-1 uppercase">Primary Trade</label>
-                      <select
-                        value={newServiceForm.trade}
-                        onChange={(e) => handleUpdateNewService('trade', e.target.value)}
-                        className="w-full p-3 bg-white border-4 border-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-bold transition-colors uppercase"
-                      >
-                        {Object.values(servicesData).map((c) => {
-                          const uniqueCategories = new Set(artisanServices.map(s => s.trade));
-                          const isAtLimit = uniqueCategories.size >= 5;
-                          const isAlreadySelected = uniqueCategories.has(c.title);
-                          const disabled = isAtLimit && !isAlreadySelected;
-                          
-                          return (
-                            <option key={c.id} value={c.title} disabled={disabled}>
-                              {c.title} {disabled ? '(Limit Reached)' : ''}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-black text-black mb-1 uppercase">Specific Service (Subcategory)</label>
-                      <select
-                        value={newServiceForm.subcategory}
-                        onChange={(e) => handleUpdateNewService('subcategory', e.target.value)}
-                        className="w-full p-3 bg-white border-4 border-black focus:outline-none focus:bg-[var(--color-brutal-yellow)] text-black font-bold transition-colors uppercase"
-                      >
-                        {Object.values(servicesData).find(c => c.title === newServiceForm.trade)?.subServices.map((sub) => (
-                          <option key={sub.id} value={sub.title}>{sub.title}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="flex items-start gap-2 p-3 bg-white border-4 border-black cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-transform mt-2">
-                        <input
-                          type="checkbox"
-                          checked={newServiceForm.hasCertification}
-                          onChange={(e) => handleUpdateNewService('hasCertification', e.target.checked)}
-                          className="w-5 h-5 border-2 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-0.5"
-                        />
-                        <span className="text-sm font-black text-black leading-tight uppercase">I have certification for this service</span>
-                      </label>
-                    </div>
-                    
-                    {newServiceForm.hasCertification && (
-                      <div className="p-4 bg-[var(--color-brutal-blue)] border-4 border-black mt-2">
-                        <label className="block text-sm font-black text-black uppercase mb-2">Upload Certificate</label>
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={(e) => {
-                            if (e.target.files) handleUpdateNewService('certificateFile', e.target.files[0]);
-                          }}
-                          className="w-full text-xs text-black file:mr-2 file:py-1 file:px-2 file:border-2 file:border-black file:font-black file:bg-[var(--color-brutal-yellow)] file:text-black cursor-pointer uppercase bg-white p-1 border-2 border-black"
-                        />
-                        {newServiceForm.certificateFile && (
-                          <p className="text-xs font-black mt-2 bg-white inline-block px-1 border-2 border-black uppercase">Selected: {newServiceForm.certificateFile.name}</p>
-                        )}
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-4 pt-2">
-                      <button 
-                        type="button" 
-                        onClick={() => setShowAddForm(false)}
-                        className="flex-1 py-3 bg-white border-4 border-black text-black font-black uppercase shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={handleAddService}
-                        className="flex-[2] py-3 bg-[var(--color-brutal-pink)] border-4 border-black text-black font-black uppercase shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-all"
-                      >
-                        Add to List
-                      </button>
-                    </div>
-                  </div>
+                
+                <div className="border-t-4 border-black pt-6">
+                  <button 
+                    type="submit" 
+                    disabled={servicesLoading}
+                    className="w-full py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {servicesLoading ? "SAVING CHANGES..." : "SAVE CHANGES TO PROFILE"}
+                  </button>
                 </div>
-              ) : (
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddForm(true)} 
-                  className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black text-black font-black uppercase tracking-widest mb-6 shadow-[4px_4px_0_0_#000] hover:-translate-y-1 transition-all"
-                >
-                  + Add New Service
-                </button>
-              )}
-              
-              <div className="border-t-4 border-black pt-6">
-                <button 
-                  type="submit" 
-                  disabled={servicesLoading}
-                  className="w-full py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {servicesLoading ? "SAVING CHANGES..." : "SAVE CHANGES TO PROFILE"}
-                </button>
-              </div>
-            </form>
-          </div>
+              </form>
+            </div>
+          )}
         </div>
       )}
 

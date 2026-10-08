@@ -30,9 +30,34 @@ public class SocialNotificationService extends Service {
         if (uid != null) {
             currentUid = uid;
             Log.d(TAG, "Service started for user: " + uid);
+            startForegroundService();
             listenToCalls(uid);
         }
         return START_STICKY;
+    }
+
+    private void startForegroundService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "social_service_channel",
+                    "Background Call Service",
+                    NotificationManager.IMPORTANCE_MIN
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.createNotificationChannel(channel);
+
+            Notification notification = new NotificationCompat.Builder(this, "social_service_channel")
+                    .setContentTitle("Need is running")
+                    .setContentText("Listening for incoming calls")
+                    .setSmallIcon(R.drawable.ic_stat_icon)
+                    .build();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1002, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(1002, notification);
+            }
+        }
     }
 
     private void listenToCalls(String uid) {
