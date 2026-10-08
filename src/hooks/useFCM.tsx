@@ -128,6 +128,23 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    // On native: eagerly create the high-priority channel as soon as the
+    // app boots. Android requires the channel to exist BEFORE any notification
+    // arrives. Doing this before auth means it's ready even on a fresh install.
+    if (Capacitor.isNativePlatform()) {
+      import("@capacitor/push-notifications").then(({ PushNotifications }) => {
+        PushNotifications.createChannel({
+          id: "high_priority_alerts",
+          name: "High Priority Alerts",
+          description: "Important updates that require immediate attention",
+          importance: 5,
+          sound: "default",
+          vibration: true,
+          visibility: 1,
+        }).catch((e) => console.warn("Channel creation error:", e));
+      });
+    }
+
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
 
