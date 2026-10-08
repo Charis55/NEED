@@ -44,7 +44,6 @@ export const metadata: Metadata = {
   },
 };
 
-import GlobalNotificationListener from "@/components/GlobalNotificationListener";
 import GlobalCallManager from "@/components/GlobalCallManager";
 import OfflineIndicator from "@/components/OfflineIndicator";
 import PullToRefresh from "@/components/PullToRefresh";
@@ -74,7 +73,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <PermissionsManager />
             <NativeBackButtonManager />
             <FCMProvider>{children}</FCMProvider>
-            <GlobalNotificationListener />
             <GlobalCallManager />
           </AlertProvider>
           <Analytics />

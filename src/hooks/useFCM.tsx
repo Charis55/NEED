@@ -2,10 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getToken, onMessage } from "firebase/messaging";
+import { getToken } from "firebase/messaging";
 import { auth, messaging, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
 
 /**
@@ -29,7 +28,6 @@ async function persistToken(uid: string, token: string) {
 }
 
 export function FCMProvider({ children }: { children: React.ReactNode }) {
-  const { showAlert } = useAlert();
   const router = useRouter();
 
   // Keep a ref to the latest native token so we can persist it
