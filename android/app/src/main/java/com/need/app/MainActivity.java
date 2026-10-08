@@ -14,34 +14,25 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(SocialNotificationPlugin.class);
         super.onCreate(savedInstanceState);
         createNotificationChannel();
     }
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel defaultChannel = new NotificationChannel(
+            NotificationChannel channel = new NotificationChannel(
                 "default",
                 "General Notifications",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            defaultChannel.setDescription("Job requests, updates, and messages");
-            defaultChannel.enableVibration(true);
-            defaultChannel.setShowBadge(true);
-
-            NotificationChannel highPriorityChannel = new NotificationChannel(
-                "high_priority_alerts",
-                "High Priority Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            );
-            highPriorityChannel.setDescription("Job requests, calls, and urgent messages");
-            highPriorityChannel.enableVibration(true);
-            highPriorityChannel.setShowBadge(true);
+            channel.setDescription("Job requests, updates, and messages");
+            channel.enableVibration(true);
+            channel.setShowBadge(true);
 
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
-                manager.createNotificationChannel(defaultChannel);
-                manager.createNotificationChannel(highPriorityChannel);
+                manager.createNotificationChannel(channel);
             }
         }
     }

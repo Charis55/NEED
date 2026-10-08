@@ -7,46 +7,10 @@ import { JobRequest } from "@/types";
 import IncomingCallModal from "./IncomingCallModal";
 import OutgoingCallModal from "./OutgoingCallModal";
 import dynamic from "next/dynamic";
+import SocialNotification from "@/lib/SocialNotification";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { sessionId } from "@/utils/sessionId";
-
-const startRingtone = () => {
-  if (typeof window === 'undefined') return;
-  try {
-    if (!(window as any).callRingtoneAudio) {
-      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
-      audio.loop = true;
-      audio.id = "call-ringtone";
-      audio.play().catch(e => console.warn("Ringtone audio play failed:", e));
-      (window as any).callRingtoneAudio = audio;
-    }
-    if (navigator.vibrate) {
-      navigator.vibrate([1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]);
-    }
-  } catch (err) {
-    console.warn("Failed to play ringtone:", err);
-  }
-};
-
-const stopRingtone = () => {
-  if (typeof window === 'undefined') return;
-  try {
-    if ((window as any).callRingtoneAudio) {
-      ((window as any).callRingtoneAudio as HTMLAudioElement).pause();
-      (window as any).callRingtoneAudio = null;
-    }
-    if ((window as any).webRingtone) {
-      ((window as any).webRingtone as HTMLAudioElement).pause();
-      (window as any).webRingtone = null;
-    }
-    if (navigator.vibrate) {
-      navigator.vibrate(0);
-    }
-  } catch (err) {
-    console.warn("Failed to stop ringtone:", err);
-  }
-};
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -105,10 +69,10 @@ export default function GlobalCallManager() {
   };
 
   const clearCallNotification = async () => {
-    stopRingtone();
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       try {
         await LocalNotifications.cancel({ notifications: [{ id: 1001 }] });
+        SocialNotification.stopRingtone().catch(e => console.warn(e));
       } catch (e) {
         // ignore
       }
@@ -121,12 +85,18 @@ export default function GlobalCallManager() {
     });
     return () => {
       unsub();
-      stopRingtone();
+      if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+         SocialNotification.stopRingtone().catch(() => {});
+      }
     };
   }, []);
 
   useEffect(() => {
     if (!userUid) return;
+    // Start our custom native bridge service for background notifications
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      SocialNotification.startService({ uid: userUid }).catch(e => console.error("Failed to start service", e));
+    }
 
     const updateCombined = (artisanJobs: JobRequest[], customerJobs: JobRequest[]) => {
       const combined = [...artisanJobs, ...customerJobs];
@@ -157,14 +127,42 @@ export default function GlobalCallManager() {
          setNotifiedCallId((prevNotified) => {
            if (prevNotified !== foundJob!.requestId) {
               triggerCallNotification(foundJob!);
-              startRingtone();
+              if (typeof window !== 'undefined') {
+                if (Capacitor.isNativePlatform()) {
+                  SocialNotification.playRingtone().catch(e => console.warn(e));
+                } else {
+                  // Fallback for Vercel / Web Browser testing
+                  const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
+                  audio.loop = true;
+                  audio.id = "web-ringtone";
+                  audio.play().catch(e => console.warn("Web audio play failed:", e));
+                  (window as any).webRingtone = audio;
+                  
+                  // Try to vibrate if the browser supports it
+                  if (navigator.vibrate) {
+                      navigator.vibrate([1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]);
+                  }
+                }
+              }
               return foundJob!.requestId;
            }
            return prevNotified;
          });
       } else {
          if (!foundJob || (foundJob && foundJob.activeCall?.status !== "ringing")) {
-           stopRingtone();
+           if (typeof window !== 'undefined') {
+             if (Capacitor.isNativePlatform()) {
+               SocialNotification.stopRingtone().catch(e => console.warn(e));
+             } else {
+               if ((window as any).webRingtone) {
+                 ((window as any).webRingtone as HTMLAudioElement).pause();
+                 (window as any).webRingtone = null;
+               }
+               if (navigator.vibrate) {
+                 navigator.vibrate(0);
+               }
+             }
+           }
            if (!foundJob) {
              setNotifiedCallId(null);
            }
