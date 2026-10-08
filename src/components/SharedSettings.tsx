@@ -53,7 +53,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     isCertificateVerified: boolean;
     certificateFile: File | null;
   }[]>([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
 
   // New Service Form State
   const defaultTrade = Object.values(servicesData)[0]?.title || "Plumbing";
@@ -130,13 +129,24 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     return () => unsubscribe();
   }, [router, isArtisan]);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleUniversalSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (!authUser) throw new Error("Not authenticated");
-      
+
+      // Validate artisan services
+      if (isArtisan) {
+        const serviceSet = new Set(artisanServices.map(s => `${s.trade}:${s.subcategory}`));
+        if (serviceSet.size !== artisanServices.length) {
+          throw new Error("You have duplicate services. Please remove or change them.");
+        }
+        if (artisanServices.length === 0) {
+          throw new Error("You must have at least one service.");
+        }
+      }
+
       const newDisplayName = `${firstName} ${lastName}`.trim();
       
       if (authUser.displayName !== newDisplayName) {
@@ -162,13 +172,60 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       await updateDoc(doc(db, "users", authUser.uid), userUpdatePayload);
 
-      if (isArtisan && emailChanged) {
-        // Also update artisan profile email
-        const artisanRef = doc(db, "artisans", authUser.uid);
-        const artisanSnap = await getDoc(artisanRef);
-        if (artisanSnap.exists()) {
-          await updateDoc(artisanRef, { email });
+      // Artisan specific updates (Email sync & Services & Certificates)
+      if (isArtisan) {
+        const uploadFileToR2 = async (file: File) => {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error("Failed to upload file");
+          const { publicUrl } = await res.json();
+          return publicUrl;
+        };
+
+        const finalServices = [];
+        const serviceKeys = [];
+
+        for (const svc of artisanServices) {
+          let certificateUrl = svc.certificateUrl;
+
+          if (svc.hasCertification && svc.certificateFile) {
+            let fileToUpload = svc.certificateFile;
+            if (svc.certificateFile.type.startsWith('image/')) {
+              fileToUpload = await compressImage(svc.certificateFile, 4);
+            }
+            certificateUrl = await uploadFileToR2(fileToUpload);
+          }
+
+          finalServices.push({
+            trade: svc.trade,
+            subcategory: svc.subcategory,
+            hasCertification: svc.hasCertification,
+            certificateUrl,
+            isCertificateVerified: svc.isCertificateVerified,
+          });
+          serviceKeys.push(`${svc.trade}:${svc.subcategory}`);
         }
+
+        const artisanUpdatePayload: Record<string, unknown> = {
+          services: finalServices,
+          serviceKeys: serviceKeys,
+        };
+
+        if (emailChanged) {
+          artisanUpdatePayload.email = email;
+        }
+
+        if (finalServices.length > 0) {
+          artisanUpdatePayload.trade = finalServices[0].trade;
+          artisanUpdatePayload.subcategory = finalServices[0].subcategory;
+          artisanUpdatePayload.hasCertification = finalServices[0].hasCertification;
+          artisanUpdatePayload.certificateUrl = finalServices[0].certificateUrl;
+          artisanUpdatePayload.isCertificateVerified = finalServices[0].isCertificateVerified;
+        }
+
+        await updateDoc(doc(db, "artisans", authUser.uid), artisanUpdatePayload);
+        setArtisanServices(finalServices.map(s => ({ ...s, certificateFile: null })));
       }
       
       if (emailChanged) {
@@ -178,13 +235,13 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         return;
       }
 
-      showAlert("Profile settings saved successfully!", "success");
+      showAlert("Settings saved successfully!", "success");
     } catch (error: unknown) {
       const err = error as Error & { code?: string };
       if (err.code === "auth/requires-recent-login") {
         showAlert("Changing your email requires recent authentication. Please sign out and sign in again.", "error");
       } else {
-        showAlert(err.message || "Failed to save profile settings", "error");
+        showAlert(err.message || "Failed to save settings", "error");
       }
     } finally {
       setLoading(false);
@@ -345,82 +402,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     setNewServiceForm(updated);
   };
 
-  const handleSaveServices = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setServicesLoading(true);
-    try {
-      if (!authUser) throw new Error("Not authenticated");
-
-      // Validate
-      const serviceSet = new Set(artisanServices.map(s => `${s.trade}:${s.subcategory}`));
-      if (serviceSet.size !== artisanServices.length) {
-        throw new Error("You have duplicate services. Please remove or change them.");
-      }
-      if (artisanServices.length === 0) {
-        throw new Error("You must have at least one service.");
-      }
-
-      // Upload any new certificates
-      const finalServices = [];
-      const serviceKeys = [];
-      
-      const uploadFileToR2 = async (file: File) => {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
-        if (!res.ok) throw new Error("Failed to upload file");
-        const { publicUrl } = await res.json();
-        return publicUrl;
-      };
-
-      for (const svc of artisanServices) {
-        let certificateUrl = svc.certificateUrl;
-
-        if (svc.hasCertification && svc.certificateFile) {
-          let fileToUpload = svc.certificateFile;
-          if (svc.certificateFile.type.startsWith('image/')) {
-            fileToUpload = await compressImage(svc.certificateFile, 4);
-          }
-          certificateUrl = await uploadFileToR2(fileToUpload);
-        }
-
-        finalServices.push({
-          trade: svc.trade,
-          subcategory: svc.subcategory,
-          hasCertification: svc.hasCertification,
-          certificateUrl,
-          isCertificateVerified: svc.isCertificateVerified,
-        });
-        serviceKeys.push(`${svc.trade}:${svc.subcategory}`); // No longer keyed by slug, but by title
-      }
-
-      const updateData: Record<string, unknown> = {
-        services: finalServices,
-        serviceKeys: serviceKeys,
-      };
-
-      // Ensure backwards compatibility fields match the first service
-      if (finalServices.length > 0) {
-        updateData.trade = finalServices[0].trade;
-        updateData.subcategory = finalServices[0].subcategory;
-        updateData.hasCertification = finalServices[0].hasCertification;
-        updateData.certificateUrl = finalServices[0].certificateUrl;
-        updateData.isCertificateVerified = finalServices[0].isCertificateVerified;
-      }
-
-      await updateDoc(doc(db, "artisans", authUser.uid), updateData);
-      
-      // Update local state without files
-      setArtisanServices(finalServices.map(s => ({ ...s, certificateFile: null })));
-      showAlert("Services updated successfully!", "success");
-    } catch (error: unknown) {
-      const err = error as Error;
-      console.error(err);
-      showAlert(err.message || "Failed to update services", "error");
-    } finally {
-      setServicesLoading(false);
-    }
-  };
 
   const handleDeleteAccount = async () => {
     if (!deleteConfirm) {
@@ -530,7 +511,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             <p className="font-black uppercase text-sm text-gray-500">Tap icon to change</p>
           </div>
 
-          <form onSubmit={handleSaveProfile}>
+          <form onSubmit={handleUniversalSave}>
             <div className="bg-[var(--color-brutal-teal)] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-8">
               <h2 className="text-xl font-black uppercase text-black mb-4">Personal Details</h2>
               
@@ -606,24 +587,13 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               </div>
             )}
 
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-4 bg-[var(--color-brutal-green)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50"
-            >
-              {loading ? "SAVING..." : "SAVE PROFILE"}
-            </button>
-          </form>
-
-          {/* Manage Services (Appended to Profile Tab) */}
-          {isArtisan && (
-            <div className="bg-[var(--color-brutal-bg)] p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mt-8">
-              <h2 className="text-2xl font-black uppercase text-black mb-4">Manage Services</h2>
-              <p className="text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
-                You can add new services or remove existing ones. Note that adding highly specific services improves your chances of being matched with customers.
-              </p>
-
-              <form onSubmit={handleSaveServices}>
+            {/* Manage Services (Appended to Profile Tab) */}
+            {isArtisan && (
+              <div className="bg-[var(--color-brutal-bg)] p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mt-8">
+                <h2 className="text-2xl font-black uppercase text-black mb-4">Manage Services</h2>
+                <p className="text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
+                  You can add new services or remove existing ones. Note that adding highly specific services improves your chances of being matched with customers.
+                </p>
                 {/* Existing Services List */}
                 <div className="mb-8">
                   <h3 className="text-lg font-black uppercase text-black border-b-4 border-black pb-2 mb-4">Your Active Services</h3>
@@ -650,7 +620,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                             ) : svc.certificateUrl || svc.certificateFile ? (
                               <span className="bg-[var(--color-brutal-yellow)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Pending</span>
                             ) : (
-                              <span className="text-[10px] font-bold text-gray-400 uppercase">No Cert</span>
+                              <span className="text-[10px] font-bold text-gray-400 uppercase">No Certificate</span>
                             )}
                           </div>
                         </div>
@@ -754,18 +724,19 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                   </button>
                 )}
                 
-                <div className="border-t-4 border-black pt-6">
-                  <button 
-                    type="submit" 
-                    disabled={servicesLoading}
-                    className="w-full py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {servicesLoading ? "SAVING CHANGES..." : "SAVE CHANGES TO PROFILE"}
-                  </button>
-                </div>
-              </form>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "SAVING CHANGES..." : "SAVE CHANGES"}
+              </button>
             </div>
-          )}
+          </form>
         </div>
       )}
 
