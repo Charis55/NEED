@@ -24,8 +24,15 @@ public class CustomMessagingService extends MessagingService {
         super.onMessageReceived(remoteMessage);
 
         Map<String, String> data = remoteMessage.getData();
-        if (data != null && "call".equals(data.get("type"))) {
+        if (data == null) return;
+
+        String type = data.get("type");
+        if ("call".equals(type)) {
             showCallNotification(data);
+        } else if ("cancel_call".equals(type)) {
+            // The caller cancelled or the call ended — dismiss any ringing notification
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            notificationManager.cancel(1001);
         }
     }
 
@@ -78,8 +85,8 @@ public class CustomMessagingService extends MessagingService {
                 .setVibrate(new long[]{0, 1000, 1000, 1000, 1000, 1000, 1000, 1000})
                 .setFullScreenIntent(pendingIntent, true)
                 .setContentIntent(pendingIntent)
-                .addAction(0, "Answer", answerPendingIntent)
-                .addAction(0, "Decline", declinePendingIntent);
+                .addAction(0, "Decline", declinePendingIntent)
+                .addAction(0, "Answer", answerPendingIntent);
 
         // Explicitly set ic_stat_icon if available
         int resId = getResources().getIdentifier("ic_stat_icon", "drawable", getPackageName());

@@ -50,15 +50,18 @@ export async function POST(req: NextRequest) {
       }
 
       try {
+        // Only incoming call notifications are data-only (so Java handles the ringing).
+        // All other types (chat, missed_call, etc.) use standard FCM notification payload.
+        const isIncomingCall = data?.type === "call";
         await getMessaging(adminApp_).send({
           token: fcmToken,
-          ...(data?.type !== "call" && {
+          ...(!isIncomingCall && {
             notification: { title, body },
           }),
           data: stringData,
           android: {
             priority: "high",
-            ...(data?.type !== "call" && {
+            ...(!isIncomingCall && {
               notification: {
                 sound: "default",
                 channelId: "high_priority_alerts",
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
           apns: {
             payload: {
               aps: {
-                alert: data?.type === "call" ? { title, body } : undefined,
+                alert: isIncomingCall ? { title, body } : undefined,
                 sound: "default",
                 contentAvailable: true,
               },

@@ -16,14 +16,15 @@ public class CallActionReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
+        
+        // Cancel the notification immediately for any call action
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.cancel(1001);
+
         if ("DECLINE_CALL".equals(action)) {
             String requestId = intent.getStringExtra("requestId");
             
-            // 1. Cancel the notification immediately
-            NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            notificationManager.cancel(1001); // Cancel the ringing notification
-            
-            // 2. Make network request to decline call without opening app
+            // Make network request to decline call without opening app
             if (requestId != null) {
                 new DeclineCallTask().execute(requestId);
             }
@@ -31,6 +32,10 @@ public class CallActionReceiver extends BroadcastReceiver {
             // Collapse the notification panel
             Intent closeIntent = new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
             context.sendBroadcast(closeIntent);
+            
+        } else if ("CANCEL_CALL_NOTIFICATION".equals(action)) {
+            // Caller cancelled the call — notification already cancelled above, nothing else needed
+            Log.d("CallActionReceiver", "Cancelled call notification dismissed");
         }
     }
 
@@ -45,6 +50,8 @@ public class CallActionReceiver extends BroadcastReceiver {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
 
                 String jsonInputString = "{\"requestId\": \"" + requestId + "\"}";
                 try (OutputStream os = conn.getOutputStream()) {
@@ -54,6 +61,7 @@ public class CallActionReceiver extends BroadcastReceiver {
 
                 int code = conn.getResponseCode();
                 Log.d("CallActionReceiver", "Decline API Response Code: " + code);
+                conn.disconnect();
             } catch (Exception e) {
                 e.printStackTrace();
             }

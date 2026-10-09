@@ -278,6 +278,18 @@ export default function GlobalCallManager() {
       }
 
       if ((reason === "timeout" || reason === "cancelled") && userUid === activeCall.callerId && receiverId) {
+        // Send a silent 'cancel_call' push first so the receiver's ringing notification stops immediately
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: receiverId,
+            title: "Call Cancelled",
+            body: "",
+            data: { requestId: jobToProcess.requestId, type: "cancel_call" }
+          })
+        }).catch(err => console.error("Cancel push failed:", err));
+        // Then send the visible missed call notification
         fetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -285,7 +297,7 @@ export default function GlobalCallManager() {
             userId: receiverId,
             title: "Missed Call",
             body: `Missed ${isVideo ? 'video' : 'voice'} call from ${auth.currentUser?.displayName || 'Someone'}`,
-            data: { requestId: jobToProcess.requestId, type: "call" }
+            data: { requestId: jobToProcess.requestId, type: "missed_call" }
           })
         }).catch(err => console.error("Push failed:", err));
       }
