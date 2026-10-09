@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
 
     if (fcmToken && pushEnabled) {
       // FCM requires ALL data values to be strings.
-      const stringData: Record<string, string> = {};
+      const stringData: Record<string, string> = {
+        title,
+        body,
+      };
       if (data && typeof data === "object") {
         for (const [key, value] of Object.entries(data)) {
           stringData[key] = String(value);

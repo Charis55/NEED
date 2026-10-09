@@ -721,8 +721,8 @@ export default function ChatPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: partnerId,
-            title: `Incoming ${type} call`,
-            body: `${currentUser.displayName || 'Someone'} is calling you`,
+            title: currentUser.displayName || 'Someone',
+            body: `Incoming ${type} call`,
             data: { requestId, type: "call" }
           })
         }).catch(err => console.error("Push failed:", err));

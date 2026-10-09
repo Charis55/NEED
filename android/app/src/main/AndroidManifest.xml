@@ -52,6 +52,12 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <receiver android:name=".CallActionReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="DECLINE_CALL" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->

@@ -58,10 +58,11 @@ public class CustomMessagingService extends MessagingService {
         answerIntent.setPackage(getPackageName());
         PendingIntent answerPendingIntent = PendingIntent.getActivity(this, 1002, answerIntent, flags);
         
-        // Decline Intent
-        Intent declineIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("needapp://call/decline?requestId=" + data.get("requestId")));
-        declineIntent.setPackage(getPackageName());
-        PendingIntent declinePendingIntent = PendingIntent.getActivity(this, 1003, declineIntent, flags);
+        // Decline Intent (Background Broadcast)
+        Intent declineIntent = new Intent(this, CallActionReceiver.class);
+        declineIntent.setAction("DECLINE_CALL");
+        declineIntent.putExtra("requestId", data.get("requestId"));
+        PendingIntent declinePendingIntent = PendingIntent.getBroadcast(this, 1003, declineIntent, flags);
 
         Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
 

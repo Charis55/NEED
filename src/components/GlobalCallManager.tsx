@@ -127,36 +127,42 @@ export default function GlobalCallManager() {
   // Handle deep links from notification action buttons (Answer / Decline)
   useEffect(() => {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-      const listener = App.addListener('appUrlOpen', (data) => {
-        const url = data.url;
+      const handleDeepLink = async (url: string) => {
         if (url.startsWith('needapp://call/')) {
           const urlObj = new URL(url);
           const action = urlObj.pathname.replace('//', '/').split('/')[2]; // /call/answer -> answer
           const reqId = urlObj.searchParams.get('requestId');
           
           if (reqId) {
-            // Need to apply the action. Because we might not have activeJob state in this exact closure if it's stale,
-            // we update firestore directly. We know the requestId.
             if (action === 'answer') {
               clearCallNotification();
-              updateDoc(doc(db, "jobRequests", reqId), {
-                "activeCall.status": "ongoing",
-                "activeCall.connectedAt": Date.now(),
-                "activeCall.acceptedBySession": sessionId
-              }).catch(e => console.error(e));
-            } else if (action === 'decline') {
-              clearCallNotification();
-              // To decline properly and send a message, we might need the full job object.
-              // But a quick hack is just setting the status to ended. The GlobalCallManager will pick it up,
-              // but if we are declining, we might want to log the message. 
-              // We can just rely on the existing endCallWithLog if we have activeJob, otherwise just update status.
-              updateDoc(doc(db, "jobRequests", reqId), {
-                "activeCall.status": "ended"
-              }).catch(e => console.error(e));
+              try {
+                const { updateDoc, doc } = await import("firebase/firestore");
+                await updateDoc(doc(db, "jobRequests", reqId), {
+                  "activeCall.status": "ongoing",
+                  "activeCall.connectedAt": Date.now(),
+                  "activeCall.acceptedBySession": sessionId
+                });
+              } catch (e) {
+                console.error(e);
+              }
             }
           }
         }
+      };
+
+      // Handle cold start
+      App.getLaunchUrl().then((launchData) => {
+        if (launchData && launchData.url) {
+          handleDeepLink(launchData.url);
+        }
       });
+
+      // Handle warm start
+      const listener = App.addListener('appUrlOpen', (data) => {
+        handleDeepLink(data.url);
+      });
+      
       return () => {
         listener.then(l => l.remove());
       };
@@ -312,11 +318,11 @@ export default function GlobalCallManager() {
 
   const { activeCall } = activeJob;
   const isCaller = activeCall.callerId === userUid;
-  const isThisDeviceCaller = isCaller && activeCall.callerSessionId === sessionId;
-  const isThisDeviceReceiver = !isCaller && activeCall.acceptedBySession === sessionId;
+  const isThisDeviceCaller = isCaller;
+  const isThisDeviceReceiver = !isCaller;
   const isRingingForMe = activeCall.status === "ringing" && !isCaller;
-  const isRingingByMe = activeCall.status === "ringing" && isThisDeviceCaller;
-  const isOngoingForMe = activeCall.status === "ongoing" && (isThisDeviceCaller || isThisDeviceReceiver);
+  const isRingingByMe = activeCall.status === "ringing" && isCaller;
+  const isOngoingForMe = activeCall.status === "ongoing";
 
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
