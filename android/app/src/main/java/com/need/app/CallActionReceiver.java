@@ -26,7 +26,8 @@ public class CallActionReceiver extends BroadcastReceiver {
             
             // Make network request to decline call without opening app
             if (requestId != null) {
-                new DeclineCallTask().execute(requestId);
+                final PendingResult pendingResult = goAsync();
+                new DeclineCallTask(pendingResult).execute(requestId);
             }
             
             // Collapse the notification panel
@@ -40,6 +41,12 @@ public class CallActionReceiver extends BroadcastReceiver {
     }
 
     private static class DeclineCallTask extends AsyncTask<String, Void, Void> {
+        private final PendingResult pendingResult;
+
+        public DeclineCallTask(PendingResult pendingResult) {
+            this.pendingResult = pendingResult;
+        }
+
         @Override
         protected Void doInBackground(String... params) {
             String requestId = params[0];
@@ -64,6 +71,10 @@ public class CallActionReceiver extends BroadcastReceiver {
                 conn.disconnect();
             } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+                if (pendingResult != null) {
+                    pendingResult.finish();
+                }
             }
             return null;
         }
