@@ -12,6 +12,7 @@ import { useLocalDraft } from "@/hooks/useLocalDraft";
 import { compressImage } from "@/utils/imageCompression";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
+import BookingTermsCheckbox from "@/components/BookingTermsCheckbox";
 
 export default function RequestArtisanPage({ params }: { params: Promise<{ artisanId: string }> }) {
   const unwrappedParams = use(params);
@@ -29,6 +30,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
   // Location (not persisted — requires fresh geolocation permission)
   const [locationData, setLocationData] = useState<{lat: number, lng: number, name: string} | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [locationError, setLocationError] = useState("");
   
   // Media upload
@@ -212,59 +214,40 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
         }
       }
 
-      const requestRef = doc(collection(db, "jobRequests"));
-      
       const selectedServices = selectedServiceIndices.map(idx => artisan.services?.[idx] || { trade: artisan.trade, subcategory: artisan.subcategory });
       
-      const newRequest: JobRequest & { mediaUrl?: string } = {
-        requestId: requestRef.id,
-        customerId: user.uid,
-        artisanId: unwrappedParams.artisanId,
-        trade: selectedServices[0]?.trade || "Unknown",
-        subcategory: selectedServices[0]?.subcategory || "Unknown",
-        services: selectedServices.map(s => ({ trade: s.trade || "Unknown", subcategory: s.subcategory || "Unknown" })),
-        description: draft.description,
-        neighborhood: locationData.name,
-        locationCoords: { lat: locationData.lat, lng: locationData.lng },
-        preferredTime: `${draft.preferredDate} at ${draft.preferredTime}`,
-        offerAmount: parsedAmount,
-        counterOfferAmount: null,
-        platformFee: parsedAmount * platformFeeRate,
-        status: "pending",
-        createdAt: Date.now(),
-        completedAt: null,
-        ...(mediaUrl && { mediaUrl })
-      };
-
-      await setDoc(requestRef, newRequest);
-      
-      // Trigger Push Notification to artisan via API
-      fetch("/api/send-notification", {
+      const checkoutRes = await fetch("/api/checkout/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: unwrappedParams.artisanId,
-          title: "New Job Request!",
-          body: `A customer requested you for a job in ${newRequest.neighborhood}.`,
-          data: { requestId: requestRef.id, type: "new_request" }
-        })
-      }).catch(err => console.error("Failed to push:", err));
-
-      // Trigger New Job Request Email
-      fetch('/api/emails/new-job-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+          customerId: user.uid,
           artisanId: unwrappedParams.artisanId,
-          customerName: user.displayName || "A customer",
-          trade: newRequest.trade,
-          neighborhood: newRequest.neighborhood,
-          preferredTime: newRequest.preferredTime
-        }),
-      }).catch(e => console.error("Failed to send job request email:", e));
+          trade: selectedServices[0]?.trade || "Unknown",
+          subcategory: selectedServices[0]?.subcategory || "Unknown",
+          services: selectedServices.map(s => ({ trade: s.trade || "Unknown", subcategory: s.subcategory || "Unknown" })),
+          description: draft.description,
+          neighborhood: locationData.name,
+          locationCoords: { lat: locationData.lat, lng: locationData.lng },
+          preferredTime: `${draft.preferredDate} at ${draft.preferredTime}`,
+          offerAmount: parsedAmount,
+          mediaUrl
+        })
+      });
+
+      const checkoutData = await checkoutRes.json();
+      
+      if (!checkoutRes.ok) {
+        throw new Error(checkoutData.error || "Failed to initialize payment");
+      }
 
       clearDraft(); // Clear the saved draft on successful submission
-      router.push("/?requested=true");
+
+      // Redirect to Paystack to complete the deposit
+      if (checkoutData.authorizationUrl) {
+        window.location.href = checkoutData.authorizationUrl;
+      } else {
+        router.push("/jobs");
+      }
     } catch (err) {
       console.error(err);
       setError("Failed to submit request.");
@@ -483,9 +466,11 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
             </div>
           </div>
 
+          <BookingTermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !termsAccepted}
             className="w-full bg-black !text-white brutal-btn py-4 text-xl flex items-center justify-between px-6"
           >
             <span>{loading ? "SUBMITTING..." : "SEND REQUEST"}</span>

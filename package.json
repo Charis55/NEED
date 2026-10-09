@@ -35,7 +35,7 @@
     "cordova-plugin-android-permissions": "^1.1.5",
     "cordova-plugin-audiotoggle": "^1.0.3",
     "firebase": "^12.19.0",
-    "firebase-admin": "^14.4.0",
+    "firebase-admin": "^14.5.0",
     "framer-motion": "^13.4.0",
     "leaflet": "^1.9.4",
     "leaflet-routing-machine": "^3.2.12",

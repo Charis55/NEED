@@ -10,6 +10,7 @@ import { ArrowRight, MapPin, Clock, ChevronLeft } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
+import BookingTermsCheckbox from "@/components/BookingTermsCheckbox";
 
 export default function MultiServiceBroadcastJobPage({ 
   params,
@@ -31,6 +32,7 @@ export default function MultiServiceBroadcastJobPage({
   const [locationError, setLocationError] = useState("");
   
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
@@ -288,10 +290,12 @@ export default function MultiServiceBroadcastJobPage({
             </div>
           </div>
 
+          <BookingTermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
+
           <div className="mt-4 mb-8">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !termsAccepted}
               className="w-full bg-[var(--color-brutal-blue)] py-5 brutal-btn text-xl uppercase flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
             >
               <span className="relative z-10">{loading ? "POSTING JOB..." : "POST JOB FOR EVERYONE"}</span>
