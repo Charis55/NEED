@@ -36,7 +36,7 @@ export default function PublicProfileModal({ artisan, onClose, onSelect, selectL
             <div className="p-4 border-b-4 border-black flex gap-4 bg-[var(--color-brutal-teal)]">
               <div className="w-16 h-16 bg-white border-2 border-black flex-shrink-0">
                 <img 
-                  src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
+                  src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Technician')}&background=random&size=150`} 
                   alt={artisan.name} 
                   className="w-full h-full object-cover"
                 />

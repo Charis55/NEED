@@ -16,15 +16,26 @@ export default function PublicHeader() {
           <span className="text-[44px] font-bold text-black leading-none tracking-tighter -ml-2">EED</span>
         </div>
       </Link>
-      <div className="flex items-center gap-4">
-        <button 
-          onClick={() => router.back()} 
-          className="hidden sm:flex items-center font-black uppercase text-black hover:text-[var(--color-brutal-teal)] tracking-widest transition-colors mr-4"
+      <div className="flex items-center gap-4 sm:gap-6">
+        <Link
+          href="/explore"
+          className="hidden md:inline-block font-black uppercase text-sm tracking-wider hover:text-[var(--color-brutal-teal)] transition-colors"
         >
-          <ArrowLeft className="w-5 h-5 mr-2 stroke-[3]" />
-          Go Back
-        </button>
-        <Link href="/login?mode=signin" className="bg-[var(--color-brutal-yellow)] px-8 py-3 text-lg brutal-btn">
+          Explore Trades
+        </Link>
+        <Link
+          href="/blog"
+          className="hidden sm:inline-block font-black uppercase text-sm tracking-wider hover:text-[var(--color-brutal-teal)] transition-colors"
+        >
+          Guides
+        </Link>
+        <Link
+          href="/about"
+          className="hidden sm:inline-block font-black uppercase text-sm tracking-wider hover:text-[var(--color-brutal-teal)] transition-colors"
+        >
+          About
+        </Link>
+        <Link href="/login?mode=signin" className="bg-[var(--color-brutal-yellow)] px-6 py-2.5 text-base font-black uppercase brutal-btn">
           Sign In
         </Link>
       </div>

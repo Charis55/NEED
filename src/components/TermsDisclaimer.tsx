@@ -41,12 +41,17 @@ export default function TermsDisclaimer({ role, onClose }: TermsDisclaimerProps)
               </p>
 
               <p>
-                2. Limitation of Platform Liability
+                2. Escrow Deposits & Broadcast Job Model
+                Posting broadcast marketplace requests is free without upfront payment. Once a technician accepts your request, a 25% commitment deposit is required to confirm the booking and authorize the technician to travel. All deposits are held in secure escrow and are only released upon your satisfactory job inspection.
+              </p>
+
+              <p>
+                3. Limitation of Platform Liability
                 NEED, its affiliates, directors, and employees, shall under no circumstances be held liable for any direct, indirect, incidental, punitive, or consequential damages arising from the actions, negligence, or misconduct of any Technician. We do not employ the Technicians; they are independent contractors. Any dispute regarding property damage, theft, bodily injury, or unsatisfactory service quality must be resolved directly with the Technician.
               </p>
 
               <p>
-                3. Data Usage and Privacy
+                4. Data Usage and Privacy
                 By utilizing NEED, you consent to the collection and transmission of your personal data—including but not limited to your precise location data, phone number, and name—to Technicians for the sole purpose of fulfilling your job requests. You acknowledge that providing inaccurate location data may result in the inability to receive services or accurate pricing.
               </p>
 
@@ -68,17 +73,22 @@ export default function TermsDisclaimer({ role, onClose }: TermsDisclaimerProps)
               </p>
 
               <p>
-                2. Liability and Quality of Work
-                You are strictly liable for the quality of the services you provide, any damages caused to a customer&apos;s property, and any bodily injury resulting from your work. NEED assumes absolutely no liability for your actions. In the event of a dispute, claim, or legal action initiated by a customer resulting from your conduct or workmanship, you agree to fully indemnify and hold NEED harmless.
+                2. Liability and Skill Representation
+                When claiming or accepting job requests (including community broadcast jobs), you legally affirm that you possess the skills, tools, and expertise to perform the work to professional standards. You are strictly liable for the quality of the services you provide, any damages caused to a customer&apos;s property, and any bodily injury resulting from your work. In the event of a dispute, claim, or legal action initiated by a customer resulting from your conduct or workmanship, you agree to fully indemnify and hold NEED harmless.
               </p>
 
               <p>
-                3. Security, Background Checks, and Police Clearance
+                3. Escrow & Dispatch Protocol
+                For broadcast and accepted jobs, you agree not to travel until the customer&apos;s 25% commitment deposit is confirmed as held in escrow. Payouts are credited upon confirmed job completion.
+              </p>
+
+              <p>
+                4. Security, Background Checks, and Police Clearance
                 To ensure platform safety, you must consent to comprehensive background checks. You are strictly required to upload a valid, up-to-date Police Clearance Certificate during onboarding. NEED reserves the right to suspend or permanently terminate your account without notice if we detect fraudulent documents, if you receive reports of aggressive or unprofessional behavior, or if you attempt to circumvent the platform&apos;s payment ecosystem.
               </p>
 
               <p>
-                4. Data Sharing and Privacy
+                5. Data Sharing and Privacy
                 You consent to NEED displaying your profile, certifications, ratings, and location data to customers to facilitate job matching. You agree to utilize customer data (such as phone numbers and addresses) strictly for the purpose of completing the assigned job and not for external marketing or harassment.
               </p>
 

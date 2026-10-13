@@ -8,6 +8,8 @@ import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, Pow
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { JobRequest, Review } from "@/types";
 import { useAlert } from "@/components/AlertProvider";
+import WalletCard from "@/components/WalletCard";
+import AccountStrikesSection from "@/components/AccountStrikesSection";
 
 // ─── Sparkline: a tiny inline SVG chart for rating trend ──────────────
 function RatingSparkline({ data }: { data: number[] }) {
@@ -207,11 +209,19 @@ export default function ArtisanDashboard() {
             const reviewsSnap = await getDocs(
               query(
                 collection(db, "reviews"),
-                where("artisanId", "==", user.uid),
-                orderBy("createdAt", "asc")
+                where("artisanId", "==", user.uid)
               )
             );
-            const allReviews: Review[] = reviewsSnap.docs.map(d => d.data() as Review);
+            const getReviewTime = (r: Review) => {
+              const c = r.createdAt as any;
+              if (typeof c === "number") return c;
+              if (typeof c?.toMillis === "function") return c.toMillis();
+              if (typeof c?.toDate === "function") return c.toDate().getTime();
+              return new Date(c).getTime() || 0;
+            };
+            const allReviews: Review[] = reviewsSnap.docs
+              .map(d => d.data() as Review)
+              .sort((a, b) => getReviewTime(a) - getReviewTime(b));
             totalReviews = allReviews.length;
 
             if (allReviews.length > 0) {
@@ -316,6 +326,13 @@ export default function ArtisanDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-12 -mt-12">
+        {/* Active Policy Strikes Banner */}
+        {auth.currentUser && (
+          <div className="mb-6 z-10 relative">
+            <AccountStrikesSection userId={auth.currentUser.uid} userType="artisan" compact={true} />
+          </div>
+        )}
+
         {/* Revoked Banner */}
         {isRevoked && (
           <div className="bg-[#FF4D4D] border-4 border-black p-8 shadow-[8px_8px_0_0_#000] mb-8 relative rotate-1 z-10 animate-pulse">
@@ -387,7 +404,7 @@ export default function ArtisanDashboard() {
                     </div>
                   </div>
                   <Link 
-                    href="/technician/jobs" 
+                    href={`/technician/jobs/${job.requestId}`} 
                     className="flex items-center justify-center gap-2 w-full bg-black text-white font-black uppercase py-4 border-2 border-transparent hover:bg-white hover:text-black hover:border-black transition-colors"
                   >
                     Manage Job <Navigation className="w-5 h-5 stroke-[3]" />
@@ -398,17 +415,8 @@ export default function ArtisanDashboard() {
           </div>
         )}
 
-        {/* Balance Card */}
-        <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-8 shadow-[6px_6px_0_0_#000] mb-8 -rotate-1 relative overflow-hidden">
-          <div className="absolute top-4 right-4 bg-white border-4 border-black w-12 h-12 flex items-center justify-center rotate-12 shadow-[2px_2px_0_0_#000]">
-            <TrendingUp className="w-8 h-8 stroke-[3]" />
-          </div>
-          <p className="text-black text-sm font-black mb-2 uppercase tracking-widest">Total Earnings</p>
-          <p className="text-5xl md:text-7xl font-black text-black tracking-tighter">₦{stats.totalEarnings.toLocaleString()}</p>
-          <Link href="/technician/earnings" className="mt-6 inline-block bg-black text-white px-6 py-3 font-black uppercase text-sm tracking-widest hover:bg-[var(--color-brutal-teal)] hover:text-black transition-colors border-2 border-black">
-            View Payment History
-          </Link>
-        </div>
+        {/* Wallet & Balance Card */}
+        <WalletCard />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

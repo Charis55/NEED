@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { paymentProvider } from "@/lib/paystack";
 import { writeJobEvent } from "@/lib/jobEvents";
 import { JobRequestData } from "@/types/platform";
+import { getConfig } from "@/lib/platformConfig";
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY as string;
 
@@ -64,20 +65,45 @@ export async function POST(req: NextRequest) {
                return; // Skip if already processed or cancelled
             }
 
+            const creditRef = adminDb.collection("customerCredits").doc(`credit_pay_${jobId}`);
+            const creditSnap = await tx.get(creditRef);
+
+            const creditDiscount = Number(metadata?.creditDiscount || job.creditDiscountApplied || 0);
+            const totalDepositPaid = amount + creditDiscount;
+
             // Mark deposit as paid and transition to confirmed
             tx.update(jobRef, {
+              status: "accepted", // Fallback for old UI
               state: "confirmed",
               stateUpdatedAt: Date.now(),
-              depositPaid: amount,
+              depositPaid: totalDepositPaid,
               depositStatus: "held", // We hold it in escrow
             });
+
+            // Award in-app payment loyalty credit to customer
+            const effectiveCustomerId = customerId || job.customerId;
+            if (!creditSnap.exists && effectiveCustomerId) {
+              const config = await getConfig();
+              const bonus = config.rewards?.inAppPaymentCredit ?? 30000;
+              if (bonus > 0) {
+                tx.set(creditRef, {
+                  creditId: creditRef.id,
+                  customerId: effectiveCustomerId,
+                  amount: bonus,
+                  reason: "in_app_payment_bonus",
+                  jobId,
+                  used: false,
+                  createdAt: Date.now()
+                });
+              }
+            }
 
             // Log event
             await writeJobEvent(
               jobId,
               "deposit_paid",
               "system",
-              { amount, reference },
+              { amount, creditDiscount, totalDepositPaid, reference },
               tx
             );
             
@@ -107,6 +133,69 @@ export async function POST(req: NextRequest) {
              }).catch(console.error);
           }
         }
+      }
+
+      // Handle wallet top-up
+      if (metadata?.type === "wallet_topup") {
+        const userId = metadata.userId;
+        const channel = event.data?.channel || verification.providerRaw?.channel || "card";
+        if (userId) {
+          const { postLedgerEntry } = await import("@/lib/ledger");
+          await adminDb.runTransaction(async (tx) => {
+            await postLedgerEntry(tx, {
+              userId,
+              jobId: null,
+              type: "topup",
+              amount,
+              reference: `topup_${reference}`,
+              channel
+            });
+          });
+        }
+      }
+    }
+
+    // Handle transfer events
+    if (event.event.startsWith("transfer.")) {
+      const { transfer_code, reference, status, amount } = event.data;
+
+      // Extract original payout doc id if we stored it (or query by reference)
+      const eventRef = adminDb.collection("paystackEvents").doc(reference + "_" + event.event);
+      const eventSnap = await eventRef.get();
+      if (eventSnap.exists) {
+        return NextResponse.json({ success: true, message: "Already processed" });
+      }
+
+      await eventRef.set({
+        processedAt: Date.now(),
+        type: event.event,
+        reference,
+        status
+      });
+
+      // Find the payout
+      const payoutsQuery = await adminDb.collection("payouts").where("reference", "==", reference).limit(1).get();
+      if (!payoutsQuery.empty) {
+        const payoutDoc = payoutsQuery.docs[0];
+        const payout = payoutDoc.data();
+        
+        await adminDb.runTransaction(async (tx) => {
+          if (event.event === "transfer.success") {
+            tx.update(payoutDoc.ref, { status: "success" });
+          } else if (event.event === "transfer.failed" || event.event === "transfer.reversed") {
+            // Reverse the ledger entry
+            const { postLedgerEntry } = await import("@/lib/ledger");
+            await postLedgerEntry(tx, {
+              userId: payout.userId,
+              jobId: null,
+              type: "withdrawal_reversal",
+              amount: payout.amount,
+              reference: `${reference}_${event.event}`
+            });
+            
+            tx.update(payoutDoc.ref, { status: event.event === "transfer.failed" ? "failed" : "reversed" });
+          }
+        });
       }
     }
 

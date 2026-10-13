@@ -1,0 +1,353 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Models & Invariant Protections
+// ===============================================================
+//
+// Collection: users
+//   - userId: matches request.auth.uid
+//   - role: "customer" | "artisan" | "admin"
+//   - name, email, phone, avatar
+//
+// Collection: artisans (Public Marketplace)
+//   - artisanId: matches request.auth.uid
+//   - trade, subcategories, rating, reviewCount, verified
+//   - Immutable by client: verified, rating, reviewCount, strikeCount, penaltyMultiplier
+//
+// Collection: userPrivate (Sensitive KYC)
+//   - NIN, BVN, bank details. Read by owner/admin only. Write by server only.
+//
+// Collection: jobRequests (Core Job State Machine)
+//   - customerId, artisanId, state, status, isBroadcast
+//   - Financial escrow & commission fields: strictly server-authoritative
+//   - Client-writable fields: chat metadata, artisan GPS, activeCall state
+//
+// Collection: wallets & walletTransactions (Double-Entry Append-Only Ledger)
+//   - Strictly client read-only. Client write: FALSE.
+//
+// Collection: guaranteeClaims, customerCredits, strikes, leakageCases
+//   - Financial guarantees, credits, and dispute enforcement: strictly server-authoritative.
+//
+// Collection: reconciliationReports, adminDiscrepancies, auditLog
+//   - Internal ledger audits: admin only.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Core Helper Functions
+    // ──────────────────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        (
+          request.auth.token.email == "obunezicharis@gmail.com" &&
+          request.auth.token.email_verified == true
+        )
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Check if user is a participant of a job document via resource data
+    function isJobParticipant() {
+      return isSignedIn() && (
+        request.auth.uid == resource.data.customerId ||
+        request.auth.uid == resource.data.artisanId
+      );
+    }
+
+    function isJobCustomer() {
+      return isSignedIn() && request.auth.uid == resource.data.customerId;
+    }
+
+    function isJobArtisan() {
+      return isSignedIn() && request.auth.uid == resource.data.artisanId;
+    }
+
+    // Check job participant when accessing a subcollection via parent lookup
+    function isParentJobParticipant(jobId) {
+      let job = get(/databases/$(database)/documents/jobRequests/$(jobId)).data;
+      return isSignedIn() && (request.auth.uid == job.customerId || request.auth.uid == job.artisanId);
+    }
+
+    function isParentJobCustomer(jobId) {
+      let job = get(/databases/$(database)/documents/jobRequests/$(jobId)).data;
+      return isSignedIn() && request.auth.uid == job.customerId;
+    }
+
+    function isParentJobArtisan(jobId) {
+      let job = get(/databases/$(database)/documents/jobRequests/$(jobId)).data;
+      return isSignedIn() && request.auth.uid == job.artisanId;
+    }
+
+    function isJobConfirmedOrLater(jobId) {
+      let job = get(/databases/$(database)/documents/jobRequests/$(jobId)).data;
+      return job.state in ['confirmed', 'en_route', 'arrived', 'in_progress', 'awaiting_customer_confirmation', 'completed'];
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // USERS & PROFILES
+    // ──────────────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isOwner(userId) &&
+        request.resource.data.keys().hasAll(['role']) &&
+        request.resource.data.role in ['customer', 'artisan'] &&
+        (!('admin' in request.resource.data) || request.resource.data.admin == false);
+
+      allow update: if isOwner(userId) &&
+        // Prevent changing userId or escalating to admin role
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'admin'])) &&
+        (request.resource.data.role == resource.data.role || isAdmin())
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    match /artisans/{artisanId} {
+      // Public marketplace discovery directory
+      allow read: if true;
+
+      allow create: if isOwner(artisanId) &&
+        // New artisans start unverified with standard defaults
+        (!('verified' in request.resource.data) || request.resource.data.verified == false) &&
+        (!('strikeCount' in request.resource.data) || request.resource.data.strikeCount == 0);
+
+      allow update: if isOwner(artisanId) &&
+        // Artisan cannot self-verify or manipulate platform ranking/strikes
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'verified', 'rating', 'reviewCount', 'strikeCount',
+          'leakageScore', 'penaltyMultiplier', 'suspended'
+        ]))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // Sensitive KYC (NIN, BVN, Bank Account): strictly server-written
+    match /userPrivate/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Server Admin SDK only
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // JOB REQUESTS (Server-Authoritative State & Escrow Machine)
+    // ──────────────────────────────────────────────────────────────────────────
+    match /jobRequests/{jobId} {
+      // Allow read for job participants, pending broadcast marketplace jobs, or admins
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.customerId == request.auth.uid ||
+        resource.data.artisanId == request.auth.uid ||
+        (resource.data.isBroadcast == true && (resource.data.status == 'pending' || resource.data.state == 'pending'))
+      );
+
+      // Customer may initiate a request, but financial and confirmation fields are locked
+      allow create: if isSignedIn() &&
+        request.resource.data.customerId == request.auth.uid &&
+        (!('depositStatus' in request.resource.data) || request.resource.data.depositStatus in ['unpaid', 'none']) &&
+        (!('commissionSettled' in request.resource.data) || request.resource.data.commissionSettled == false) &&
+        (!('state' in request.resource.data) || request.resource.data.state in ['pending', 'negotiating', 'broadcasting']);
+
+      // Updates: Participants can update chat metadata, GPS routing, or call state;
+      // Money, escrow, fee calculation, and completion are STRICTLY protected against tampering.
+      allow update: if isAdmin() || (
+        (isJobParticipant() || (resource.data.isBroadcast == true && (resource.data.artisanId == null || !('artisanId' in resource.data) || resource.data.artisanId == '') && request.resource.data.artisanId == request.auth.uid)) &&
+        // CRITICAL INVARIANT: Financial & Escrow fields cannot be altered by client SDK
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'depositPaid', 'depositRequired', 'depositStatus',
+          'platformFee', 'feeRatePercentApplied', 'feeConfigVersion',
+          'commissionSettled', 'completedAt', 'commissionPaid'
+        ])) &&
+        // GPS location updates are restricted to the assigned artisan
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['artisanLocation', 'heading', 'speed']) || isJobArtisan())
+      );
+
+      allow delete: if false;
+
+      // Exact residential coordinates: customer or arrived/confirmed artisan only
+      match /private/details {
+        allow read: if isAdmin()
+          || isParentJobCustomer(jobId)
+          || (isParentJobArtisan(jobId) && isJobConfirmedOrLater(jobId));
+        allow write: if false;
+      }
+
+      // Append-only job audit timeline
+      match /events/{eventId} {
+        allow read: if isAdmin() || isParentJobParticipant(jobId);
+        allow write: if false;
+      }
+
+      // Technician real-time GPS trail
+      match /locationTrail/{pointId} {
+        allow read: if isAdmin() || isParentJobParticipant(jobId);
+        allow write: if false; // Streamed through server GPS validator
+      }
+
+      // Quote revisions
+      match /quoteRevisions/{revisionId} {
+        allow read: if isAdmin() || isParentJobParticipant(jobId);
+        allow write: if false;
+      }
+
+      // In-job chat messages subcollection
+      match /messages/{messageId} {
+        allow read: if isParentJobParticipant(jobId) || isAdmin();
+        
+        allow create: if isSignedIn() &&
+          (isParentJobParticipant(jobId) || isAdmin()) &&
+          request.resource.data.senderId == request.auth.uid &&
+          (!('text' in request.resource.data) || request.resource.data.text.size() <= 4000);
+
+        // Participants can only mark messages as read or add reactions
+        allow update: if isParentJobParticipant(jobId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'reactions']);
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // FINANCIAL LEDGER & WALLETS (Double-Entry Protection)
+    // Invariant: Never allow client writes to mutate balances or create money
+    // ──────────────────────────────────────────────────────────────────────────
+    match /wallets/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Server Admin SDK only
+    }
+
+    match /walletTransactions/{txId} {
+      allow read: if (resource != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false; // Server Admin SDK only
+    }
+
+    match /payments/{paymentId} {
+      allow read: if (resource != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false; // Verified via Paystack webhook
+    }
+
+    match /payouts/{payoutId} {
+      allow read: if (resource != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false; // Server Admin SDK only
+    }
+
+    match /paystackEvents/{eventKey} {
+      allow read, write: if false; // Internal idempotency ledger
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // REPUTATION & REVIEWS
+    // ──────────────────────────────────────────────────────────────────────────
+    match /reviews/{reviewId} {
+      allow read: if true; // Public reviews and ratings
+
+      allow create: if isSignedIn() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
+        request.resource.data.comment.size() <= 2000;
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // DISPUTES & CUSTOMER REPORTS
+    // ──────────────────────────────────────────────────────────────────────────
+    match /disputes/{disputeId} {
+      allow read: if isAdmin() || (
+        resource != null && (
+          resource.data.reporterUserId == request.auth.uid ||
+          resource.data.reportedUserId == request.auth.uid
+        )
+      );
+
+      allow create: if isSignedIn() &&
+        request.resource.data.reporterUserId == request.auth.uid &&
+        request.resource.data.status == 'open';
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // LEAKAGE CONTROL, STRIKES & GUARANTEE CLAIMS
+    // ──────────────────────────────────────────────────────────────────────────
+    match /strikes/{strikeId} {
+      allow read: if (resource != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if isAdmin(); // Appeals processed via /api/strikes/appeal
+    }
+
+    match /leakageCases/{caseId} {
+      allow read, write: if isAdmin(); // Confidential compliance investigation
+    }
+
+    match /leakageSurveys/{surveyId} {
+      allow read: if (resource != null && resource.data.customerId == request.auth.uid) || isAdmin();
+      allow write: if false; // Awarded via server
+    }
+
+    match /guaranteeClaims/{claimId} {
+      allow read: if isAdmin() || (
+        resource != null && (
+          resource.data.customerId == request.auth.uid ||
+          resource.data.artisanId == request.auth.uid
+        )
+      );
+      allow write: if false; // Submitted & resolved via server guarantee routes
+    }
+
+    match /customerCredits/{creditId} {
+      allow read: if (resource != null && resource.data.customerId == request.auth.uid) || isAdmin();
+      allow write: if false; // Managed exclusively via server loyalty & refund ledger
+    }
+
+    match /pairs/{pairId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Managed via server repeat client tracker
+    }
+
+    match /recurringServices/{id} {
+      allow read: if isSignedIn();
+      allow write: if false; // Managed via server recurring service scheduler
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // FINANCIAL RECONCILIATION & AUDIT LOGS
+    // ──────────────────────────────────────────────────────────────────────────
+    match /reconciliationReports/{reportId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /adminDiscrepancies/{discrepancyId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /auditLog/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /contactAttempts/{attemptId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /platformConfig/{docId} {
+      allow read: if true; // Public operational parameters
+      allow write: if isAdmin();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // DEFAULT CATCH-ALL: DENY EVERYTHING ELSE
+    // ──────────────────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

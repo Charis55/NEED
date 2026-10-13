@@ -139,6 +139,7 @@ export interface JobRequest {
   subcategory: string;
   services?: { trade: string; subcategory: string }[];
   description: string;
+  mediaUrl?: string | null;
   neighborhood: string;
   unreadCount?: Record<string, number>;
   locationCoords?: {
@@ -147,20 +148,26 @@ export interface JobRequest {
   };
   preferredTime: string;
   offerAmount: number;
+  agreedPrice?: number;
+  depositStatus?: "unpaid" | "none" | "pending" | "held" | "released" | "refunded" | string;
+  depositPaid?: number;
+  depositRequired?: number;
   counterOfferAmount: number | null;
   lastCounterBy?: "customer" | "artisan";
   declinedBy?: "customer" | "artisan";
   lastMessageText?: string;
   platformFee: number | null;
   cancellationFee?: number;
-  cancelledBy?: "customer" | "artisan";
-  cancelledReason?: string;
-  cancelledAt?: string | number;
+  cancelledBy?: "customer" | "artisan" | "system" | null;
+  cancelledReason?: string | null;
+  cancelReasonCode?: string | null;
+  cancelledAt?: string | number | null;
   rescheduledAt?: number;
   newPreferredTime?: string;
   rescheduleRequestedBy?: "customer" | "artisan";
   rescheduleStatus?: "pending" | "accepted" | "declined";
-  status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered" | "payment_pending" | "en_route" | "in_progress";
+  state?: string;
+  status: "pending" | "accepted" | "declined" | "completed" | "cancelled" | "countered" | "payment_pending" | "en_route" | "arrived" | "in_progress";
   technicianLocation?: {
     lat: number;
     lng: number;
@@ -183,6 +190,8 @@ export interface JobRequest {
     connectedAt?: number;
     acceptedBySession?: string;
   };
+  guaranteeClaimId?: string;
+  guaranteeResolution?: "redo_arranged" | "refunded_clawback" | "rejected" | null;
 }
 
 export interface Review {

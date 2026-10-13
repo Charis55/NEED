@@ -70,7 +70,8 @@ export const jobStateTransitions: Record<JobState, TransitionRule[]> = {
   ],
   disputed: [
     { to: "completed", actor: "admin" }, 
-    { to: "cancelled", actor: "admin" }
+    { to: "cancelled", actor: "admin" },
+    { to: "in_progress", actor: "admin" }
   ],
   cancelled: []
 };

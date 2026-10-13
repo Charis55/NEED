@@ -9,6 +9,7 @@ export interface PaymentProvider {
     email: string;
     reference: string;
     metadata?: Record<string, any>;
+    callbackUrl?: string;
   }): Promise<{ authorizationUrl: string; accessCode: string; reference: string }>;
 
   /**

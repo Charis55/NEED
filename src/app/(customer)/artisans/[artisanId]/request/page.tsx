@@ -6,7 +6,7 @@ import { collection, doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { JobRequest, ArtisanProfile } from "@/types";
 import BackButton from "@/components/BackButton";
-import { ArrowRight, MapPin, Clock, Info, Image as ImageIcon, X, Check } from "lucide-react";
+import { ArrowRight, MapPin, Clock, Info, Image as ImageIcon, X, Check, Coins, Sparkles, ShieldCheck, Star } from "lucide-react";
 import { reverseGeocode } from "@/utils/location";
 import { useLocalDraft } from "@/hooks/useLocalDraft";
 import { compressImage } from "@/utils/imageCompression";
@@ -18,6 +18,20 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
   const unwrappedParams = use(params);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [selectedServiceIndices, setSelectedServiceIndices] = useState<number[]>([0]);
+  
+  // Customer loyalty credits state
+  const [availableCreditsNaira, setAvailableCreditsNaira] = useState(0);
+  const [applyCredits, setApplyCredits] = useState(true);
+
+  // Repeat customer loyalty tier state
+  const [pairStatus, setPairStatus] = useState<{
+    completedCount: number;
+    pairJobNumber: number;
+    currentRatePercent: number;
+    savingsPercent: number;
+    tierLabel: string;
+    isRepeatClient: boolean;
+  } | null>(null);
   
   // Draft persistence — survives page refreshes and dropped connections
   const [draft, setDraft, clearDraft] = useLocalDraft(`request-${unwrappedParams.artisanId}`, {
@@ -32,6 +46,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
   const [isLocating, setIsLocating] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
   // Media upload
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -87,6 +102,31 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
       }
     };
     fetchArtisan();
+  }, [unwrappedParams.artisanId]);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetch(`/api/credits/my-credits?customerId=${user.uid}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              setAvailableCreditsNaira(data.availableBalanceNaira || 0);
+            }
+          })
+          .catch(console.error);
+
+        fetch(`/api/pairs/status?customerId=${user.uid}&artisanId=${unwrappedParams.artisanId}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              setPairStatus(data);
+            }
+          })
+          .catch(console.error);
+      }
+    });
+    return () => unsubscribe();
   }, [unwrappedParams.artisanId]);
 
   const detectLocation = async () => {
@@ -156,6 +196,30 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Custom Validation
+    const errors: Record<string, string> = {};
+    if (!draft.description.trim()) errors.description = "Please provide a job description.";
+    if (!locationData) errors.location = "Please detect your location before sending.";
+    if (!draft.preferredDate) errors.preferredDate = "Please select a preferred date.";
+    if (!draft.preferredTime) errors.preferredTime = "Please select a preferred time.";
+    
+    const parsedAmount = parseInt(draft.offerAmount.replace(/,/g, ''), 10);
+    if (isNaN(parsedAmount) || parsedAmount < 500) {
+      errors.offerAmount = "Please enter an offer amount of at least ₦500.";
+    }
+    
+    if (!termsAccepted) {
+      errors.terms = "You must accept the Booking Terms & Conditions.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      setError("Please check the highlighted fields and try again.");
+      return;
+    }
+
+    setFormErrors({});
     setLoading(true);
     setError("");
 
@@ -168,19 +232,6 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
 
       if (!artisan) {
         setError("Cannot submit request. Artisan data is missing.");
-        setLoading(false);
-        return;
-      }
-
-      if (!locationData) {
-        setError("Please detect your location before sending the request.");
-        setLoading(false);
-        return;
-      }
-
-      const parsedAmount = parseInt(draft.offerAmount.replace(/,/g, ''), 10);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
-        setError("Please enter a valid offer amount.");
         setLoading(false);
         return;
       }
@@ -226,10 +277,11 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
           subcategory: selectedServices[0]?.subcategory || "Unknown",
           services: selectedServices.map(s => ({ trade: s.trade || "Unknown", subcategory: s.subcategory || "Unknown" })),
           description: draft.description,
-          neighborhood: locationData.name,
-          locationCoords: { lat: locationData.lat, lng: locationData.lng },
+          neighborhood: locationData?.name || "",
+          locationCoords: { lat: locationData?.lat || 0, lng: locationData?.lng || 0 },
           preferredTime: `${draft.preferredDate} at ${draft.preferredTime}`,
           offerAmount: parsedAmount,
+          applyCredits: applyCredits && availableCreditsNaira > 0,
           mediaUrl
         })
       });
@@ -265,6 +317,13 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
       </div>
     );
   }
+
+  const parsedOfferNaira = parseInt(draft.offerAmount.replace(/,/g, ''), 10) || 0;
+  const estimatedDepositNaira = parsedOfferNaira >= 500 
+    ? Math.max(1000, Math.round(parsedOfferNaira * 0.25))
+    : 0;
+  const creditDiscountNaira = applyCredits ? Math.min(estimatedDepositNaira, availableCreditsNaira) : 0;
+  const payableDepositNaira = Math.max(0, estimatedDepositNaira - creditDiscountNaira);
 
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans selection:bg-[var(--color-brutal-pink)] selection:text-black">
@@ -333,18 +392,21 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div className="bg-[var(--color-brutal-yellow)] brutal-card p-6">
             <label className="block text-xl font-black uppercase tracking-tighter text-black mb-3 border-b-4 border-black pb-1">
               Job Description
             </label>
+            {formErrors.description && <p className="text-[var(--color-brutal-red)] text-sm font-black mb-2 uppercase border-2 border-[var(--color-brutal-red)] bg-white p-1 px-2">{formErrors.description}</p>}
             <textarea
               value={draft.description}
-              onChange={(e) => setDraft({ description: e.target.value })}
-              required
+              onChange={(e) => {
+                setDraft({ description: e.target.value });
+                if (formErrors.description) setFormErrors(prev => ({ ...prev, description: "" }));
+              }}
               rows={4}
               placeholder="E.g., My kitchen sink is leaking heavily from the bottom pipe..."
-              className="w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-medium resize-none bg-white placeholder:text-gray-400"
+              className={`w-full p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-medium resize-none bg-white placeholder:text-gray-400 ${formErrors.description ? 'border-[var(--color-brutal-red)] border-4' : ''}`}
             />
             
             <div className="mt-4 border-4 border-black p-4 bg-white">
@@ -390,6 +452,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               <MapPin className="w-5 h-5 stroke-[3]" /> Location *
             </label>
             <p className="text-xs font-bold text-gray-500 mb-3">We need your location so the technician knows where to go.</p>
+            {formErrors.location && <p className="text-[var(--color-brutal-red)] text-sm font-black mb-2 uppercase border-2 border-[var(--color-brutal-red)] bg-white p-1 px-2">{formErrors.location}</p>}
             
             {locationData ? (
               <div className="p-4 bg-[var(--color-brutal-teal)] brutal-border font-black text-black uppercase flex justify-between items-center">
@@ -423,24 +486,30 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
                 <Clock className="w-5 h-5 stroke-[3]" /> Date
               </label>
+              {formErrors.preferredDate && <p className="text-[var(--color-brutal-red)] text-xs font-black mb-1 uppercase">{formErrors.preferredDate}</p>}
               <input
                 type="date"
                 value={draft.preferredDate}
-                onChange={(e) => setDraft({ preferredDate: e.target.value })}
-                required
-                className="w-full max-w-full min-w-0 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white appearance-none"
+                onChange={(e) => {
+                  setDraft({ preferredDate: e.target.value });
+                  if (formErrors.preferredDate) setFormErrors(prev => ({ ...prev, preferredDate: "" }));
+                }}
+                className={`w-full max-w-full min-w-0 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white appearance-none ${formErrors.preferredDate ? 'border-[var(--color-brutal-red)] border-4' : ''}`}
               />
             </div>
             <div className="flex-1 min-w-0">
               <label className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter text-black mb-3">
                 <Clock className="w-5 h-5 stroke-[3]" /> Time
               </label>
+              {formErrors.preferredTime && <p className="text-[var(--color-brutal-red)] text-xs font-black mb-1 uppercase">{formErrors.preferredTime}</p>}
               <input
                 type="time"
                 value={draft.preferredTime}
-                onChange={(e) => setDraft({ preferredTime: e.target.value })}
-                required
-                className="w-full max-w-full min-w-0 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white appearance-none"
+                onChange={(e) => {
+                  setDraft({ preferredTime: e.target.value });
+                  if (formErrors.preferredTime) setFormErrors(prev => ({ ...prev, preferredTime: "" }));
+                }}
+                className={`w-full max-w-full min-w-0 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black bg-white appearance-none ${formErrors.preferredTime ? 'border-[var(--color-brutal-red)] border-4' : ''}`}
               />
             </div>
           </div>
@@ -453,27 +522,133 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
               The technician can accept, decline, or counter this offer.
             </p>
             <div className="relative">
+              {formErrors.offerAmount && <p className="text-[var(--color-brutal-red)] text-sm font-black mb-2 uppercase border-2 border-[var(--color-brutal-red)] bg-white p-1 px-2">{formErrors.offerAmount}</p>}
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black font-black text-xl">₦</span>
               <input
                 type="number"
                 value={draft.offerAmount}
-                onChange={(e) => setDraft({ offerAmount: e.target.value })}
-                required
+                onChange={(e) => {
+                  setDraft({ offerAmount: e.target.value });
+                  if (formErrors.offerAmount) setFormErrors(prev => ({ ...prev, offerAmount: "" }));
+                }}
                 min="500"
                 placeholder="5000"
-                className="w-full pl-10 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black text-xl bg-white placeholder:text-gray-400"
+                className={`w-full pl-10 p-3 brutal-border focus:outline-none focus:ring-4 focus:ring-black text-black font-black text-xl bg-white placeholder:text-gray-400 ${formErrors.offerAmount ? 'border-[var(--color-brutal-red)] border-4' : ''}`}
               />
             </div>
           </div>
 
-          <BookingTermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
+          {/* Deposit & Escrow Breakdown with Credit Application */}
+          <div className="bg-white brutal-card p-6 border-4 border-black space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex items-center justify-between border-b-2 border-black pb-2">
+              <span className="font-black text-sm uppercase tracking-wider text-black flex items-center gap-1.5">
+                <Coins className="w-4 h-4 stroke-[3] text-black" />
+                Deposit & Escrow Protection
+              </span>
+              <span className="bg-[var(--color-brutal-blue)] text-white text-[10px] font-black uppercase px-2 py-0.5 border border-black">
+                25% Escrow
+              </span>
+            </div>
+
+            <div className="space-y-2.5 text-sm font-bold">
+              {pairStatus && pairStatus.isRepeatClient && (
+                <div className="bg-[var(--color-brutal-green)] border-2 border-black p-3 space-y-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs uppercase text-black flex items-center gap-1.5">
+                      <Star className="w-4 h-4 fill-black stroke-black" />
+                      Repeat Client Loyalty Discount
+                    </span>
+                    <span className="bg-black text-white font-black text-xs px-2 py-0.5 border border-black">
+                      {pairStatus.currentRatePercent}% Fee (Saves {pairStatus.savingsPercent}%)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-black font-bold">
+                    {pairStatus.tierLabel}. You and this technician pay lower fees by booking through NEED!
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-gray-700">
+                <span>Estimated Required Deposit:</span>
+                <span className="font-black text-black">
+                  {estimatedDepositNaira > 0 ? `₦${estimatedDepositNaira.toLocaleString()}` : "Enter offer above"}
+                </span>
+              </div>
+
+              {availableCreditsNaira > 0 ? (
+                <div className="bg-[var(--color-brutal-yellow)] border-2 border-black p-3 space-y-2">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyCredits}
+                      onChange={(e) => setApplyCredits(e.target.checked)}
+                      className="mt-0.5 w-5 h-5 accent-black border-2 border-black cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-xs uppercase text-black flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 fill-black" />
+                          Apply Reward Credits
+                        </span>
+                        <span className="bg-[var(--color-brutal-green)] text-black font-black text-xs px-1.5 border border-black">
+                          -₦{creditDiscountNaira.toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-black/80 font-bold mt-0.5">
+                        You have ₦{availableCreditsNaira.toLocaleString()} available in loyalty rewards!
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <div className="bg-[var(--color-brutal-teal)]/30 border-2 border-black p-2.5 text-xs font-black uppercase text-black flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 shrink-0 text-black" />
+                  <span>Pay deposit in-app to earn ₦300 loyalty reward credit!</span>
+                </div>
+              )}
+
+              <div className="pt-2 border-t-2 border-black flex justify-between items-center text-base">
+                <span className="font-black uppercase text-black">Deposit Payable Now:</span>
+                <div className="text-right">
+                  {payableDepositNaira === 0 && estimatedDepositNaira > 0 ? (
+                    <span className="bg-[var(--color-brutal-green)] text-black px-2 py-1 font-black text-xs uppercase border-2 border-black inline-block">
+                      ₦0 (Covered by Credits!)
+                    </span>
+                  ) : (
+                    <span className="font-black text-xl text-black">
+                      ₦{payableDepositNaira.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600 uppercase border-t border-black/20 pt-2">
+              <ShieldCheck className="w-4 h-4 text-[var(--color-brutal-green)] shrink-0" />
+              <span>Held safely in escrow until you confirm job completion.</span>
+            </div>
+          </div>
+
+          <div>
+            {formErrors.terms && <p className="text-[var(--color-brutal-red)] text-sm font-black mb-2 uppercase border-2 border-[var(--color-brutal-red)] bg-white p-1 px-2">{formErrors.terms}</p>}
+            <BookingTermsCheckbox checked={termsAccepted} onChange={(checked) => {
+              setTermsAccepted(checked);
+              if (checked && formErrors.terms) setFormErrors(prev => ({ ...prev, terms: "" }));
+            }} />
+          </div>
 
           <button
             type="submit"
-            disabled={loading || !termsAccepted}
+            disabled={loading}
             className="w-full bg-black !text-white brutal-btn py-4 text-xl flex items-center justify-between px-6"
           >
-            <span>{loading ? "SUBMITTING..." : "SEND REQUEST"}</span>
+            <span>
+              {loading 
+                ? "SUBMITTING..." 
+                : (payableDepositNaira === 0 && estimatedDepositNaira > 0 
+                    ? "CONFIRM BOOKING (FREE DEPOSIT)" 
+                    : `PAY DEPOSIT & SEND (${payableDepositNaira > 0 ? `₦${payableDepositNaira.toLocaleString()}` : "REQUEST"})`)}
+            </span>
             {!loading && <ArrowRight className="w-6 h-6 stroke-[3]" />}
           </button>
         </form>

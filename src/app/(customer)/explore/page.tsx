@@ -5,7 +5,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { auth, db } from "@/lib/firebase";
 import { User } from "firebase/auth";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import UserAvatar from "@/components/UserAvatar";
 import GlobalSearch from "@/components/GlobalSearch";
 import { servicesData } from "@/data/services";
@@ -36,6 +36,8 @@ type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortType>("Most Available");
 
   useEffect(() => {
@@ -56,8 +58,37 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        setDisplayName(currentUser.displayName || "");
+        setProfilePhoto(currentUser.photoURL || null);
+
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            const uData = userDoc.data();
+            if (uData.photoURL) setProfilePhoto(uData.photoURL);
+            if (uData.displayName || uData.name || uData.firstName) {
+              setDisplayName(uData.displayName || uData.name || `${uData.firstName || ''} ${uData.lastName || ''}`.trim());
+            }
+          }
+
+          const artisanDoc = await getDoc(doc(db, "artisans", currentUser.uid));
+          if (artisanDoc.exists()) {
+            const aData = artisanDoc.data();
+            if (aData.profilePictureUrl) setProfilePhoto(aData.profilePictureUrl);
+            if (!displayName && (aData.name || aData.businessName)) {
+              setDisplayName(aData.name || aData.businessName);
+            }
+          }
+        } catch (e) {
+          console.warn("Could not fetch user profile details:", e);
+        }
+      } else {
+        setProfilePhoto(null);
+        setDisplayName("");
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -118,10 +149,10 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="w-full h-full text-2xl text-black font-black" />
+              <UserAvatar photoURL={profilePhoto || user?.photoURL} name={displayName || user?.displayName} className="w-full h-full text-2xl text-black font-black" />
             </div>
             <div>
-              <h2 className="text-black font-black text-2xl tracking-tighter uppercase leading-none mb-1">{user?.displayName || "New User"}</h2>
+              <h2 className="text-black font-black text-2xl tracking-tighter uppercase leading-none mb-1">{displayName || user?.displayName || "New User"}</h2>
               <p className="text-black font-black text-xs mt-0.5 border-black border-2 bg-white px-2 py-0.5 inline-block -rotate-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">{formattedDate}</p>
             </div>
           </div>

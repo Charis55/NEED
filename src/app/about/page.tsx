@@ -1,5 +1,11 @@
 import PublicHeader from "@/components/PublicHeader";
 import Footer from "@/components/Footer";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About NEED Marketplace | Trust, Verification & Local Technicians",
+  description: "Learn how NEED is modernizing the local trades economy with strict background checks, upfront pricing, escrow security, and a 30-day workmanship guarantee.",
+};
 
 export default function AboutPage() {
   return (
@@ -17,7 +23,7 @@ export default function AboutPage() {
               Our Mission
             </h2>
             <p className="text-xl md:text-2xl font-medium leading-relaxed">
-              For too long, hiring a plumber, electrician, or carpenter has relied on luck and sketchy word-of-mouth recommendations. We built <span className="bg-[var(--color-brutal-yellow)] px-2 font-black border-2 border-black">NEED</span> to inject trust, speed, and transparency into the local service economy. We want to empower honest artisans to build their business while giving customers absolute peace of mind.
+              For too long, hiring a plumber, electrician, or carpenter has relied on luck and sketchy word-of-mouth recommendations. We built <span className="bg-[var(--color-brutal-yellow)] px-2 font-black border-2 border-black">NEED</span> to inject trust, speed, and transparency into the local service economy. We want to empower honest technicians to build their business while giving customers absolute peace of mind.
             </p>
           </div>
 
@@ -28,7 +34,7 @@ export default function AboutPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="border-l-8 border-[var(--color-brutal-teal)] pl-6">
                 <h3 className="text-2xl font-black uppercase mb-2 text-black">Strict Verification</h3>
-                <p className="font-bold text-xl text-black leading-relaxed">Every artisan on our platform has passed a rigorous identity and background check. No exceptions.</p>
+                <p className="font-bold text-xl text-black leading-relaxed">Every technician on our platform has passed a rigorous identity and background check. No exceptions.</p>
               </div>
               <div className="border-l-8 border-[var(--color-brutal-yellow)] pl-6">
                 <h3 className="text-2xl font-black uppercase mb-2 text-black">Real Reviews</h3>
@@ -40,7 +46,7 @@ export default function AboutPage() {
               </div>
               <div className="border-l-8 border-black pl-6">
                 <h3 className="text-2xl font-black uppercase mb-2 text-black">Transparent Portfolios</h3>
-                <p className="font-bold text-xl text-black leading-relaxed">See exactly what an artisan has built or repaired before you ever send a message.</p>
+                <p className="font-bold text-xl text-black leading-relaxed">See exactly what a technician has built or repaired before you ever send a message.</p>
               </div>
             </div>
           </div>

@@ -32,20 +32,14 @@ export default function Footer() {
           <h4 className="text-xl font-black uppercase mb-4 tracking-widest text-[var(--color-brutal-teal)]">Legal</h4>
           <ul className="space-y-2 font-bold">
             <li>
-              <button 
-                onClick={() => setShowTerms(true)} 
-                className="hover:text-[var(--color-brutal-pink)] transition-colors text-left"
-              >
+              <Link href="/terms" className="hover:text-[var(--color-brutal-pink)] transition-colors">
                 Terms of Service
-              </button>
+              </Link>
             </li>
             <li>
-              <button 
-                onClick={() => setShowTerms(true)} 
-                className="hover:text-[var(--color-brutal-pink)] transition-colors text-left"
-              >
+              <Link href="/privacy" className="hover:text-[var(--color-brutal-pink)] transition-colors">
                 Privacy Policy
-              </button>
+              </Link>
             </li>
           </ul>
         </div>

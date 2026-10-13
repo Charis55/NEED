@@ -24,10 +24,14 @@ export default function JobReceiptPage() {
   const handleDownloadReceipt = async () => {
     if (!job) return;
     const price = job.counterOfferAmount || job.offerAmount || 0;
+    const completionDateObj = new Date(job.completedAt || job.createdAt);
+    const dateFormatted = completionDateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeFormatted = completionDateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
     const receiptContent = `NEED PLATFORM - JOB RECEIPT
 ==============================
 Receipt ID: #${job.requestId.slice(-8).toUpperCase()}
-Date: ${new Date(job.completedAt || job.createdAt).toLocaleDateString()}
+Date & Time: ${dateFormatted} at ${timeFormatted}
 
 BILLED TO:
 ${customer?.displayName || "Customer"}
@@ -36,7 +40,7 @@ ${job.neighborhood || ""}
 
 SERVICE BY:
 ${artisan?.name || "Technician"}
-${artisan?.phone || ""}
+Trade: ${artisan?.trade || "Professional"}
 
 JOB DETAILS:
 ${job.subcategory}
@@ -121,7 +125,10 @@ Thank you for using NEED.`;
   }
 
   const price = job.counterOfferAmount || job.offerAmount || 0;
-  const date = new Date(job.completedAt || job.createdAt).toLocaleDateString();
+  const completionDateObj = new Date(job.completedAt || job.createdAt);
+  const dateStr = completionDateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const timeStr = completionDateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const date = `${dateStr} at ${timeStr}`;
 
   return (
     <div className="min-h-screen bg-[#FFF0E5] pt-16 px-6 md:px-12 pb-20">

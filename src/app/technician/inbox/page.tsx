@@ -191,7 +191,7 @@ export default function InboxPage() {
                     <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-black bg-[var(--color-brutal-yellow)]">
                       <UserAvatar 
                         photoURL={customer?.photoURL} 
-                        name={customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Customer"} 
+                        name={customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || "Customer"} 
                         className="w-full h-full text-xl text-black font-black" 
                       />
                     </div>
@@ -205,7 +205,7 @@ export default function InboxPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start mb-1">
                       <h3 className="text-xl font-black text-black truncate uppercase tracking-tighter">
-                        {customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Customer"}
+                        {customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || "Customer"}
                       </h3>
                       <span className="text-xs font-black px-2 py-0.5 bg-[var(--color-brutal-bg)] border-2 border-black -rotate-2 whitespace-nowrap ml-2">
                         {new Date(job.createdAt).toLocaleDateString('en-GB')}

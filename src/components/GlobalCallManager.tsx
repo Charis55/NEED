@@ -143,9 +143,17 @@ export default function GlobalCallManager() {
                   "activeCall.connectedAt": Date.now(),
                   "activeCall.acceptedBySession": sessionId
                 });
+                playCallSound("pickup");
               } catch (e) {
                 console.error(e);
               }
+            } else if (action === 'decline') {
+              clearCallNotification();
+              fetch("/api/calls/end", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobId: reqId, callerId: userUid, reason: "declined", durationMs: null }),
+              }).catch(console.error);
             }
           }
         }
@@ -216,99 +224,30 @@ export default function GlobalCallManager() {
   const endCallWithLog = async (reason?: "cancelled" | "declined" | "timeout" | "ended") => {
     if (!activeJob || !activeJob.activeCall || !userUid) return;
     
-    // Play end sound immediately
+    // Play end sound immediately and clear any ringing notification
     playCallSound("end");
     clearCallNotification();
 
-    try {
-      const jobToProcess = activeJob;
-      const activeCall = jobToProcess.activeCall;
-      if (!activeCall) return;
+    // Optimistically clear UI so user sees the dismissal instantly
+    setActiveJob(null);
 
-      const isVideo = activeCall.type === "video";
-      
-      let durationText = "Missed Call";
-      if (activeCall.connectedAt) {
-        const durationMs = Math.max(0, Date.now() - activeCall.connectedAt);
-        const totalSeconds = Math.floor(durationMs / 1000);
-        const m = Math.floor(totalSeconds / 60);
-        const s = totalSeconds % 60;
-        durationText = `${m}:${s.toString().padStart(2, '0')} mins`;
-      } else if (reason === "declined") {
-         durationText = "Declined Call";
-      } else if (reason === "cancelled") {
-         durationText = "Cancelled";
-      } else if (reason === "timeout") {
-         durationText = "Missed Call";
-      }
-
-      const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:${durationText}`;
-      
-      const messageSenderId = reason === "declined" 
-        ? (jobToProcess.customerId === activeCall.callerId ? jobToProcess.artisanId! : jobToProcess.customerId)
-        : activeCall.callerId;
-        
-      const receiverId = jobToProcess.customerId === messageSenderId ? jobToProcess.artisanId : jobToProcess.customerId;
-
-      // We use isolated operations instead of a batch to ensure the call ends even if logging fails.
-      const jobRef = doc(db, "jobRequests", jobToProcess.requestId);
-      
-      try {
-        await updateDoc(jobRef, {
-          "activeCall.status": "ended",
-          lastMessageText: messageText,
-          lastMessageSenderId: messageSenderId || userUid,
-          lastMessageAt: Date.now(),
-          ...(receiverId ? { [`unreadCount.${receiverId}`]: increment(1) } : {})
-        });
-      } catch (updateErr) {
-        console.error("Failed to update job request status:", updateErr);
-      }
-
-      try {
-        const msgRef = doc(collection(db, "jobRequests", jobToProcess.requestId, "messages"));
-        const { setDoc } = await import("firebase/firestore");
-        await setDoc(msgRef, {
-          text: messageText,
-          senderId: messageSenderId || userUid,
-          createdAt: Date.now()
-        });
-      } catch (msgErr) {
-        console.error("Failed to append message to history:", msgErr);
-      }
-
-      if ((reason === "timeout" || reason === "cancelled") && userUid === activeCall.callerId && receiverId) {
-        // Send a silent 'cancel_call' push first so the receiver's ringing notification stops immediately
-        fetch("/api/send-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: receiverId,
-            title: "Call Cancelled",
-            body: "",
-            data: { requestId: jobToProcess.requestId, type: "cancel_call" }
-          })
-        }).catch(err => console.error("Cancel push failed:", err));
-        // Then send the visible missed call notification
-        fetch("/api/send-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: receiverId,
-            title: "Missed Call",
-            body: `Missed ${isVideo ? 'video' : 'voice'} call from ${auth.currentUser?.displayName || 'Someone'}`,
-            data: { requestId: jobToProcess.requestId, type: "missed_call" }
-          })
-        }).catch(err => console.error("Push failed:", err));
-      }
-
-      // Hide UI
-      setActiveJob(null);
-    } catch (e) {
-      console.error("Failed to end call:", e);
-      // Fallback: just clear it locally anyway
-      setActiveJob(null);
+    // Compute duration for the server (it also computes it, but pass what we know client-side)
+    let durationMs: number | null = null;
+    if (activeJob.activeCall.connectedAt) {
+      durationMs = Math.max(0, Date.now() - activeJob.activeCall.connectedAt);
     }
+
+    // Delegate all Firestore updates, message logging, and push notifications to the server
+    fetch("/api/calls/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobId: activeJob.requestId,
+        callerId: userUid,
+        reason: reason || "ended",
+        durationMs,
+      }),
+    }).catch(err => console.error("Failed to end call via server:", err));
   };
 
   const acceptCall = async () => {
@@ -316,11 +255,14 @@ export default function GlobalCallManager() {
 
     clearCallNotification();
     try {
+      // Accept: directly update Firestore (no server logic needed — state gate
+      // is already enforced on initiation; accept just flips status to "ongoing")
       await updateDoc(doc(db, "jobRequests", activeJob.requestId), {
         "activeCall.status": "ongoing",
         "activeCall.connectedAt": Date.now(),
         "activeCall.acceptedBySession": sessionId
       });
+      playCallSound("pickup");
     } catch (e) {
       console.error("Failed to accept call", e);
     }

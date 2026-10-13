@@ -12,7 +12,9 @@ import Link from "next/link";
 import { useAlert } from "@/components/AlertProvider";
 import ImageCropper from "@/components/ImageCropper";
 import UserAvatar from "@/components/UserAvatar";
-import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle } from "lucide-react";
+import AccountStrikesSection from "@/components/AccountStrikesSection";
+import CustomerCreditsCard from "@/components/CustomerCreditsCard";
+import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle, Pencil } from "lucide-react";
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 
@@ -24,7 +26,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
   const router = useRouter();
   const { showAlert } = useAlert();
 
-  const [activeTab, setActiveTab] = useState<"profile" | "services" | "account" | "notifications" | "about">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "credits" | "notifications" | "about">("profile");
 
   const [authUser, setAuthUser] = useState<User | null>(null);
 
@@ -40,10 +42,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
   const [cropperSrc, setCropperSrc] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Artisan Certificates
-  const [certificates, setCertificates] = useState<string[]>([]);
-  const [uploadingCert, setUploadingCert] = useState(false);
-
   // Advanced Services Management
   const [artisanServices, setArtisanServices] = useState<{
     trade: string;
@@ -53,6 +51,22 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     isCertificateVerified: boolean;
     certificateFile: File | null;
   }[]>([]);
+
+  // Edit Service Form State
+  const [editingServiceIndex, setEditingServiceIndex] = useState<number | null>(null);
+  const [editServiceForm, setEditServiceForm] = useState<{
+    trade: string;
+    subcategory: string;
+    hasCertification: boolean;
+    certificateFile: File | null;
+    certificateUrl: string | null;
+  }>({
+    trade: "",
+    subcategory: "",
+    hasCertification: false,
+    certificateFile: null,
+    certificateUrl: null,
+  });
 
   // New Service Form State
   const defaultTrade = Object.values(servicesData)[0]?.title || "Plumbing";
@@ -106,7 +120,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
             if (artisanDoc.exists()) {
               const data = artisanDoc.data();
-              setCertificates(data.certificates || []);
               if (data.services) {
                 setArtisanServices(data.services.map((s: Record<string, unknown>) => ({ ...s, certificateFile: null })));
               }
@@ -326,33 +339,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     }
   };
 
-  const handleCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    setUploadingCert(true);
-    try {
-      const user = auth.currentUser || authUser;
-      if (!user) throw new Error("Not authenticated");
-
-      const formData = new FormData();
-      formData.append("file", file, `${user.uid}_cert_${Date.now()}_${file.name}`);
-      const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error("Failed to upload certificate");
-      const { publicUrl } = await res.json();
-
-      const newCerts = [...certificates, publicUrl];
-      await updateDoc(doc(db, "artisans", user.uid), { certificates: newCerts });
-      setCertificates(newCerts);
-      showAlert("Certificate uploaded successfully!", "success");
-    } catch (error) {
-      console.error("Certificate upload failed:", error);
-      showAlert("Failed to upload certificate.", "error");
-    } finally {
-      setUploadingCert(false);
-      e.target.value = "";
-    }
-  };
-
   const handleAddService = () => {
     const tradeCategories = Object.values(servicesData);
     const defaultCategory = tradeCategories[0].title;
@@ -389,6 +375,58 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
   const handleRemoveService = (index: number) => {
     setArtisanServices(artisanServices.filter((_, i) => i !== index));
+    if (editingServiceIndex === index) {
+      setEditingServiceIndex(null);
+    }
+  };
+
+  const handleStartEditService = (index: number) => {
+    const svc = artisanServices[index];
+    setEditingServiceIndex(index);
+    setEditServiceForm({
+      trade: svc.trade,
+      subcategory: svc.subcategory,
+      hasCertification: svc.hasCertification,
+      certificateFile: svc.certificateFile || null,
+      certificateUrl: svc.certificateUrl || null,
+    });
+    setShowAddForm(false);
+  };
+
+  const handleUpdateEditService = (field: string, value: any) => {
+    const updated = { ...editServiceForm, [field]: value };
+    if (field === 'trade') {
+      const categoryData = Object.values(servicesData).find(c => c.title === value);
+      if (categoryData) {
+        updated.subcategory = categoryData.subServices[0].title;
+      }
+    }
+    setEditServiceForm(updated);
+  };
+
+  const handleSaveEditService = () => {
+    if (editingServiceIndex === null) return;
+    const duplicate = artisanServices.some((s, idx) => 
+      idx !== editingServiceIndex && s.trade === editServiceForm.trade && s.subcategory === editServiceForm.subcategory
+    );
+    if (duplicate) {
+      showAlert("You already offer this specific service.", "error");
+      return;
+    }
+    const updatedServices = [...artisanServices];
+    const oldSvc = updatedServices[editingServiceIndex];
+    updatedServices[editingServiceIndex] = {
+      ...oldSvc,
+      trade: editServiceForm.trade,
+      subcategory: editServiceForm.subcategory,
+      hasCertification: editServiceForm.hasCertification,
+      certificateFile: editServiceForm.certificateFile,
+      certificateUrl: editServiceForm.certificateFile ? null : editServiceForm.certificateUrl,
+      isCertificateVerified: editServiceForm.certificateFile ? false : (oldSvc.trade === editServiceForm.trade && oldSvc.subcategory === editServiceForm.subcategory ? oldSvc.isCertificateVerified : false),
+    };
+    setArtisanServices(updatedServices);
+    setEditingServiceIndex(null);
+    showAlert("Service updated. Click SAVE CHANGES to save all updates.", "success");
   };
 
   const handleUpdateNewService = <K extends keyof typeof newServiceForm>(field: K, value: typeof newServiceForm[K]) => {
@@ -456,28 +494,30 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       <div className="flex w-full border-b-4 border-black mb-8 relative">
         <button
           onClick={() => setActiveTab("profile")}
-          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "profile" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
-            }`}
-        >
-          Profile
-        </button>
-        <button
-          onClick={() => setActiveTab("account")}
-          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "account" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
+          className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "profile" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
             }`}
         >
           Account
         </button>
+        {!isArtisan && (
+          <button
+            onClick={() => setActiveTab("credits")}
+            className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "credits" ? "bg-[var(--color-brutal-green)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
+              }`}
+          >
+            Credits
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("notifications")}
-          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "notifications" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
+          className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "notifications" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
             }`}
         >
           Alerts
         </button>
         <button
           onClick={() => setActiveTab("about")}
-          className={`flex-1 py-4 font-black uppercase text-sm md:text-lg transition-colors ${activeTab === "about" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
+          className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg transition-colors ${activeTab === "about" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
             }`}
         >
           About
@@ -564,31 +604,12 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                 </div>
               </div>
 
-              {isArtisan && (
-                <div className="bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-8">
-                  <h2 className="text-xl font-black uppercase text-black mb-4">Certificates</h2>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    {certificates.map((cert, idx) => (
-                      <a key={idx} href={cert} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-gray-100 border-4 border-black hover:bg-[var(--color-brutal-yellow)] transition-colors">
-                        <FileText className="w-6 h-6 stroke-[3]" />
-                        <span className="font-bold text-sm truncate uppercase">Cert {idx + 1}</span>
-                      </a>
-                    ))}
-                    {certificates.length === 0 && <p className="col-span-2 text-sm font-bold uppercase text-gray-500">No certificates uploaded.</p>}
-                  </div>
-                  <label className="w-full py-4 bg-[var(--color-brutal-blue)] border-4 border-black font-black uppercase text-white flex justify-center cursor-pointer hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-                    {uploadingCert ? "UPLOADING..." : "UPLOAD NEW CERTIFICATE"}
-                    <input type="file" accept="application/pdf,image/*" onChange={handleCertUpload} className="hidden" disabled={uploadingCert} />
-                  </label>
-                </div>
-              )}
-
-              {/* Manage Services (Appended to Profile Tab) */}
+              {/* Manage Services (Appended to Account Tab) */}
               {isArtisan && (
                 <div className="bg-[var(--color-brutal-bg)] p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mt-8">
                   <h2 className="text-2xl font-black uppercase text-black mb-4">Manage Services</h2>
                   <p className="text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
-                    You can add new services or remove existing ones. Note that adding highly specific services improves your chances of being matched with customers.
+                    You can add, edit, or remove services and attach certificates. Adding specific services improves your matching rate.
                   </p>
                   {/* Existing Services List */}
                   <div className="mb-8">
@@ -600,21 +621,35 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {artisanServices.map((svc, index) => (
                           <div key={index} className="bg-white border-4 border-black p-4 relative flex flex-col hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition-all">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveService(index)}
-                              className="absolute -top-3 -right-3 w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center font-black text-white hover:scale-110 transition-transform shadow-[2px_2px_0_0_#000] z-10"
-                            >
-                              X
-                            </button>
-                            <h4 className="font-black text-lg uppercase leading-tight mb-1">{svc.trade}</h4>
+                            {/* Action Buttons: Remove & Edit Pen */}
+                            <div className="absolute -top-3 -right-3 flex flex-col gap-1.5 z-10">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveService(index)}
+                                className="w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center font-black text-white hover:scale-110 transition-transform shadow-[2px_2px_0_0_#000] cursor-pointer"
+                                title="Remove Service"
+                              >
+                                X
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditService(index)}
+                                className="w-8 h-8 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center font-black text-black hover:scale-110 transition-transform shadow-[2px_2px_0_0_#000] cursor-pointer"
+                                title="Edit Service & Certificate"
+                              >
+                                <Pencil className="w-4 h-4 stroke-[2.5]" />
+                              </button>
+                            </div>
+                            <h4 className="font-black text-lg uppercase leading-tight mb-1 pr-8">{svc.trade}</h4>
                             <p className="font-bold text-gray-600 text-xs uppercase mb-3 border-l-2 border-black pl-2">{svc.subcategory}</p>
 
                             <div className="mt-auto pt-2 border-t-2 border-dashed border-gray-300 flex items-center justify-between">
                               {svc.isCertificateVerified ? (
                                 <span className="bg-[var(--color-brutal-green)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Verified</span>
                               ) : svc.certificateUrl || svc.certificateFile ? (
-                                <span className="bg-[var(--color-brutal-yellow)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">Pending</span>
+                                <span className="bg-[var(--color-brutal-yellow)] text-black text-[10px] font-black px-2 py-0.5 border-2 border-black uppercase">
+                                  {svc.certificateFile ? "New Cert Attached" : "Cert Pending"}
+                                </span>
                               ) : (
                                 <span className="text-[10px] font-bold text-gray-400 uppercase">No Certificate</span>
                               )}
@@ -624,6 +659,112 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                       </div>
                     )}
                   </div>
+
+                  {/* Inline Edit Service Form */}
+                  {editingServiceIndex !== null && (
+                    <div className="p-6 bg-[var(--color-brutal-yellow)] border-4 border-black mb-8 shadow-[6px_6px_0_0_#000]">
+                      <div className="flex justify-between items-center mb-4 border-b-3 border-black pb-2">
+                        <h3 className="text-xl font-black uppercase text-black flex items-center gap-2">
+                          <Pencil className="w-5 h-5 stroke-[3]" />
+                          Edit Service #{editingServiceIndex + 1}
+                        </h3>
+                        <button 
+                          type="button"
+                          onClick={() => setEditingServiceIndex(null)}
+                          className="w-7 h-7 bg-white border-2 border-black font-black flex items-center justify-center hover:bg-black hover:text-white text-xs cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-black text-black mb-1 uppercase">Primary Trade</label>
+                          <select
+                            value={editServiceForm.trade}
+                            onChange={(e) => handleUpdateEditService('trade', e.target.value)}
+                            className="w-full p-3 bg-white border-4 border-black focus:outline-none focus:bg-white text-black font-bold uppercase"
+                          >
+                            {Object.values(servicesData).map((c) => (
+                              <option key={c.id} value={c.title}>{c.title}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-black text-black mb-1 uppercase">Specific Service (Subcategory)</label>
+                          <select
+                            value={editServiceForm.subcategory}
+                            onChange={(e) => handleUpdateEditService('subcategory', e.target.value)}
+                            className="w-full p-3 bg-white border-4 border-black focus:outline-none focus:bg-white text-black font-bold uppercase"
+                          >
+                            {Object.values(servicesData).find(c => c.title === editServiceForm.trade)?.subServices.map((sub) => (
+                              <option key={sub.id} value={sub.title}>{sub.title}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="flex items-start gap-2 p-3 bg-white border-4 border-black cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-transform mt-2">
+                            <input
+                              type="checkbox"
+                              checked={editServiceForm.hasCertification}
+                              onChange={(e) => handleUpdateEditService('hasCertification', e.target.checked)}
+                              className="w-5 h-5 border-2 border-black appearance-none checked:bg-black bg-white cursor-pointer mt-0.5"
+                            />
+                            <span className="text-sm font-black text-black leading-tight uppercase">I have certification for this service</span>
+                          </label>
+                        </div>
+
+                        {editServiceForm.hasCertification && (
+                          <div className="p-4 bg-white border-4 border-black mt-2">
+                            <label className="block text-sm font-black text-black uppercase mb-1">Upload / Replace Certificate</label>
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-3">Upload your license, training certificate, or trade qualification (PDF or Image).</p>
+                            
+                            {editServiceForm.certificateUrl && !editServiceForm.certificateFile && (
+                              <div className="mb-3 flex items-center gap-2 p-2 bg-[var(--color-brutal-teal)] border-2 border-black">
+                                <FileText className="w-4 h-4" />
+                                <a href={editServiceForm.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-black uppercase underline truncate">
+                                  View Current Certificate ↗
+                                </a>
+                              </div>
+                            )}
+
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={(e) => {
+                                if (e.target.files) handleUpdateEditService('certificateFile', e.target.files[0]);
+                              }}
+                              className="w-full text-xs text-black file:mr-2 file:py-1 file:px-2 file:border-2 file:border-black file:font-black file:bg-[var(--color-brutal-teal)] file:text-black cursor-pointer uppercase bg-gray-50 p-1 border-2 border-black"
+                            />
+                            {editServiceForm.certificateFile && (
+                              <p className="text-xs font-black mt-2 bg-[var(--color-brutal-green)] inline-block px-1 border-2 border-black uppercase">
+                                New File Selected: {editServiceForm.certificateFile.name}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex gap-4 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingServiceIndex(null)}
+                            className="flex-1 py-3 bg-white border-4 border-black text-black font-black uppercase shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-all cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveEditService}
+                            className="flex-[2] py-3 bg-[var(--color-brutal-green)] border-4 border-black text-black font-black uppercase shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 transition-all cursor-pointer"
+                          >
+                            Save Service Updates
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Add New Service Form */}
                   {showAddForm ? (
@@ -733,48 +874,60 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                 </button>
               </div>
             </form>
+
+            {/* Account Status & Security */}
+            {authUser && (
+              <AccountStrikesSection
+                userId={authUser.uid}
+                userType={isArtisan ? "artisan" : "customer"}
+              />
+            )}
+
+            <div className="bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-4">
+              <h2 className="text-xl font-black uppercase text-black mb-4">Account Security & Actions</h2>
+
+              <button
+                type="button"
+                className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                onClick={async () => {
+                  if (!authUser || !authUser.email) {
+                    showAlert("No email associated with this account.", "error");
+                    return;
+                  }
+                  try {
+                    await sendPasswordResetEmail(auth, authUser.email);
+                    showAlert(`Password reset email sent to ${authUser.email}.`, "success");
+                  } catch (error: unknown) {
+                    showAlert((error as Error).message || "Failed to send password reset email.", "error");
+                  }
+                }}
+                disabled={loading}
+              >
+                CHANGE PASSWORD
+              </button>
+
+              <SignOutButton className="w-full py-4 bg-gray-200 border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
+                SIGN OUT
+              </SignOutButton>
+
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={loading}
+                className={`w-full py-4 border-4 border-black font-black uppercase transition-all ${deleteConfirm
+                    ? "bg-[var(--color-brutal-red)] text-white hover:bg-red-700 animate-pulse"
+                    : "bg-white text-[var(--color-brutal-red)] hover:bg-[var(--color-brutal-red)] hover:text-white"
+                  } hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]`}
+              >
+                {deleteConfirm ? "CLICK AGAIN TO CONFIRM DELETE" : "DELETE ACCOUNT"}
+              </button>
+            </div>
           </div>
         )}
 
-        {activeTab === "account" && (
-          <div className="bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <h2 className="text-xl font-black uppercase text-black mb-4">Account Actions</h2>
-
-            <button
-              type="button"
-              className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
-              onClick={async () => {
-                if (!authUser || !authUser.email) {
-                  showAlert("No email associated with this account.", "error");
-                  return;
-                }
-                try {
-                  await sendPasswordResetEmail(auth, authUser.email);
-                  showAlert(`Password reset email sent to ${authUser.email}.`, "success");
-                } catch (error: unknown) {
-                  showAlert((error as Error).message || "Failed to send password reset email.", "error");
-                }
-              }}
-              disabled={loading}
-            >
-              CHANGE PASSWORD
-            </button>
-
-            <SignOutButton className="w-full py-4 bg-gray-200 border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-              SIGN OUT
-            </SignOutButton>
-
-            <button
-              type="button"
-              onClick={handleDeleteAccount}
-              disabled={loading}
-              className={`w-full py-4 border-4 border-black font-black uppercase transition-all ${deleteConfirm
-                  ? "bg-[var(--color-brutal-red)] text-white hover:bg-red-700 animate-pulse"
-                  : "bg-white text-[var(--color-brutal-red)] hover:bg-[var(--color-brutal-red)] hover:text-white"
-                } hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]`}
-            >
-              {deleteConfirm ? "CLICK AGAIN TO CONFIRM DELETE" : "DELETE ACCOUNT"}
-            </button>
+        {activeTab === "credits" && !isArtisan && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {authUser && <CustomerCreditsCard customerId={authUser.uid} />}
           </div>
         )}
 

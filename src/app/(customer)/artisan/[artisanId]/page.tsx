@@ -83,12 +83,16 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
         <div className="flex flex-col items-center text-center mt-2">
           <div 
             className="w-32 h-32 bg-[var(--color-brutal-blue)] brutal-border brutal-shadow mb-4 overflow-hidden cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => setFullscreenImage(artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=1024`)}
+            onClick={() => setFullscreenImage(artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Technician')}&background=random&size=1024`)}
           >
             <img 
-              src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Artisan')}&background=random&size=150`} 
+              src={artisan.profilePictureUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Technician')}&background=random&size=150`} 
               alt={artisan.name} 
               className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(artisan.name || 'Technician')}&background=FFD700&color=000000&size=150`;
+              }}
             />
           </div>
           
@@ -159,7 +163,11 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
               <h2 className="text-xl font-black uppercase mb-4 border-b-2 border-black pb-2">Experience</h2>
               <div className="flex items-center gap-3 font-bold text-black uppercase mb-3">
                 <Clock className="w-6 h-6 stroke-[3] text-[var(--color-brutal-blue)]" />
-                {artisan.yearsOfExperience} Years
+                {artisan.yearsOfExperience
+                  ? /years?/i.test(artisan.yearsOfExperience)
+                    ? artisan.yearsOfExperience
+                    : `${artisan.yearsOfExperience} Years`
+                  : "3-5 Years"}
               </div>
               <div className="flex items-center gap-3 font-bold text-black uppercase">
                 <BadgeCheck className="w-6 h-6 stroke-[3] text-[var(--color-brutal-teal)]" />
@@ -218,7 +226,14 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
                           className="w-20 h-20 flex-shrink-0 border-2 border-black bg-gray-200 cursor-pointer hover:scale-105 transition-transform"
                           onClick={() => setFullscreenImage(photo)}
                         >
-                          <img src={photo} alt="Work done" className="w-full h-full object-cover" />
+                          <img 
+                            src={photo} 
+                            alt="Work done" 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         </div>
                       ))}
                     </div>

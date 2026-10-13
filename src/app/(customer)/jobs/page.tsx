@@ -252,9 +252,14 @@ function JobsContent() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {requests.map((req) => {
-            const currentPrice = req.status === "countered" && req.counterOfferAmount 
+            const currentStatus = String(req.status || req.state || 'pending');
+            const currentPrice = currentStatus === "countered" && req.counterOfferAmount 
               ? req.counterOfferAmount 
-              : (req.offerAmount || 0);
+              : (req.offerAmount || (req.agreedPrice ? Math.round(req.agreedPrice / 100) : 0));
+
+            const isAcceptedAwaitingDeposit = (req.status === "accepted" || currentStatus === "accepted") && 
+              (req.state === "awaiting_deposit" || req.depositStatus === "pending" || (!req.depositPaid && req.depositStatus !== "held"));
+            const isJustAwaitingDeposit = !isAcceptedAwaitingDeposit && (req.state === "awaiting_deposit" || req.depositStatus === "pending");
 
             return (
               <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
@@ -262,260 +267,99 @@ function JobsContent() {
                   <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-6 border-b-4 border-black pb-6 flex-grow">
                     <div>
                       <span className={`inline-block px-4 py-2 text-xs font-black uppercase tracking-widest mb-3 brutal-border
-                        ${req.status === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
-                        ${req.status === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
-                        ${req.status === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
-                        ${req.status === 'en_route' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
-                        ${req.status === 'in_progress' ? 'bg-[#bbf7d0] text-black' : ''}
-                        ${req.status === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black border-dashed' : ''}
-                        ${req.status === 'declined' ? 'bg-[var(--color-brutal-red)] text-white' : ''}
-                        ${req.status === 'cancelled' ? 'bg-gray-800 text-white' : ''}
+                        ${isAcceptedAwaitingDeposit ? 'bg-[var(--color-brutal-yellow)] text-black border-4 border-black animate-pulse' : ''}
+                        ${!isAcceptedAwaitingDeposit && isJustAwaitingDeposit ? 'bg-yellow-100 text-black border-2 border-black' : ''}
+                        ${!isAcceptedAwaitingDeposit && !isJustAwaitingDeposit && currentStatus === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
+                        ${!isAcceptedAwaitingDeposit && currentStatus === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
+                        ${!isAcceptedAwaitingDeposit && currentStatus === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
+                        ${currentStatus === 'en_route' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
+                        ${currentStatus === 'in_progress' ? 'bg-[#bbf7d0] text-black' : ''}
+                        ${currentStatus === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black border-dashed' : ''}
+                        ${currentStatus === 'declined' ? 'bg-[var(--color-brutal-red)] text-white' : ''}
+                        ${currentStatus === 'cancelled' ? 'bg-gray-800 text-white' : ''}
                       `}>
-                        {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'AWAITING TECHNICIAN' : 'ACTION REQUIRED') : req.status === 'declined' ? (req.declinedBy === 'customer' ? 'CUSTOMER DECLINED' : 'TECHNICIAN DECLINED') : req.status.replace('_', ' ')}
+                        {isAcceptedAwaitingDeposit 
+                          ? 'JOB ACCEPTED • AWAITING DEPOSIT'
+                          : isJustAwaitingDeposit
+                            ? 'AWAITING DEPOSIT'
+                            : currentStatus === 'countered' 
+                              ? (req.lastCounterBy === 'customer' ? 'AWAITING TECHNICIAN' : 'ACTION REQUIRED') 
+                              : currentStatus === 'declined' 
+                                ? (req.declinedBy === 'customer' ? 'CUSTOMER DECLINED' : 'TECHNICIAN DECLINED') 
+                                : currentStatus.replace('_', ' ')}
                       </span>
                       <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
                         {req.trade} - {req.subcategory}
                       </h3>
-                      <p className="text-sm text-black font-bold flex items-center gap-2 uppercase tracking-widest">
-                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood}</span>
-                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {req.preferredTime}</span>
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
+                        <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1 text-xs font-bold text-black">
+                          <Clock className="w-3 h-3" /> {req.preferredTime || "Flexible"}
+                        </span>
+                        {req.neighborhood && (
+                          <span className="bg-white border-2 border-black px-2 py-1 flex items-center gap-1 text-xs font-bold text-black">
+                            <MapPin className="w-3 h-3 text-[var(--color-brutal-pink)]" /> {req.neighborhood}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    
-                    {/* Price Tag */}
                     <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 text-right min-w-[200px] shadow-[4px_4px_0_0_#000]">
                       <p className="text-xs text-black font-black uppercase tracking-widest mb-1 bg-white inline-block px-1 border-2 border-black -rotate-2">
-                        {req.status === "countered" 
-                          ? (req.lastCounterBy === 'customer' ? "Your Counter Offer" : "Technician's Counter")
+                        {currentStatus === "countered" 
+                          ? (req.lastCounterBy === 'customer' ? "Your Counter" : "Technician's Counter")
                           : "Your Offer"}
                       </p>
                       <p className="text-4xl font-black text-black tracking-tighter mt-1">₦{currentPrice.toLocaleString()}</p>
                     </div>
                   </div>
-                  
-                  <div className="bg-[var(--color-brutal-yellow)] p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000]">
-                    <p className="text-black font-bold leading-relaxed">{req.description}</p>
-                  </div>
 
-                  {req.status === "cancelled" && req.cancelledReason && (
+                  {req.description && (
+                    <div className="bg-[var(--color-brutal-bg)] border-2 border-black p-3 mb-4">
+                      <p className="text-xs font-black uppercase tracking-wider text-gray-600 mb-0.5">Job Requirements</p>
+                      <p className="text-sm font-bold text-black line-clamp-3 whitespace-pre-wrap">{req.description}</p>
+                    </div>
+                  )}
+
+                  {req.mediaUrl && (
+                    <div className="mb-4">
+                      <a 
+                        href={req.mediaUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-2 bg-white border-2 border-black px-3 py-1.5 text-xs font-black uppercase hover:bg-[var(--color-brutal-yellow)] transition-colors shadow-[2px_2px_0_0_#000]"
+                      >
+                        <span>📷 View Attached {req.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
+                      </a>
+                    </div>
+                  )}
+
+                  {currentStatus === "cancelled" && req.cancelledReason && (
                     <div className="bg-red-100 p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000] border-red-500">
                       <p className="font-black text-red-900 flex items-center gap-2 mb-1 uppercase tracking-widest"><AlertTriangle className="w-5 h-5" /> Job Cancelled</p>
                       <p className="font-bold text-red-800">{req.cancelledReason}</p>
                     </div>
                   )}
 
-                  {req.status === "countered" && req.lastCounterBy !== "customer" && (
-                    <div className="space-y-4">
-                      {showCounterFor !== req.requestId ? (
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <button 
-                            onClick={() => handleUpdateStatus(req.requestId, "accepted")}
-                            className="flex-1 bg-[var(--color-brutal-teal)] py-4 text-lg brutal-btn"
-                          >
-                            ACCEPT JOB
-                          </button>
-                          <button 
-                            onClick={() => setShowCounterFor(req.requestId)}
-                            className="flex-1 bg-[var(--color-brutal-yellow)] py-4 text-lg brutal-btn"
-                          >
-                            COUNTER OFFER
-                          </button>
-                          <button 
-                            onClick={() => handleUpdateStatus(req.requestId, "declined")}
-                            className="flex-none bg-[var(--color-brutal-red)] py-4 text-lg brutal-btn"
-                          >
-                            DECLINE
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="bg-[var(--color-brutal-bg)] p-6 brutal-border border-dashed">
-                          <label className="block text-sm font-black text-black mb-2 uppercase">Your New Offer Amount (₦)</label>
-                          <div className="flex flex-col sm:flex-row gap-4">
-                            <input
-                              type="text"
-                              value={counterInputs[req.requestId] || ""}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/[^0-9]/g, '');
-                                setCounterInputs(prev => ({ ...prev, [req.requestId]: val ? Number(val).toLocaleString() : "" }));
-                              }}
-                              placeholder="e.g. 5,000"
-                              className="flex-1 p-4 bg-white brutal-border text-xl font-black focus:outline-none focus:bg-[var(--color-brutal-yellow)]"
-                            />
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => handleUpdateStatus(req.requestId, "countered", parseInt(counterInputs[req.requestId]?.replace(/,/g, '') || "0", 10))}
-                                className="bg-black text-white px-8 font-black uppercase hover:bg-[var(--color-brutal-teal)] hover:text-black brutal-border transition-colors whitespace-nowrap"
-                              >
-                                SEND COUNTER
-                              </button>
-                              <button 
-                                onClick={() => {
-                                  setShowCounterFor(null);
-                                  setCounterInputs(prev => ({ ...prev, [req.requestId]: "" }));
-                                }}
-                                className="bg-[var(--color-brutal-red)] px-6 font-black uppercase brutal-border"
-                              >
-                                X
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="mt-4 flex flex-col gap-3">
+                    {isAcceptedAwaitingDeposit && (
+                      <Link 
+                        href={`/jobs/${req.requestId}`} 
+                        className="w-full bg-[var(--color-brutal-green)] border-4 border-black font-black uppercase text-center block py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
+                      >
+                        <span className="flex items-center justify-center gap-2">💳 PAY DEPOSIT & FINALIZE BOOKING</span>
+                      </Link>
+                    )}
 
-                  {["accepted", "en_route", "in_progress", "payment_pending"].includes(req.status) && (
-                    <div className="mt-4 flex flex-col gap-4">
-                      <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
+                    {["accepted", "confirmed", "en_route", "in_progress", "payment_pending", "completed"].includes(currentStatus) && (
+                      <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-3.5 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
                         <span className="flex items-center justify-center gap-2"><MessageSquare className="w-5 h-5" /> CHAT WITH TECHNICIAN</span>
                       </Link>
-                    </div>
-                  )}
+                    )}
 
-                  {["accepted", "en_route"].includes(req.status) && (
-                    <div className="mt-4 flex flex-col gap-4">
-                      {req.rescheduleStatus === "pending" ? (
-                        req.rescheduleRequestedBy === "artisan" ? (
-                          <div className="bg-[var(--color-brutal-yellow)] p-4 border-4 border-black">
-                            <p className="font-black text-black uppercase mb-2">Technician requested to reschedule to: <br/>{req.newPreferredTime}</p>
-                            <div className="flex gap-2">
-                              <button onClick={() => handleRespondReschedule(req.requestId, "accepted", req.newPreferredTime!)} className="flex-1 bg-[var(--color-brutal-teal)] text-black border-2 border-black font-black uppercase py-2">Accept</button>
-                              <button onClick={() => handleRespondReschedule(req.requestId, "declined", "")} className="flex-1 bg-[var(--color-brutal-red)] text-white border-2 border-black font-black uppercase py-2">Decline</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-white p-4 border-4 border-black text-center font-black uppercase text-sm">
-                            Waiting for technician to accept reschedule
-                          </div>
-                        )
-                      ) : (
-                        reschedulingJob === req.requestId ? (
-                          <div className="bg-[var(--color-brutal-pink)] p-4 border-4 border-black flex flex-col gap-2">
-                            <label className="font-black uppercase text-sm">New Date</label>
-                            <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="p-2 border-2 border-black font-bold" />
-                            <label className="font-black uppercase text-sm">New Time</label>
-                            <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="p-2 border-2 border-black font-bold" />
-                            <div className="flex gap-2 mt-2">
-                              <button onClick={() => handleRequestReschedule(req.requestId)} className="flex-1 bg-black text-white border-2 border-black font-black uppercase py-2">Submit</button>
-                              <button onClick={() => setReschedulingJob(null)} className="flex-1 bg-white text-black border-2 border-black font-black uppercase py-2">Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button 
-                            onClick={() => {
-                              setReschedulingJob(req.requestId);
-                              setNewDate("");
-                              setNewTime("");
-                            }}
-                            className="w-full bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
-                          >
-                            <span className="flex items-center justify-center gap-2"><Calendar className="w-5 h-5" /> REQUEST RESCHEDULE</span>
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
+                    <Link href={`/jobs/${req.requestId}`} className="w-full bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-center block py-3.5 hover:bg-black hover:text-white transition-colors brutal-shadow-sm">
+                      <span className="flex items-center justify-center gap-2"><Wrench className="w-5 h-5" /> MANAGE BOOKING</span>
+                    </Link>
+                  </div>
 
-                  {["pending", "accepted"].includes(req.status) && (
-                    <div className="mt-4">
-                      <button 
-                        onClick={() => {
-                          if (confirm("Are you sure you want to cancel this job?")) {
-                            handleUpdateStatus(req.requestId, "cancelled");
-                          }
-                        }}
-                        className="w-full bg-[var(--color-brutal-red)] text-white border-4 border-black font-black uppercase text-center py-4 hover:bg-black transition-colors brutal-shadow-sm"
-                      >
-                        <span className="flex items-center justify-center gap-2"><X className="w-5 h-5 stroke-[3]" /> CANCEL JOB</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {req.status === "en_route" && (
-                    <div className="flex gap-4 mt-4">
-                      <a href={`/jobs/${req.requestId}/track`} className="flex-1 bg-black text-white px-6 py-4 font-black uppercase brutal-border text-center hover:bg-[var(--color-brutal-yellow)] hover:text-black transition-colors block">
-                        <span className="flex items-center justify-center gap-2"><MapPin className="w-5 h-5" /> TRACK TECHNICIAN</span>
-                      </a>
-                    </div>
-                  )}
-
-                  {req.status === "completed" && (
-                    <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                      {!req.reviewed && reviewingJob !== req.requestId && (
-                        <button 
-                          onClick={() => setReviewingJob(req.requestId)}
-                          className="flex-1 bg-[var(--color-brutal-blue)] text-black px-6 py-3 font-black uppercase brutal-border shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
-                        >
-                          <span className="flex items-center justify-center gap-2"><Star className="w-5 h-5" /> LEAVE A REVIEW</span>
-                        </button>
-                      )}
-                      {req.reviewed && (
-                        <div className="flex-none bg-white border-4 border-black text-black px-4 py-3 text-sm font-black uppercase shadow-[4px_4px_0_0_#000] -rotate-2 self-start flex items-center justify-center">
-                          <span className="flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5" /> REVIEWED</span>
-                        </div>
-                      )}
-                      <a 
-                        href={`/artisans/${req.artisanId}/request?trade=${encodeURIComponent(req.trade)}&subcategory=${encodeURIComponent(req.subcategory)}&desc=${encodeURIComponent(req.description)}`}
-                        className="flex-1 bg-[var(--color-brutal-yellow)] text-black px-6 py-3 font-black uppercase brutal-border text-center hover:-translate-y-1 transition-transform block"
-                      >
-                        <span className="flex items-center justify-center gap-2"><RefreshCw className="w-5 h-5" /> BOOK AGAIN</span>
-                      </a>
-                      <a 
-                        href={`/jobs/${req.requestId}/receipt`}
-                        className="flex-1 bg-white text-black px-6 py-3 font-black uppercase brutal-border text-center hover:-translate-y-1 transition-transform block"
-                      >
-                        <span className="flex items-center justify-center gap-2"><FileText className="w-5 h-5" /> RECEIPT</span>
-                      </a>
-                    </div>
-                  )}
-
-                  {reviewingJob === req.requestId && (
-                    <form onSubmit={(e) => handleSubmitReview(e, req)} className="bg-[var(--color-brutal-blue)] p-6 brutal-border shadow-[4px_4px_0_0_#000] mt-4">
-                      <h3 className="text-2xl font-black text-black mb-4 uppercase">Review this job</h3>
-                      <div className="mb-4">
-                        <label className="block text-sm font-black text-black mb-2 uppercase">Rating (1-5)</label>
-                        <input 
-                          type="number" min="1" max="5" 
-                          value={rating} onChange={e => setRating(Number(e.target.value))}
-                          className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-yellow)] font-black text-xl"
-                        />
-                      </div>
-                      <div className="mb-6">
-                        <label className="block text-sm font-black text-black mb-2 uppercase">Comment</label>
-                        <textarea 
-                          value={comment} onChange={e => setComment(e.target.value)}
-                          className="w-full p-4 bg-white brutal-border focus:outline-none focus:bg-[var(--color-brutal-yellow)] font-bold"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex gap-4">
-                        <button type="submit" className="bg-black text-white px-8 py-3 font-black uppercase hover:bg-white hover:text-black brutal-border transition-colors">
-                          Submit Review
-                        </button>
-                        <button type="button" onClick={() => setReviewingJob(null)} className="bg-white text-black px-8 py-3 font-black uppercase brutal-border hover:bg-[var(--color-brutal-red)] transition-colors">
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                  {["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(req.status) && (
-                    <div className="mt-6 pt-4 border-t-2 border-black/10 flex flex-col gap-3">
-                      {req.status === "in_progress" && (
-                        <button 
-                          onClick={() => handleSOS(req.requestId)}
-                          className="w-full bg-red-600 text-white py-3 border-4 border-black font-black uppercase tracking-widest text-lg hover:bg-red-700 transition-colors brutal-shadow-sm flex items-center justify-center gap-2"
-                        >
-                          <PhoneCall className="w-5 h-5 fill-current" /> SOS / PANIC BUTTON
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setReportingJob(req)}
-                        className="text-xs font-black uppercase text-gray-500 hover:text-[var(--color-brutal-red)] transition-colors flex items-center justify-center gap-1 mx-auto"
-                      >
-                        <AlertTriangle className="w-3 h-3 stroke-[3]" /> REPORT AN ISSUE
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             );

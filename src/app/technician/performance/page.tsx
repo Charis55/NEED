@@ -11,6 +11,7 @@ import Image from "next/image";
 import { JobRequest } from "@/types";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAlert } from "@/components/AlertProvider";
+import AccountStrikesSection from "@/components/AccountStrikesSection";
 
 export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
@@ -167,6 +168,13 @@ export default function PerformancePage() {
           </div>
         </div>
 
+        {/* Account Standing & Policy Strikes */}
+        {auth.currentUser && (
+          <div className="mb-10">
+            <AccountStrikesSection userId={auth.currentUser.uid} userType="artisan" />
+          </div>
+        )}
+
         {/* Job Metrics & Chart */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
           <div className="lg:col-span-1 flex flex-col gap-6">
@@ -241,7 +249,7 @@ export default function PerformancePage() {
               <ShieldCheck className="w-8 h-8 stroke-[3]" />
             </div>
             <div>
-              <h4 className="font-black uppercase text-xl mb-1">Top Tier Artisan</h4>
+              <h4 className="font-black uppercase text-xl mb-1">Top Tier Technician</h4>
               <p className="text-sm font-bold leading-tight">Maintain a 4.5+ rating to unlock exclusive high-paying jobs and premium placement.</p>
             </div>
           </div>
@@ -289,7 +297,7 @@ export default function PerformancePage() {
                       <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
                         {review.photos.map((photo, idx) => (
                           <div key={idx} className="w-20 h-20 border-2 border-black relative shrink-0">
-                            <Image src={photo} alt="Review photo" fill className="object-cover" />
+                            <Image src={photo} alt="Review photo" fill sizes="80px" className="object-cover" />
                           </div>
                         ))}
                       </div>

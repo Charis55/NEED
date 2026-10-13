@@ -2,19 +2,22 @@
 
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { JobRequest } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall } from "lucide-react";
+import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
 
 export default function ArtisanDashboard() {
   const { showAlert } = useAlert();
   const [requests, setRequests] = useState<JobRequest[]>([]);
+  const [upForGrabsJobs, setUpForGrabsJobs] = useState<JobRequest[]>([]);
+  const [artisanServices, setArtisanServices] = useState<{ trade: string; subcategory: string }[]>([]);
+  const [claimingJobId, setClaimingJobId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(false);
   const [reportingJob, setReportingJob] = useState<JobRequest | null>(null);
@@ -22,6 +25,9 @@ export default function ArtisanDashboard() {
   const [showCounterFor, setShowCounterFor] = useState<string | null>(null);
   const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
   const [showPromoOverlay, setShowPromoOverlay] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [cancellingJob, setCancellingJob] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   useEffect(() => {
     let unsubs: (() => void)[] = [];
@@ -35,26 +41,32 @@ export default function ArtisanDashboard() {
         return;
       }
 
-      let validServices: { trade: string, subcategory: string }[] = [];
+      let validServices: { trade: string; subcategory: string }[] = [];
       let isVerifiedArtisan = false;
       let directResults: JobRequest[] = [];
       let broadcastResults: JobRequest[] = [];
 
       const updateCombined = () => {
-        const matchedBroadcastResults = isVerifiedArtisan
-          ? broadcastResults.filter(job => validServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory))
-          : [];
+        // Direct jobs assigned to this artisan
+        const direct = [...directResults];
+        direct.sort((a, b) => b.createdAt - a.createdAt);
 
-        const combined = [...directResults, ...matchedBroadcastResults];
-        const uniqueResults = Array.from(new Map(combined.map(item => [item.requestId, item])).values());
-        uniqueResults.sort((a, b) => b.createdAt - a.createdAt);
+        // Open broadcast jobs up for grabs (unassigned to any technician)
+        const unassignedBroadcasts = broadcastResults.filter(
+          job => (!job.artisanId || job.artisanId === "") && job.status === "pending"
+        );
 
-        setRequests((prev) => {
-          const prevKey = JSON.stringify(prev.map(r => ({ id: r.requestId, s: r.status, lat: r.technicianLocation?.lat, lng: r.technicianLocation?.lng })));
-          const nextKey = JSON.stringify(uniqueResults.map(r => ({ id: r.requestId, s: r.status, lat: r.technicianLocation?.lat, lng: r.technicianLocation?.lng })));
-          if (prevKey === nextKey) return prev;
-          return uniqueResults;
+        // Sort: jobs matching technician's skills first, then newest
+        unassignedBroadcasts.sort((a, b) => {
+          const aMatch = validServices.some(svc => svc.trade === a.trade && svc.subcategory === a.subcategory) ? 1 : 0;
+          const bMatch = validServices.some(svc => svc.trade === b.trade && svc.subcategory === b.subcategory) ? 1 : 0;
+          if (aMatch !== bMatch) return bMatch - aMatch;
+          return b.createdAt - a.createdAt;
         });
+
+        setRequests(direct);
+        setUpForGrabsJobs(unassignedBroadcasts);
+        setArtisanServices(validServices);
         setLoading(false);
       };
 
@@ -77,6 +89,7 @@ export default function ArtisanDashboard() {
             const daysSinceSignup = Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24));
             setPromoDaysLeft(Math.max(0, 30 - daysSinceSignup));
           }
+          setWalletBalance(artisanData.walletBalance || 0);
 
           if (artisanData.services && artisanData.services.length > 0) {
             validServices = artisanData.services;
@@ -108,33 +121,240 @@ export default function ArtisanDashboard() {
     };
   }, []);
 
-  const handleUpdateStatus = async (requestId: string, newStatus: JobRequest['status'], counterAmt: number | null = null) => {
+  const handleClaimUpForGrabs = async (job: JobRequest) => {
+    if (!isVerified) {
+      showAlert("Your account must be approved by an administrator before you can accept jobs.", "error");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      showAlert("Please log in to claim jobs.", "error");
+      return;
+    }
+
+    setClaimingJobId(job.requestId);
+    try {
+      const reqRef = doc(db, "jobRequests", job.requestId);
+      const requiresDeposit = !job.depositPaid || job.depositStatus !== "held";
+      const updatePayload: Partial<JobRequest> = {
+        artisanId: user.uid,
+        status: "accepted",
+        state: requiresDeposit ? "awaiting_deposit" : "confirmed",
+        depositStatus: requiresDeposit ? "pending" : (job.depositStatus || "held"),
+      };
+
+      await updateDoc(reqRef, updatePayload);
+
+      // Auto-add trade & subcategory to technician profile if missing
+      try {
+        const artisanRef = doc(db, "artisans", user.uid);
+        const artisanSnap = await getDoc(artisanRef);
+        if (artisanSnap.exists()) {
+          const artData = artisanSnap.data();
+          const currentServices: any[] = artData.services || (artData.trade && artData.subcategory ? [{ trade: artData.trade, subcategory: artData.subcategory }] : []);
+          const alreadyHas = currentServices.some((s: any) => s.trade === job.trade && s.subcategory === job.subcategory);
+          if (!alreadyHas && job.trade && job.subcategory) {
+            const newServices = [
+              ...currentServices,
+              {
+                trade: job.trade,
+                subcategory: job.subcategory,
+                hasCertification: false,
+                certificateUrl: null,
+                isCertificateVerified: false,
+              }
+            ];
+            const newKeys = newServices.map((s: any) => `${s.trade}:${s.subcategory}`);
+            await updateDoc(artisanRef, {
+              services: newServices,
+              serviceKeys: newKeys,
+            });
+            showAlert(`Job claimed! "${job.subcategory}" was also added to your profile skills.`, "success");
+          } else {
+            showAlert("Job claimed successfully! Added to your active bookings.", "success");
+          }
+        }
+      } catch (skillErr) {
+        console.warn("Could not auto-add skill to profile:", skillErr);
+        showAlert("Job claimed successfully! Added to your active bookings.", "success");
+      }
+
+      // Send push notification to customer
+      if (job.customerId) {
+        const requiresDeposit = !job.depositPaid || job.depositStatus !== "held";
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: job.customerId,
+            title: requiresDeposit ? "Job Accepted - Deposit Required" : "Job Accepted!",
+            body: requiresDeposit 
+              ? `${user.displayName || "A technician"} has accepted your job request! Please pay the 25% commitment deposit to confirm.`
+              : `${user.displayName || "A technician"} has accepted your broadcast job request.`,
+            data: { requestId: job.requestId, type: "job_update", status: "accepted", state: requiresDeposit ? "awaiting_deposit" : "confirmed" }
+          })
+        }).catch(err => console.error("Failed to push notification:", err));
+      }
+    } catch (err: any) {
+      console.error("Failed to claim job:", err);
+      showAlert(err.message || "Failed to claim job", "error");
+    } finally {
+      setClaimingJobId(null);
+    }
+  };
+
+  const handleCounterUpForGrabs = async (job: JobRequest, amount: number) => {
+    if (!isVerified) {
+      showAlert("Your account must be approved by an administrator before you can counter jobs.", "error");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) return;
+
+    if (isNaN(amount) || amount <= 0) {
+      showAlert("Please enter a valid counter amount.", "error");
+      return;
+    }
+
+    setClaimingJobId(job.requestId);
+    try {
+      const reqRef = doc(db, "jobRequests", job.requestId);
+      const updatePayload: Partial<JobRequest> = {
+        artisanId: user.uid,
+        status: "countered",
+        state: "negotiating" as any,
+        counterOfferAmount: amount,
+        lastCounterBy: "artisan",
+      };
+
+      await updateDoc(reqRef, updatePayload);
+
+      // Auto-add trade & subcategory to technician profile if missing
+      try {
+        const artisanRef = doc(db, "artisans", user.uid);
+        const artisanSnap = await getDoc(artisanRef);
+        if (artisanSnap.exists()) {
+          const artData = artisanSnap.data();
+          const currentServices: any[] = artData.services || (artData.trade && artData.subcategory ? [{ trade: artData.trade, subcategory: artData.subcategory }] : []);
+          const alreadyHas = currentServices.some((s: any) => s.trade === job.trade && s.subcategory === job.subcategory);
+          if (!alreadyHas && job.trade && job.subcategory) {
+            const newServices = [
+              ...currentServices,
+              {
+                trade: job.trade,
+                subcategory: job.subcategory,
+                hasCertification: false,
+                certificateUrl: null,
+                isCertificateVerified: false,
+              }
+            ];
+            const newKeys = newServices.map((s: any) => `${s.trade}:${s.subcategory}`);
+            await updateDoc(artisanRef, {
+              services: newServices,
+              serviceKeys: newKeys,
+            });
+          }
+        }
+      } catch (skillErr) {
+        console.warn("Could not auto-add skill to profile:", skillErr);
+      }
+
+      // Send push notification to customer
+      if (job.customerId) {
+        fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: job.customerId,
+            title: "Counter Offer Received!",
+            body: `${user.displayName || "A technician"} countered your job with ₦${amount.toLocaleString()}.`,
+            data: { requestId: job.requestId, type: "job_update", status: "countered" }
+          })
+        }).catch(err => console.error("Failed to push notification:", err));
+      }
+
+      showAlert(`Counter offer of ₦${amount.toLocaleString()} submitted!`, "success");
+      setShowCounterFor(null);
+    } catch (err: any) {
+      console.error("Failed to submit counter offer:", err);
+      showAlert(err.message || "Failed to submit counter offer", "error");
+    } finally {
+      setClaimingJobId(null);
+    }
+  };
+
+  const handleUpdateStatus = async (requestId: string, newStatus: JobRequest['status'], counterAmt: number | null = null, extraData?: any) => {
     if ((newStatus === 'accepted' || newStatus === 'countered') && !isVerified) {
       showAlert("Your account must be approved by an administrator before you can accept or counter jobs.", "error");
       return;
     }
     try {
       const reqRef = doc(db, "jobRequests", requestId);
-      
-      const updatePayload: Partial<JobRequest> = { 
-        status: newStatus 
-      };
-
       const user = auth.currentUser;
       const req = requests.find(r => r.requestId === requestId);
+      const requiresDeposit = !req?.depositPaid || req?.depositStatus !== "held";
+
+      const updatePayload: Partial<JobRequest> = { 
+        status: newStatus,
+        state: newStatus === "accepted" && requiresDeposit ? "awaiting_deposit" : (newStatus as any),
+        ...(newStatus === "accepted" && requiresDeposit ? { depositStatus: "pending" } : {})
+      };
       if (req?.isBroadcast && user) {
         updatePayload.artisanId = user.uid;
+
+        // Auto-add trade & subcategory to technician profile if missing
+        try {
+          const artisanRef = doc(db, "artisans", user.uid);
+          const artisanSnap = await getDoc(artisanRef);
+          if (artisanSnap.exists()) {
+            const artData = artisanSnap.data();
+            const currentServices: any[] = artData.services || (artData.trade && artData.subcategory ? [{ trade: artData.trade, subcategory: artData.subcategory }] : []);
+            const alreadyHas = currentServices.some((s: any) => s.trade === req.trade && s.subcategory === req.subcategory);
+            if (!alreadyHas && req.trade && req.subcategory) {
+              const newServices = [
+                ...currentServices,
+                {
+                  trade: req.trade,
+                  subcategory: req.subcategory,
+                  hasCertification: false,
+                  certificateUrl: null,
+                  isCertificateVerified: false
+                }
+              ];
+              const newKeys = newServices.map((s: any) => `${s.trade}:${s.subcategory}`);
+              await updateDoc(artisanRef, {
+                services: newServices,
+                serviceKeys: newKeys
+              });
+            }
+          }
+        } catch (skillErr) {
+          console.warn("Could not auto-add skill to profile:", skillErr);
+        }
+      }
+
+      if (newStatus === "arrived") {
+        (updatePayload as any).arrivedAt = Date.now();
+        (updatePayload as any).arrivalSource = "manual";
+      }
+
+      if (newStatus === "in_progress") {
+        (updatePayload as any).startedAt = Date.now();
       }
 
       if (newStatus === "completed" || newStatus === "payment_pending") {
         updatePayload.completedAt = Date.now();
       }
 
+      if (newStatus === "cancelled") {
+        updatePayload.cancelledBy = "artisan";
+        if (extraData?.reason) {
+          updatePayload.cancelledReason = extraData.reason;
+        }
+      }
+
       if (newStatus === "countered" && counterAmt) {
-        const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
-        const platformFeeRate = isPromoActive ? 0 : 0.20;
         updatePayload.counterOfferAmount = counterAmt;
-        updatePayload.platformFee = counterAmt * platformFeeRate;
         updatePayload.lastCounterBy = "artisan";
       }
 
@@ -171,13 +391,15 @@ export default function ArtisanDashboard() {
           title = "Job Accepted!"; body = "Your technician has accepted the job request.";
         } else if (newStatus === "en_route") {
           title = "Technician En Route!"; body = "Your technician is on their way.";
+        } else if (newStatus === "arrived") {
+          title = "Technician Arrived!"; body = "Your technician has arrived at your location.";
         } else if (newStatus === "in_progress") {
-          title = "Technician Arrived!"; body = "Your technician has arrived and started the job.";
+          title = "Job Started!"; body = "Your technician has started work on your job.";
         } else if (newStatus === "completed" || newStatus === "payment_pending") {
           title = "Job Completed!"; body = "The job has been marked as completed.";
         }
         
-        if (["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(newStatus)) {
+        if (["accepted", "en_route", "arrived", "in_progress", "completed", "payment_pending"].includes(newStatus)) {
           fetch("/api/send-notification", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -191,17 +413,17 @@ export default function ArtisanDashboard() {
         }
       }
 
-      setRequests(prev => prev.map(req => {
-        if (req.requestId === requestId) {
+      setRequests(prev => prev.map(r => {
+        if (r.requestId === requestId) {
           const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
           const platformFeeRate = isPromoActive ? 0 : 0.20;
           return { 
-            ...req, 
+            ...r, 
             status: newStatus, 
             ...(newStatus === "countered" ? { counterOfferAmount: counterAmt, platformFee: counterAmt! * platformFeeRate, lastCounterBy: "artisan" } : {}) 
           };
         }
-        return req;
+        return r;
       }));
       setShowCounterFor(null);
     } catch (error) {
@@ -294,7 +516,7 @@ export default function ArtisanDashboard() {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Job Requests</h1>
         <div className="mb-12 w-full block">
-          <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming and active jobs.</p>
+          <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming, active, and community broadcast jobs.</p>
         </div>
 
         {outstandingBalance > 0 && (
@@ -315,7 +537,227 @@ export default function ArtisanDashboard() {
           </div>
         )}
 
+        {/* ============================================================== */}
+        {/* UP FOR GRABS SECTION (OPEN COMMUNITY BROADCAST JOBS) */}
+        {/* ============================================================== */}
+        <div className="mb-14">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b-4 border-black pb-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_#000] rotate-3">
+                  <Zap className="w-6 h-6 text-black fill-black" />
+                </div>
+                <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tighter">
+                  Up For Grabs
+                </h2>
+                <span className="bg-[var(--color-brutal-pink)] text-black border-2 border-black px-3 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000] -rotate-2">
+                  {upForGrabsJobs.length} {upForGrabsJobs.length === 1 ? 'JOB OPEN' : 'JOBS OPEN'}
+                </span>
+              </div>
+              <p className="text-sm font-bold text-gray-800 mt-2">
+                Broadcast jobs posted by customers seeking technicians. Claim immediately to accept and automatically add the trade to your verified skills!
+              </p>
+            </div>
+          </div>
 
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <GlobalSpinner text="SCANNING OPEN BROADCASTS" />
+            </div>
+          ) : upForGrabsJobs.length === 0 ? (
+            <div className="bg-white p-8 md:p-10 text-center brutal-border brutal-shadow-sm mb-12">
+              <div className="w-16 h-16 bg-[var(--color-brutal-yellow)] brutal-border flex items-center justify-center mx-auto mb-3 rotate-3 shadow-[2px_2px_0_0_#000]">
+                <Zap className="w-8 h-8 text-black fill-black" />
+              </div>
+              <h3 className="text-xl font-black text-black mb-1 uppercase">All Caught Up!</h3>
+              <p className="text-black font-bold text-sm">
+                No open broadcast jobs right now. When customers post jobs waiting for an available technician, they will appear here live for anyone to claim.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+              {upForGrabsJobs.map((job) => {
+                const isSkillMatch = artisanServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory);
+                const currentPrice = job.offerAmount || 0;
+                const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
+                const platformFeeRate = isPromoActive ? 0 : 0.20;
+                const platformFee = currentPrice * platformFeeRate;
+                const artisanTakeHome = currentPrice - platformFee;
+                const isClaiming = claimingJobId === job.requestId;
+                const isCounteringThis = showCounterFor === job.requestId;
+
+                const counterVal = parseInt(counterInputs[job.requestId]?.replace(/,/g, '') || "0", 10);
+                const counterFee = counterVal * platformFeeRate;
+                const counterTakeHome = counterVal - counterFee;
+
+                return (
+                  <div key={job.requestId} className="bg-white border-4 border-black shadow-[6px_6px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full relative">
+                    <div className="p-6 md:p-8 flex flex-col flex-grow">
+                      {/* Top Badges */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        {isSkillMatch ? (
+                          <span className="bg-[var(--color-brutal-teal)] text-black border-2 border-black px-3 py-1 text-xs font-black uppercase flex items-center gap-1.5 shadow-[2px_2px_0_0_#000]">
+                            <Sparkles className="w-3.5 h-3.5 fill-black" /> MATCHES YOUR TRADE
+                          </span>
+                        ) : (
+                          <span className="bg-[var(--color-brutal-pink)] text-black border-2 border-black px-3 py-1 text-xs font-black uppercase flex items-center gap-1.5 shadow-[2px_2px_0_0_#000]">
+                            <Zap className="w-3.5 h-3.5 fill-black" /> OPEN COMMUNITY JOB • EXPAND SKILLS
+                          </span>
+                        )}
+                        <span className="bg-black text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wider">
+                          BROADCAST
+                        </span>
+                      </div>
+
+                      {/* Title & Price */}
+                      <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-5 border-b-4 border-black pb-5">
+                        <div>
+                          <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
+                            {job.trade ? `${job.trade} - ${job.subcategory}` : (job.subcategory || "Broadcast Request")}
+                          </h3>
+                          <div className="text-sm text-black font-bold flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
+                            <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2.5 py-1 flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5" /> {job.neighborhood || "Location on file"}
+                            </span>
+                            <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2.5 py-1 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" /> {job.preferredTime || "Flexible"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Price Tag */}
+                        <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 text-right min-w-[200px] shadow-[4px_4px_0_0_#000]">
+                          <p className="text-xs text-black font-black uppercase tracking-widest mb-1 bg-white inline-block px-1 border-2 border-black -rotate-2">
+                            Customer&apos;s Offer
+                          </p>
+                          <p className="text-4xl font-black text-black tracking-tighter mt-1">
+                            ₦{currentPrice.toLocaleString()}
+                          </p>
+                          <div className="mt-2 text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t-2 border-black pt-1">
+                            Take Home: ₦{artisanTakeHome.toLocaleString()}
+                          </div>
+                          {isPromoActive && (
+                            <p className="text-[10px] font-black text-purple-700 uppercase mt-0.5">
+                              ✨ 0% Fee Promo Active
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Description & Media */}
+                      {job.description && (
+                        <div className="bg-[var(--color-brutal-yellow)] p-4 brutal-border mb-4 shadow-[2px_2px_0_0_#000]">
+                          <p className="text-black font-bold leading-relaxed text-sm line-clamp-3">
+                            {job.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {job.mediaUrl && (
+                        <div className="mb-4">
+                          <a 
+                            href={job.mediaUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="inline-flex items-center gap-2 bg-white border-2 border-black px-3 py-1.5 text-xs font-black uppercase hover:bg-[var(--color-brutal-yellow)] transition-colors shadow-[2px_2px_0_0_#000]"
+                          >
+                            <span>📷 View Attached {job.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Inline Counter Form */}
+                      {isCounteringThis && (
+                        <div className="mb-6 p-4 bg-[var(--color-brutal-bg)] border-3 border-black shadow-[3px_3px_0_0_#000]">
+                          <p className="text-xs font-black uppercase tracking-wider mb-2">Propose Counter Offer Amount (₦):</p>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <span className="absolute left-3 top-3 font-black text-lg">₦</span>
+                              <input
+                                type="text"
+                                value={counterInputs[job.requestId] || ""}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, "");
+                                  const formatted = raw ? Number(raw).toLocaleString() : "";
+                                  setCounterInputs(prev => ({ ...prev, [job.requestId]: formatted }));
+                                }}
+                                placeholder="e.g. 25,000"
+                                className="w-full pl-8 pr-3 py-2.5 font-black text-lg border-2 border-black brutal-shadow-sm focus:outline-none"
+                              />
+                            </div>
+                            <button
+                              onClick={() => {
+                                const val = parseInt(counterInputs[job.requestId]?.replace(/,/g, '') || "0", 10);
+                                if (val > 0) handleCounterUpForGrabs(job, val);
+                              }}
+                              disabled={isClaiming || !counterVal}
+                              className="px-4 py-2 bg-black text-white font-black text-sm uppercase border-2 border-black hover:bg-white hover:text-black transition-colors disabled:opacity-50"
+                            >
+                              SUBMIT
+                            </button>
+                            <button
+                              onClick={() => setShowCounterFor(null)}
+                              className="px-3 py-2 bg-white text-black font-black text-sm uppercase border-2 border-black hover:bg-gray-100"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {counterVal > 0 && (
+                            <p className="text-xs font-black text-[var(--color-brutal-teal)] mt-2">
+                              Take home on counter: ₦{counterTakeHome.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="mt-auto flex flex-col sm:flex-row gap-3 pt-4 border-t-2 border-black">
+                        <button
+                          onClick={() => handleClaimUpForGrabs(job)}
+                          disabled={isClaiming}
+                          className="flex-1 bg-[var(--color-brutal-green)] text-black border-4 border-black font-black uppercase text-center py-4 hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isClaiming ? (
+                            <>
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              <span>CLAIMING JOB...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-5 h-5 stroke-[2.5]" />
+                              <span>CLAIM JOB (₦{currentPrice.toLocaleString()})</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => setShowCounterFor(isCounteringThis ? null : job.requestId)}
+                          disabled={isClaiming}
+                          className="bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 px-5 hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          <Wrench className="w-5 h-5" />
+                          <span>COUNTER</span>
+                        </button>
+
+                        <Link
+                          href={`/technician/jobs/${job.requestId}`}
+                          className="bg-white text-black border-4 border-black font-black uppercase text-center py-4 px-4 hover:bg-black hover:text-white transition-colors shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-1"
+                          title="View Details"
+                        >
+                          <ArrowRight className="w-5 h-5" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* DIRECT / ACTIVE REQUESTS SECTION */}
+        {/* ============================================================== */}
         <h2 className="text-3xl font-black text-black mb-6 uppercase tracking-tighter border-b-4 border-black pb-2 inline-block">Recent Job Requests</h2>
         
         {loading ? (
@@ -333,7 +775,10 @@ export default function ArtisanDashboard() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {requests.map((req) => {
-              const currentPrice = req.counterOfferAmount || req.offerAmount || 0;
+              const currentStatus = String(req.status || req.state || 'pending');
+              const currentPrice = req.counterOfferAmount || req.offerAmount || (req.agreedPrice ? Math.round(req.agreedPrice / 100) : 0);
+              const isAwaitingCustDeposit = (req.status === "accepted" || currentStatus === "accepted") && 
+                (req.state === "awaiting_deposit" || req.depositStatus === "pending" || (!req.depositPaid && req.depositStatus !== "held"));
               
               const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
               const platformFeeRate = isPromoActive ? 0 : 0.20;
@@ -349,281 +794,79 @@ export default function ArtisanDashboard() {
               return (
                 <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
                   <div className="p-6 md:p-8 flex flex-col flex-grow">
-                    <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-6 border-b-4 border-black pb-6 flex-grow">
+                    <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-6 border-b-4 border-black pb-6">
                       <div>
                         <span className={`inline-block px-4 py-2 text-xs font-black uppercase tracking-widest mb-3 brutal-border
-                          ${req.status === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
-                          ${req.status === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
-                          ${req.status === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
-                          ${req.status === 'en_route' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
-                          ${req.status === 'in_progress' ? 'bg-[var(--color-brutal-blue)] text-white bg-black' : ''}
-                          ${req.status === 'payment_pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
-                          ${req.status === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
-                          ${req.status === 'declined' ? 'bg-[var(--color-brutal-red)] text-black' : ''}
+                          ${isAwaitingCustDeposit ? 'bg-[var(--color-brutal-yellow)] text-black border-4 border-black' : ''}
+                          ${!isAwaitingCustDeposit && currentStatus === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
+                          ${!isAwaitingCustDeposit && currentStatus === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
+                          ${!isAwaitingCustDeposit && currentStatus === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
+                          ${currentStatus === 'en_route' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
+                          ${currentStatus === 'in_progress' ? 'bg-[#bbf7d0] text-black' : ''}
+                          ${currentStatus === 'payment_pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
+                          ${currentStatus === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
+                          ${currentStatus === 'declined' ? 'bg-[var(--color-brutal-red)] text-white' : ''}
+                          ${currentStatus === 'cancelled' ? 'bg-gray-800 text-white' : ''}
                         `}>
-                          {req.status === 'countered' ? (req.lastCounterBy === 'customer' ? 'ACTION REQUIRED' : 'AWAITING CUSTOMER') : req.status === 'declined' ? (req.declinedBy === 'artisan' ? 'TECHNICIAN DECLINED' : 'CUSTOMER DECLINED') : req.status.replace('_', ' ')}
+                          {isAwaitingCustDeposit 
+                            ? 'ACCEPTED • AWAITING CUSTOMER DEPOSIT'
+                            : currentStatus === 'countered' 
+                              ? (req.lastCounterBy === 'customer' ? 'ACTION REQUIRED' : 'AWAITING CUSTOMER') 
+                              : currentStatus === 'declined' 
+                                ? (req.declinedBy === 'artisan' ? 'TECHNICIAN DECLINED' : 'CUSTOMER DECLINED') 
+                                : currentStatus.replace('_', ' ')}
                         </span>
                         <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
-                          {req.isBroadcast && req.status === "pending" ? "Broadcast Request" : "Job Details"}
+                          {req.trade ? `${req.trade} - ${req.subcategory}` : (req.isBroadcast ? "Broadcast Request" : req.subcategory || "Service Request")}
                         </h3>
-                        <p className="text-sm text-black font-bold flex items-center gap-2 uppercase tracking-widest">
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood}</span>
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {req.preferredTime}</span>
+                        <p className="text-sm text-black font-bold flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
+                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood || "Location on file"}</span>
+                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {req.preferredTime || "Flexible"}</span>
                         </p>
                       </div>
                       
                       {/* Price Tag */}
                       <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 text-right min-w-[200px] shadow-[4px_4px_0_0_#000]">
                         <p className="text-xs text-black font-black uppercase tracking-widest mb-1 bg-white inline-block px-1 border-2 border-black -rotate-2">
-                          {req.status === "countered" ? "Your Counter Offer" : "Customer's Offer"}
+                          {currentStatus === "countered" ? "Counter Offer" : "Customer's Offer"}
                         </p>
                         <p className="text-4xl font-black text-black tracking-tighter mt-1">₦{currentPrice.toLocaleString()}</p>
-                        <div className="mt-4 space-y-1 text-sm font-bold border-t-2 border-black pt-2">
-                          <p className="text-[var(--color-brutal-red)] flex justify-between">
-                            <span>Platform Fee {isPromoActive ? "(0% PROMO)" : "(20%)"}</span> 
-                            {isPromoActive ? (
-                              <span className="text-[var(--color-brutal-teal)]">FREE</span>
-                            ) : (
-                              <span>-₦{platformFee.toLocaleString()}</span>
-                            )}
-                          </p>
-                          <p className="text-[var(--color-brutal-teal)] flex justify-between text-lg font-black mt-2">
-                            <span className="uppercase">Your Earnings</span> <span>₦{artisanTakeHome.toLocaleString()}</span>
-                          </p>
+                        <div className="mt-2 text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t-2 border-black pt-1">
+                          Take Home: ₦{artisanTakeHome.toLocaleString()}
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="bg-[var(--color-brutal-yellow)] p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000]">
-                      <p className="text-black font-bold leading-relaxed">{req.description}</p>
-                    </div>
 
-                    {req.status === "cancelled" && req.cancelledReason && (
-                      <div className="bg-red-100 p-5 brutal-border mb-6 shadow-[2px_2px_0_0_#000] border-red-500">
-                        <p className="font-black text-red-900 flex items-center gap-2 mb-1 uppercase tracking-widest"><AlertTriangle className="w-5 h-5" /> Job Cancelled</p>
-                        <p className="font-bold text-red-800">{req.cancelledReason}</p>
+                    {req.description && (
+                      <div className="bg-[var(--color-brutal-yellow)] p-4 brutal-border mb-6 shadow-[2px_2px_0_0_#000]">
+                        <p className="text-black font-bold leading-relaxed text-sm line-clamp-2">{req.description}</p>
                       </div>
                     )}
 
-                    {/* Pending Status Actions */}
-                    {(req.status === "pending" || (req.status === "countered" && req.lastCounterBy === "customer")) && (
-                      <div className="space-y-4">
-                        {showCounterFor !== req.requestId ? (
-                          <div className="flex flex-col sm:flex-row gap-4">
-                            <button 
-                              disabled={isRestricted}
-                              onClick={() => handleUpdateStatus(req.requestId, "accepted")}
-                              className={`flex-1 py-4 text-lg brutal-btn ${isRestricted ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-[var(--color-brutal-teal)]'}`}
-                            >
-                              ACCEPT JOB
-                            </button>
-                            <button 
-                              disabled={isRestricted}
-                              onClick={() => setShowCounterFor(req.requestId)}
-                              className={`flex-1 py-4 text-lg brutal-btn ${isRestricted ? 'bg-gray-400 cursor-not-allowed opacity-50' : 'bg-[var(--color-brutal-yellow)]'}`}
-                            >
-                              COUNTER OFFER
-                            </button>
-                            <button 
-                              onClick={() => handleUpdateStatus(req.requestId, "declined")}
-                              className="flex-none bg-[var(--color-brutal-red)] py-4 text-lg brutal-btn"
-                            >
-                              DECLINE
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="bg-[var(--color-brutal-pink)] brutal-border p-6 shadow-[4px_4px_0_0_#000]">
-                            <h4 className="font-black text-black mb-4 uppercase text-2xl tracking-tighter border-b-2 border-black pb-2 inline-block">Make a Counter Offer</h4>
-                            <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                              <div className="relative flex-1">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black font-black text-xl">₦</span>
-                                <input
-                                  type="number"
-                                  placeholder="10000"
-                                  value={counterInputs[req.requestId] || ""}
-                                  onChange={(e) => setCounterInputs({ ...counterInputs, [req.requestId]: e.target.value })}
-                                  className="w-full pl-12 pr-4 py-4 brutal-border bg-white focus:outline-none text-black font-black text-xl"
-                                />
-                              </div>
-                              <div className="flex gap-4">
-                                <button
-                                  onClick={() => setShowCounterFor(null)}
-                                  className="px-6 py-4 bg-white brutal-btn text-lg"
-                                >
-                                  CANCEL
-                                </button>
-                                <button
-                                  onClick={() => submitCounterOffer(req.requestId)}
-                                  className="px-8 py-4 bg-[var(--color-brutal-teal)] brutal-btn text-lg"
-                                >
-                                  SEND
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {typingVal > 0 && (
-                              <div className="flex gap-6 text-sm font-black uppercase mt-4 bg-white brutal-border p-3">
-                                <span className="text-[var(--color-brutal-red)]">
-                                  Platform Cut: {isPromoActive ? 'FREE' : `-₦${dynamicFee.toLocaleString()}`}
-                                </span>
-                                <span className="text-[var(--color-brutal-teal)]">You Keep: ₦{dynamicTakeHome.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                    {currentStatus === "cancelled" && req.cancelledReason && (
+                      <div className="bg-red-100 p-4 brutal-border mb-6 shadow-[2px_2px_0_0_#000] border-red-500">
+                        <p className="font-black text-red-900 flex items-center gap-2 mb-1 uppercase tracking-widest text-xs"><AlertTriangle className="w-4 h-4" /> Job Cancelled</p>
+                        <p className="font-bold text-red-800 text-sm">{req.cancelledReason}</p>
                       </div>
                     )}
 
-                    {req.status === "accepted" && (
-                      <div className="mt-6">
-                        <button 
-                          onClick={() => handleUpdateStatus(req.requestId, "en_route")}
-                          className="w-full bg-[var(--color-brutal-blue)] py-5 text-xl brutal-btn"
+                    <div className="mt-auto flex flex-col gap-3 pt-4 border-t-2 border-black">
+                      {["accepted", "confirmed", "en_route", "arrived", "in_progress", "payment_pending", "completed"].includes(currentStatus) && (
+                        <Link 
+                          href={`/chat/${req.requestId}`} 
+                          className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
                         >
-                          I'M ON MY WAY
-                        </button>
-                      </div>
-                    )}
-
-                    {req.status === "en_route" && (
-                      <div className="mt-6">
-                        <button 
-                          onClick={() => handleUpdateStatus(req.requestId, "in_progress")}
-                          className="w-full bg-[var(--color-brutal-teal)] py-5 text-xl brutal-btn"
-                        >
-                          START JOB
-                        </button>
-                      </div>
-                    )}
-
-                    {req.status === "in_progress" && (
-                      <div className="mt-6">
-                        <button 
-                          onClick={() => handleUpdateStatus(req.requestId, "payment_pending")}
-                          className="w-full bg-[var(--color-brutal-yellow)] py-5 text-xl brutal-btn"
-                        >
-                          MARK JOB AS FINISHED
-                        </button>
-                      </div>
-                    )}
-
-                    {["accepted", "en_route", "in_progress", "payment_pending"].includes(req.status) && (
-                      <div className="mt-4 flex flex-col gap-4">
-                        {req.status === "en_route" && (
-                          <Link 
-                            href={`/technician/jobs/${req.requestId}/navigate`} 
-                            className="w-full bg-black text-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-blue)] hover:text-black transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
-                          >
-                            <span className="flex items-center justify-center gap-2"><MapIcon className="w-5 h-5" /> NAVIGATE TO CUSTOMER</span>
-                          </Link>
-                        )}
-                        <Link href={`/chat/${req.requestId}`} className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none">
                           <span className="flex items-center justify-center gap-2"><MessageSquare className="w-5 h-5" /> CHAT WITH CUSTOMER</span>
                         </Link>
-                      </div>
-                    )}
-
-                    {["accepted", "en_route"].includes(req.status) && (
-                      <div className="mt-4 flex flex-col gap-4">
-                        {req.rescheduleStatus === "pending" ? (
-                          req.rescheduleRequestedBy === "customer" ? (
-                            <div className="bg-[var(--color-brutal-yellow)] p-4 border-4 border-black">
-                              <p className="font-black text-black uppercase mb-2">Customer requested to reschedule to: <br/>{req.newPreferredTime}</p>
-                              <div className="flex gap-2">
-                                <button onClick={() => handleRespondReschedule(req.requestId, "accepted", req.newPreferredTime!)} className="flex-1 bg-[var(--color-brutal-teal)] text-black border-2 border-black font-black uppercase py-2">Accept</button>
-                                <button onClick={() => handleRespondReschedule(req.requestId, "declined", "")} className="flex-1 bg-[var(--color-brutal-red)] text-white border-2 border-black font-black uppercase py-2">Decline</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="bg-white p-4 border-4 border-black text-center font-black uppercase text-sm">
-                              Waiting for customer to accept reschedule
-                            </div>
-                          )
-                        ) : (
-                          reschedulingJob === req.requestId ? (
-                            <div className="bg-[var(--color-brutal-pink)] p-4 border-4 border-black flex flex-col gap-2">
-                              <label className="font-black uppercase text-sm">New Date</label>
-                              <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="p-2 border-2 border-black font-bold" />
-                              <label className="font-black uppercase text-sm">New Time</label>
-                              <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="p-2 border-2 border-black font-bold" />
-                              <div className="flex gap-2 mt-2">
-                                <button onClick={() => handleRequestReschedule(req.requestId)} className="flex-1 bg-black text-white border-2 border-black font-black uppercase py-2">Submit</button>
-                                <button onClick={() => setReschedulingJob(null)} className="flex-1 bg-white text-black border-2 border-black font-black uppercase py-2">Cancel</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button 
-                              onClick={() => {
-                                setReschedulingJob(req.requestId);
-                                setNewDate("");
-                                setNewTime("");
-                              }}
-                              className="w-full bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
-                            >
-                              <span className="flex items-center justify-center gap-2"><Calendar className="w-5 h-5" /> REQUEST RESCHEDULE</span>
-                            </button>
-                          )
-                        )}
-                      </div>
-                    )}
-
-                    {["pending", "accepted"].includes(req.status) && (
-                      <div className="mt-4">
-                        <button 
-                          onClick={() => {
-                            if (confirm("Are you sure you want to cancel this job?")) {
-                              handleUpdateStatus(req.requestId, "cancelled");
-                            }
-                          }}
-                          className="w-full bg-[var(--color-brutal-red)] text-white border-4 border-black font-black uppercase text-center py-4 hover:bg-black transition-colors brutal-shadow-sm"
-                        >
-                          <span className="flex items-center justify-center gap-2"><X className="w-5 h-5 stroke-[3]" /> CANCEL JOB</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {req.status === "payment_pending" && (
-                      <div className="mt-6 p-4 bg-[var(--color-brutal-yellow)] border-4 border-black brutal-shadow text-center">
-                        <h4 className="font-black uppercase mb-4">Waiting for Payment</h4>
-                        {req.proofOfPaymentUrl && (
-                          <div className="mb-4">
-                            <p className="font-bold text-sm mb-2">Customer uploaded Proof of Payment:</p>
-                            <a 
-                              href={req.proofOfPaymentUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-block bg-white px-4 py-2 border-2 border-black font-black uppercase brutal-shadow-sm hover:-translate-y-1 transition-transform"
-                            >
-                              VIEW PROOF OF PAYMENT
-                            </a>
-                          </div>
-                        )}
-                        <button 
-                          onClick={() => handleUpdateStatus(req.requestId, "completed")}
-                          className="w-full bg-[var(--color-brutal-green)] py-4 text-xl brutal-btn"
-                        >
-                          CONFIRM PAYMENT RECEIVED
-                        </button>
-                      </div>
-                    )}
-                  {["accepted", "en_route", "in_progress", "completed", "payment_pending"].includes(req.status) && (
-                    <div className="mt-6 pt-4 border-t-2 border-black/10 flex flex-col gap-3">
-                      {req.status === "in_progress" && (
-                        <button 
-                          onClick={() => handleSOS(req.requestId)}
-                          className="w-full bg-red-600 text-white py-3 border-4 border-black font-black uppercase tracking-widest text-lg hover:bg-red-700 transition-colors brutal-shadow-sm flex items-center justify-center gap-2"
-                        >
-                          <PhoneCall className="w-5 h-5 fill-current" /> SOS / PANIC BUTTON
-                        </button>
                       )}
-                      <button 
-                        onClick={() => setReportingJob(req)}
-                        className="text-xs font-black uppercase text-gray-500 hover:text-[var(--color-brutal-red)] transition-colors flex items-center justify-center gap-1 mx-auto"
+
+                      <Link 
+                        href={`/technician/jobs/${req.requestId}`} 
+                        className="w-full bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-center block py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
                       >
-                        <AlertTriangle className="w-3 h-3 stroke-[3]" /> REPORT AN ISSUE
-                      </button>
+                        <span className="flex items-center justify-center gap-2"><Wrench className="w-5 h-5" /> MANAGE BOOKING</span>
+                      </Link>
                     </div>
-                  )}
                   </div>
                 </div>
               );
@@ -680,21 +923,11 @@ export default function ArtisanDashboard() {
           // Update local state immediately
           setRequests(prev => prev.map(req => 
             unpaidJobs.find(u => u.requestId === req.requestId) 
-              ? { ...req, paidToPlatform: true } 
+              ? { ...req, paidToPlatform: true, commissionPaid: true, commissionSettled: true } 
               : req
           ));
         }}
       />
-
-      {reportingJob && auth.currentUser && (
-        <ReportModal 
-          jobId={reportingJob.requestId}
-          reportedUserId={reportingJob.customerId}
-          reporterUserId={auth.currentUser.uid}
-          reporterRole="artisan"
-          onClose={() => setReportingJob(null)}
-        />
-      )}
     </div>
   );
 }

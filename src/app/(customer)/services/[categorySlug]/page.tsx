@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, ArrowRight, Clock, SlidersHorizontal, Users } from "lucide-react";
+import { Search, ArrowRight, Clock, SlidersHorizontal, Users, Send, Sparkles } from "lucide-react";
 import BackButton from "@/components/BackButton";
 import { servicesData } from "@/data/services";
 import { notFound } from "next/navigation";
@@ -191,7 +191,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
               return (
                 <div 
                   key={service.id} 
-                  className={`p-6 brutal-card flex flex-col relative transition-transform ${isAvailable ? 'bg-white hover:-translate-y-1' : 'bg-gray-200 opacity-80'} ${selectedSubServices.includes(service.id) ? 'ring-4 ring-black border-black bg-[var(--color-brutal-pink)]' : ''}`}
+                  className={`p-6 brutal-card flex flex-col relative transition-transform bg-white hover:-translate-y-1 ${selectedSubServices.includes(service.id) ? 'ring-4 ring-black border-black bg-[var(--color-brutal-pink)]' : ''}`}
                 >
                   <label className="absolute top-4 right-4 flex items-center justify-center w-8 h-8 border-4 border-black bg-white cursor-pointer shadow-[2px_2px_0_0_#000]">
                     <input 
@@ -205,7 +205,6 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
                           setSelectedSubServices(selectedSubServices.filter(id => id !== service.id));
                         }
                       }}
-                      disabled={!isAvailable}
                     />
                   </label>
                   <h2 className="text-3xl font-black text-black mb-2 uppercase tracking-tighter">{service.title}</h2>
@@ -215,9 +214,9 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
                   
                   <div className="flex flex-col gap-4 mt-auto">
                     <div className="flex items-center gap-2">
-                      <div className={`inline-flex items-center gap-2 px-3 py-1 brutal-border border-black font-black text-xs uppercase shadow-[2px_2px_0_0_#000] ${isAvailable ? 'bg-[var(--color-brutal-teal)] text-black' : 'bg-gray-300 text-gray-700'}`}>
-                        <Users className="w-4 h-4 stroke-[3]" />
-                        <span>{loading ? "..." : count} TECHNICIAN{count !== 1 ? 'S' : ''} READY</span>
+                      <div className={`inline-flex items-center gap-2 px-3 py-1 brutal-border border-black font-black text-xs uppercase shadow-[2px_2px_0_0_#000] ${isAvailable ? 'bg-[var(--color-brutal-teal)] text-black' : 'bg-[var(--color-brutal-yellow)] text-black'}`}>
+                        {isAvailable ? <Users className="w-4 h-4 stroke-[3]" /> : <Sparkles className="w-4 h-4 stroke-[3]" />}
+                        <span>{loading ? "..." : count} TECHNICIAN{count !== 1 ? 'S' : ''} READY {count === 0 ? '• POST ANYWAY' : ''}</span>
                       </div>
                     </div>
 
@@ -236,10 +235,14 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
                           <ArrowRight className="w-5 h-5 stroke-[3] text-black" />
                         </Link>
                       ) : (
-                        <div className="flex items-center gap-3 bg-gray-400 px-4 py-3 brutal-border border-black w-full justify-center">
-                          <span className="text-sm font-black text-black">COMING SOON</span>
-                          <Clock className="w-5 h-5 stroke-[3] text-black" />
-                        </div>
+                        <Link 
+                          href={`/services/${unwrappedParams.categorySlug}/${service.id}/broadcast`}
+                          className="flex items-center gap-3 bg-[var(--color-brutal-pink)] text-black px-4 py-3 brutal-btn w-full justify-center shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
+                          prefetch={false}
+                        >
+                          <span className="text-sm font-black text-black">POST JOB ANYWAY</span>
+                          <Send className="w-5 h-5 stroke-[3] text-black" />
+                        </Link>
                       )}
                     </div>
                   </div>

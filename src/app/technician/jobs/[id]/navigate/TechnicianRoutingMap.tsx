@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { Navigation } from 'lucide-react';
 import { enableKeepAwake, disableKeepAwake } from '@/utils/keepAwake';
 import { Capacitor } from '@capacitor/core';
@@ -105,14 +105,44 @@ export default function TechnicianRoutingMap({
             setCurrentLocation({ lat: latitude, lng: longitude });
 
             isSyncing = true;
+            const currentUserId = auth.currentUser?.uid;
+
+            // Direct update for map UI reflection
             updateDoc(doc(db, "jobRequests", jobId), {
               technicianLocation: { lat: latitude, lng: longitude },
               lastLocationUpdate: now
-            }).catch(err => {
-              console.error("Failed to sync location:", err);
-            }).finally(() => {
+            }).catch(console.error);
+
+            // Server authoritative location trail & geofence arrival check
+            if (currentUserId) {
+              fetch(`/api/jobs/${jobId}/location`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  artisanId: currentUserId,
+                  lat: latitude,
+                  lng: longitude
+                })
+              })
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.arrivedViaGeofence) {
+                  try {
+                    import("@capacitor/haptics").then(({ Haptics, NotificationType }) => {
+                      Haptics.notification({ type: NotificationType.Success });
+                    });
+                  } catch {
+                    // Fallback on web
+                  }
+                }
+              })
+              .catch((err) => console.error("Failed to post location ping:", err))
+              .finally(() => {
+                isSyncing = false;
+              });
+            } else {
               isSyncing = false;
-            });
+            }
           }
         });
       } catch (err) {

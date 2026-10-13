@@ -693,8 +693,8 @@ export default function ChatPage() {
 
   const isCustomerViewing = currentUser?.uid === job?.customerId;
   const chatPartnerName = isCustomerViewing 
-    ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || artisanUser?.phone || "Unknown Technician") 
-    : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || customer?.phone || "Unknown Customer");
+    ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician") 
+    : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || "Customer");
 
   const startCall = async (type: "audio" | "video") => {
     if (!job || !currentUser) {
@@ -703,29 +703,24 @@ export default function ChatPage() {
     }
     showAlert("Starting call...", "success");
     try {
-      await updateDoc(doc(db, "jobRequests", requestId), {
-        activeCall: {
-          channelName: requestId,
+      const res = await fetch("/api/calls/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId: requestId,
           callerId: currentUser.uid,
-          callerSessionId: sessionId,
-          type,
-          status: "ringing",
-          timestamp: Date.now()
-        }
+          callType: type,
+        }),
       });
-
-      const partnerId = isCustomerViewing ? job?.artisanId : job?.customerId;
-      if (partnerId) {
-        fetch("/api/send-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: partnerId,
-            title: currentUser.displayName || 'Someone',
-            body: `Incoming ${type} call`,
-            data: { requestId, type: "call" }
-          })
-        }).catch(err => console.error("Push failed:", err));
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "CALL_STATE_GATE") {
+          showAlert("Calls are only available once a job is confirmed.", "error");
+        } else if (data.code === "CALL_ACTIVE") {
+          showAlert("A call is already active on this job.", "error");
+        } else {
+          showAlert(data.error || "Failed to start call", "error");
+        }
       }
     } catch (error) {
       console.error("Failed to start call", error);
@@ -1286,7 +1281,7 @@ export default function ChatPage() {
           onClose={() => setShowProfileModal(false)}
           onSelect={() => {
             setShowProfileModal(false);
-            router.push(`/artisans/${artisan.artisanId}`);
+            router.push(`/artisan/${artisan.artisanId}`);
           }}
           selectLabel="VIEW PROFILE"
         />

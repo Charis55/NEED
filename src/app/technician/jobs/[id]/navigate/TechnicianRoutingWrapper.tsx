@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { doc, onSnapshot, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { JobRequest, UserAccount } from "@/types";
-import { Phone, MessageSquare, MapPin } from "lucide-react";
+import { Phone, MessageSquare, MapPin, CheckCircle, Play, ShieldCheck } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import dynamicImport from "next/dynamic";
 import { geocode } from "@/utils/location";
@@ -18,6 +18,8 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
   const [destCoords, setDestCoords] = useState<{lat: number, lng: number} | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [transitioning, setTransitioning] = useState(false);
+  const [arrivalMessage, setArrivalMessage] = useState("");
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // km
@@ -32,35 +34,89 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
 
   const startCall = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!job || !customer) return;
+    if (!job) return;
     try {
       const { auth } = await import("@/lib/firebase");
-      const { updateDoc, doc } = await import("firebase/firestore");
       const currentUser = auth.currentUser;
       if (!currentUser) return;
       
-      await updateDoc(doc(db, "jobRequests", job.requestId), {
-        activeCall: {
-          channelName: job.requestId,
-          callerId: currentUser.uid,
-          callerSessionId: sessionId,
-          type: "audio",
-          status: "ringing",
-          timestamp: Date.now()
-        }
-      });
-      fetch("/api/send-notification", {
+      const res = await fetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: customer.userId,
-          title: `Incoming audio call`,
-          body: `${currentUser.displayName || 'Technician'} is calling you`,
-          data: { requestId: job.requestId, type: "call" }
-        })
-      }).catch(err => console.error("Push failed:", err));
+          jobId: job.requestId,
+          callerId: currentUser.uid,
+          callType: "audio",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        console.warn("Call initiation rejected:", data.error);
+      }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleManualArrival = async () => {
+    if (!job) return;
+    setTransitioning(true);
+    setArrivalMessage("");
+    try {
+      const { auth } = await import("@/lib/firebase");
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      const techLoc = job.technicianLocation;
+      const res = await fetch(`/api/jobs/${job.requestId}/manual-arrival`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artisanId: currentUser.uid,
+          lat: techLoc?.lat,
+          lng: techLoc?.lng
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to mark arrival");
+      setArrivalMessage("Arrival confirmed! Customer has been notified.");
+    } catch (err: any) {
+      console.error("Manual arrival error:", err);
+      setArrivalMessage(err.message || "Could not confirm arrival.");
+    } finally {
+      setTransitioning(false);
+    }
+  };
+
+  const handleStartWork = async () => {
+    if (!job) return;
+    setTransitioning(true);
+    try {
+      const { auth } = await import("@/lib/firebase");
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      const res = await fetch("/api/jobs/transition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId: job.requestId,
+          toState: "in_progress",
+          actorId: currentUser.uid,
+          actorRole: "artisan"
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start work");
+      
+      await updateDoc(doc(db, "jobRequests", job.requestId), {
+        status: "in_progress"
+      });
+    } catch (err: any) {
+      console.error("Start work error:", err);
+      alert(err.message || "Failed to start job");
+    } finally {
+      setTransitioning(false);
     }
   };
 
@@ -81,18 +137,16 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
         }
         
         // Find lat/lng for customer's location
-        if (!destCoords) {
-          if (jobData.locationCoords) {
-            setDestCoords(jobData.locationCoords);
-          } else if (jobData.neighborhood) {
-            try {
-              const coords = await geocode(jobData.neighborhood);
-              setDestCoords(coords);
-            } catch (e) {
-              console.error("Geocoding failed for destination", e);
-              // Default fallback coords (Lagos)
-              setDestCoords({ lat: 6.5244, lng: 3.3792 });
-            }
+        if (jobData.locationCoords && (jobData.locationCoords.lat !== 0 || jobData.locationCoords.lng !== 0)) {
+          setDestCoords(jobData.locationCoords);
+        } else if (!destCoords && jobData.neighborhood) {
+          try {
+            const coords = await geocode(jobData.neighborhood);
+            setDestCoords(coords);
+          } catch (e) {
+            console.error("Geocoding failed for destination", e);
+            // Default fallback coords (Lagos)
+            setDestCoords({ lat: 6.5244, lng: 3.3792 });
           }
         }
         
@@ -198,6 +252,56 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
               </>
             );
           })()}
+
+          {/* Dynamic Arrival & Work Controls */}
+          {(job.status === "en_route" || (job as any).state === "en_route") && (
+            <div className="mt-4 pt-4 border-t-3 border-black space-y-2">
+              <button
+                onClick={handleManualArrival}
+                disabled={transitioning}
+                className="w-full bg-[var(--color-brutal-green)] text-black font-black uppercase text-base py-3.5 px-4 border-3 border-black shadow-[4px_4px_0_0_#000] hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_#000] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <CheckCircle className="w-5 h-5 stroke-[2.5]" />
+                {transitioning ? "CONFIRMING..." : "I HAVE ARRIVED"}
+              </button>
+              <p className="text-[11px] font-bold text-gray-500 uppercase text-center">
+                Geofence auto-triggers within 300m of customer
+              </p>
+              {arrivalMessage && (
+                <p className="text-xs font-black text-black bg-[var(--color-brutal-yellow)] p-2 border-2 border-black text-center uppercase">
+                  {arrivalMessage}
+                </p>
+              )}
+            </div>
+          )}
+
+          {(job.status === "arrived" || (job as any).state === "arrived") && (
+            <div className="mt-4 pt-4 border-t-3 border-black space-y-2">
+              <div className="bg-[var(--color-brutal-green)] text-black p-3 border-2 border-black flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 shrink-0 stroke-[2.5]" />
+                <span className="font-black text-xs uppercase">
+                  Arrival Confirmed ({((job as any).arrivalSource === "geofence" ? "Geofence Verified" : "Manual Check-In")})
+                </span>
+              </div>
+              <button
+                onClick={handleStartWork}
+                disabled={transitioning}
+                className="w-full bg-black text-white font-black uppercase text-base py-3.5 px-4 border-3 border-black shadow-[4px_4px_0_0_#000] hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_#000] active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Play className="w-5 h-5 fill-white stroke-[2.5]" />
+                {transitioning ? "STARTING..." : "START WORK (IN PROGRESS)"}
+              </button>
+            </div>
+          )}
+
+          {(job.status === "in_progress" || (job as any).state === "in_progress") && (
+            <div className="mt-4 pt-4 border-t-3 border-black">
+              <div className="bg-[var(--color-brutal-yellow)] text-black p-3 border-2 border-black font-black text-xs uppercase flex items-center gap-2">
+                <Play className="w-4 h-4 fill-black shrink-0" />
+                <span>Job is currently in progress. Complete work and request confirmation.</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Customer Info */}

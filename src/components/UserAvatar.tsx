@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -13,20 +15,27 @@ interface UserAvatarProps {
 }
 
 export default function UserAvatar({ photoURL, name, className }: UserAvatarProps) {
-  if (photoURL) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [photoURL]);
+
+  if (photoURL && !hasError) {
     return (
       <img 
         src={photoURL} 
         alt={name || "User profile"} 
-        className={cn("object-cover", className)} 
+        className={cn("object-cover w-full h-full", className)} 
+        onError={() => setHasError(true)}
       />
     );
   }
 
-  const initial = name ? name.charAt(0).toUpperCase() : '?';
+  const initial = name?.trim() ? name.trim().charAt(0).toUpperCase() : '?';
 
   return (
-    <div className={cn("flex items-center justify-center bg-[var(--color-brutal-yellow)] text-black font-black uppercase", className)}>
+    <div className={cn("flex items-center justify-center bg-[var(--color-brutal-yellow)] text-black font-black uppercase select-none", className)}>
       {initial}
     </div>
   );

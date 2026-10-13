@@ -200,7 +200,7 @@ function InboxContent() {
                 <div className="relative mr-4 shrink-0">
                   <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
                     <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 flex items-center justify-center">
-                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.profilePictureUrl} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || item.artisanUser?.phone || "Unknown Technician"} className="w-full h-full text-2xl text-black font-black" />
+                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.profilePictureUrl} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || "Technician"} className="w-full h-full text-2xl text-black font-black" />
                     </div>
                   </div>
                   {/* Unread Badge */}
@@ -215,7 +215,7 @@ function InboxContent() {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <h3 className="font-black text-black text-lg truncate uppercase">
-                      {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || item.artisanUser?.phone || "Unknown Technician"}
+                      {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || "Technician"}
                     </h3>
                     <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
                       {new Date(item.job.createdAt).toLocaleDateString('en-GB')}

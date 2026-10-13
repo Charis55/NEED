@@ -4,7 +4,6 @@ import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { FCMProvider } from "@/hooks/useFCM";
 import { AlertProvider } from "@/components/AlertProvider";
-import Script from "next/script";
 
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -29,8 +28,25 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "NEED",
-  description: "Find trusted local professionals.",
+  metadataBase: new URL("https://need-chi.vercel.app"),
+  title: {
+    default: "NEED Marketplace | Hire Verified Local Technicians",
+    template: "%s | NEED Marketplace",
+  },
+  description:
+    "Hire trusted, background-checked plumbers, electricians, AC technicians, and carpenters. Upfront pricing, escrow payment protection, and a 30-day workmanship guarantee.",
+  keywords: [
+    "hire plumber",
+    "find electrician",
+    "generator repair",
+    "AC technician",
+    "carpenter",
+    "home repairs",
+    "vetted technicians",
+    "NEED marketplace",
+    "Lagos",
+    "Nigeria",
+  ],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -41,6 +57,15 @@ export const metadata: Metadata = {
     icon: "/LOGO.png",
     shortcut: "/LOGO.png",
     apple: "/icons/icon-192.png",
+  },
+  openGraph: {
+    title: "NEED Marketplace | Hire Verified Local Technicians",
+    description:
+      "Find vetted local plumbers, electricians, carpenters, and technicians with transparent pricing and 30-day workmanship guarantee.",
+    url: "https://need-chi.vercel.app",
+    siteName: "NEED Marketplace",
+    locale: "en_NG",
+    type: "website",
   },
 };
 
@@ -58,12 +83,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossOrigin="" />
-        <Script
-          id="google-adsense"
+        <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4445454590724783"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
       </head>
       <body className="min-h-full flex flex-col">

@@ -37,6 +37,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (type === "nin") {
+      const { isIdentityBlacklisted } = await import("@/lib/strikes");
+      const check = await isIdentityBlacklisted({ nin: cleaned });
+      if (check.blacklisted) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "This National Identification Number has been permanently blacklisted due to terms of service violations.",
+            provider: provider.providerName,
+          },
+          { status: 200 }
+        );
+      }
+    }
+
     const result =
       type === "nin"
         ? await provider.verifyNIN(cleaned)

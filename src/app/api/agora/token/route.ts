@@ -26,6 +26,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Agora credentials not configured' }, { status: 500, headers: corsHeaders });
     }
 
+    // If channelName corresponds to a jobId, gate calls by state
+    try {
+      const { adminDb } = await import("@/lib/firebaseAdmin");
+      const { writeJobEvent } = await import("@/lib/jobEvents");
+      const jobSnap = await adminDb.collection("jobRequests").doc(channelName).get();
+      if (jobSnap.exists) {
+        const job = jobSnap.data();
+        const allowedStates = ["confirmed", "en_route", "arrived", "in_progress", "awaiting_customer_confirmation", "completed"];
+        if (job && !allowedStates.includes(job.state)) {
+          return NextResponse.json(
+            { error: "Calls are only available after the booking is confirmed." },
+            { status: 403, headers: corsHeaders }
+          );
+        }
+        // Log call start event
+        await writeJobEvent(channelName, "call_started", uid, { channelName });
+      }
+    } catch (checkErr) {
+      console.warn("Job call gating check skipped/failed:", checkErr);
+    }
+
     // Role: Publisher for both sides (able to send and receive audio/video)
     const role = RtcRole.PUBLISHER;
 
