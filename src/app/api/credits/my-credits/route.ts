@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebaseAdmin";
+import { adminAuth } from "@/lib/firebaseAdminAuth";
 import { getCustomerCreditSummary } from "@/lib/customerCredits";
 
 export async function GET(req: NextRequest) {

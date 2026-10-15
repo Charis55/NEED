@@ -12,13 +12,11 @@ import { initializeApp as initAdminApp, getApps as getAdminApps, cert } from "fi
 import type { App } from "firebase-admin/app";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import type { Firestore } from "firebase-admin/firestore";
-import type { Auth } from "firebase-admin/auth";
 import fs from "fs";
 import path from "path";
 
 let _adminApp: App | null = null;
 let _adminDb: Firestore | null = null;
-let _adminAuth: Auth | null = null;
 
 export function getAdminApp(): App {
   if (_adminApp) return _adminApp;
@@ -96,16 +94,6 @@ export function getAdminDb(): Firestore {
   return _adminDb;
 }
 
-export function getAdminAuth(): Auth {
-  if (!_adminAuth) {
-    // Dynamically require firebase-admin/auth so that ESM jwks-rsa/jose issues on serverless do not crash unrelated Firestore ops
-    const { getAuth: initAdminAuth } = require("firebase-admin/auth");
-    _adminAuth = initAdminAuth(getAdminApp());
-  }
-  return _adminAuth!;
-}
-
-// Proxies ensure that importing `adminDb`, `adminAuth`, or `adminApp_` never crashes at module evaluation time
 export const adminApp_: App = new Proxy({} as App, {
   get(_target, prop) {
     if (prop === "then" || prop === "catch" || prop === "toJSON" || typeof prop === "symbol") {
@@ -125,16 +113,5 @@ export const adminDb: Firestore = new Proxy({} as Firestore, {
     const db = getAdminDb();
     const val = (db as any)[prop];
     return typeof val === "function" ? val.bind(db) : val;
-  }
-});
-
-export const adminAuth: Auth = new Proxy({} as Auth, {
-  get(_target, prop) {
-    if (prop === "then" || prop === "catch" || prop === "toJSON" || typeof prop === "symbol") {
-      return undefined;
-    }
-    const auth = getAdminAuth();
-    const val = (auth as any)[prop];
-    return typeof val === "function" ? val.bind(auth) : val;
   }
 });

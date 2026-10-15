@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { adminAuth } from '@/lib/firebaseAdminAuth';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
