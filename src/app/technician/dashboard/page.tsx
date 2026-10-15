@@ -181,14 +181,17 @@ export default function ArtisanDashboard() {
               totalResponseTime += (data.completedAt - data.createdAt);
               responseCount++;
             }
-
-            if (["accepted", "en_route", "in_progress", "payment_pending"].includes(data.status)) {
-              setActiveJobs(prev => {
-                if (prev.some(job => job.requestId === data.requestId)) return prev;
-                return [...prev, data];
-              });
-            }
           });
+
+          const activeList = allJobs
+            .filter(data => ["accepted", "en_route", "in_progress", "payment_pending"].includes(data.status))
+            .sort((a, b) => {
+              const timeA = (a as any).acceptedAt || a.createdAt || 0;
+              const timeB = (b as any).acceptedAt || b.createdAt || 0;
+              return timeB - timeA;
+            })
+            .slice(0, 2);
+          setActiveJobs(activeList);
 
           // Compute acceptance rate
           const totalDecisionable = accepted + declined;
@@ -380,43 +383,54 @@ export default function ArtisanDashboard() {
           </div>
         )}
 
-        {/* Active Jobs Screen Section */}
+        {/* Wallet & Balance Card: FIRST THING at the top of the dashboard */}
+        <div className="mb-8 z-10 relative">
+          <WalletCard />
+        </div>
+
+        {/* Active Jobs Section (Top 2 Most Recent) */}
         {activeJobs.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-3xl font-black uppercase mb-4 tracking-tighter flex items-center gap-2">
-              <span className="bg-[var(--color-brutal-yellow)] border-2 border-black w-4 h-4 rounded-full animate-pulse"></span>
-              Active Jobs ({activeJobs.length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
+                <span className="bg-[var(--color-brutal-yellow)] border-2 border-black w-4 h-4 rounded-full animate-pulse"></span>
+                Active Jobs ({activeJobs.length})
+              </h2>
+              <Link 
+                href="/technician/jobs" 
+                className="text-xs sm:text-sm font-black uppercase underline hover:text-[var(--color-brutal-teal)] flex items-center gap-1"
+              >
+                <span>View All Requests</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {activeJobs.map(job => (
-                <div key={job.requestId} className="bg-white border-4 border-black p-6 shadow-[6px_6px_0_0_#000]">
+                <div key={job.requestId} className="bg-white border-4 border-black p-5 sm:p-6 shadow-[6px_6px_0_0_#000]">
                   <div className="flex justify-between items-start mb-4 border-b-4 border-black pb-4">
                     <div>
-                      <span className="bg-[var(--color-brutal-teal)] text-black text-xs font-black uppercase px-2 py-1 border-2 border-black mb-2 inline-block">
+                      <span className="bg-[var(--color-brutal-teal)] text-black text-[11px] sm:text-xs font-black uppercase px-2 py-1 border-2 border-black mb-2 inline-block">
                         {job.status.replace("_", " ")}
                       </span>
-                      <h3 className="text-2xl font-black uppercase">{job.trade}</h3>
-                      <p className="font-bold text-sm flex items-center gap-1"><MapPin className="w-4 h-4 shrink-0" /> {job.neighborhood}</p>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase leading-tight">{job.trade}</h3>
+                      <p className="font-bold text-xs sm:text-sm flex items-center gap-1 mt-1 text-gray-700"><MapPin className="w-3.5 h-3.5 shrink-0" /> {job.neighborhood}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-3xl font-black">₦{((job.counterOfferAmount || job.offerAmount || 0) * (promoDaysLeft && promoDaysLeft > 0 ? 1 : 0.8)).toLocaleString()}</p>
-                      <p className="text-xs font-bold uppercase text-[var(--color-brutal-teal)]">Net Earnings</p>
+                    <div className="text-right shrink-0 pl-2">
+                      <p className="text-2xl sm:text-3xl font-black">₦{((job.counterOfferAmount || job.offerAmount || 0) * (promoDaysLeft && promoDaysLeft > 0 ? 1 : 0.8)).toLocaleString()}</p>
+                      <p className="text-[10px] sm:text-xs font-bold uppercase text-[var(--color-brutal-teal)]">Net Earnings</p>
                     </div>
                   </div>
                   <Link 
                     href={`/technician/jobs/${job.requestId}`} 
-                    className="flex items-center justify-center gap-2 w-full bg-black text-white font-black uppercase py-4 border-2 border-transparent hover:bg-white hover:text-black hover:border-black transition-colors"
+                    className="flex items-center justify-center gap-2 w-full bg-black text-white font-black uppercase py-3.5 sm:py-4 border-2 border-transparent hover:bg-white hover:text-black hover:border-black transition-colors text-sm sm:text-base cursor-pointer"
                   >
-                    Manage Job <Navigation className="w-5 h-5 stroke-[3]" />
+                    Manage Job <Navigation className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3]" />
                   </Link>
                 </div>
               ))}
             </div>
           </div>
         )}
-
-        {/* Wallet & Balance Card */}
-        <WalletCard />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

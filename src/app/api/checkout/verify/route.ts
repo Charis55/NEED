@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
 import { paymentProvider } from "@/lib/paystack";
-import { writeJobEvent } from "@/lib/jobEvents";
 import { JobRequestData } from "@/types/platform";
-import { getConfig } from "@/lib/platformConfig";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +27,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "Transaction not successful yet" }, { headers: corsHeaders });
     }
 
+    const { adminDb } = await import("@/lib/firebaseAdmin");
+
     const amount = verification.amount;
     const metadata = verification.providerRaw?.metadata || {};
     const detectedType = 
@@ -48,14 +47,14 @@ export async function POST(req: NextRequest) {
         type: detectedType,
         amount,
         jobId: jobId || metadata.jobId
-      });
+      }, { headers: corsHeaders });
     }
 
     // 1. Handle Wallet Top-up
     if (detectedType === "wallet_topup") {
       const userId = metadata.userId || (reference.startsWith("topup_") ? reference.split("_")[1] : null);
       if (!userId) {
-        return NextResponse.json({ error: "Cannot identify user for wallet topup" }, { status: 400 });
+        return NextResponse.json({ error: "Cannot identify user for wallet topup" }, { status: 400, headers: corsHeaders });
       }
 
       const channel = verification.providerRaw?.channel || "card";
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
           jobId: null,
           type: "topup",
           amount,
-          reference: `topup_${reference}`,
+          reference: reference.startsWith("topup_") ? reference : `topup_${reference}`,
           channel
         });
       });
@@ -88,7 +87,7 @@ export async function POST(req: NextRequest) {
         amount, 
         channel,
         userId 
-      });
+      }, { headers: corsHeaders });
     }
 
     // 2. Handle Job Deposit
@@ -101,6 +100,9 @@ export async function POST(req: NextRequest) {
         reference,
         source: "client_verify"
       });
+
+      const { writeJobEvent } = await import("@/lib/jobEvents");
+      const { getConfig } = await import("@/lib/platformConfig");
 
       await adminDb.runTransaction(async (tx) => {
         const jobRef = adminDb.collection("jobRequests").doc(targetJobId);

@@ -8,7 +8,7 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign } from "lucide-react";
+import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign, Search, ArrowUpDown } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
 import { formatDateTime12Hour } from "@/utils/formatTime";
@@ -29,6 +29,11 @@ export default function ArtisanDashboard() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  
+  // Search and Sort controls
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "a_z" | "z_a">("newest");
+  const [activeFilterTab, setActiveFilterTab] = useState<"all" | "broadcasts" | "direct">("all");
 
   useEffect(() => {
     let unsubs: (() => void)[] = [];
@@ -461,12 +466,47 @@ export default function ArtisanDashboard() {
   
   const [showPayModal, setShowPayModal] = useState(false);
 
+  // Sorter and Search filter logic
+  const sortJobsList = (list: JobRequest[]) => {
+    return [...list].sort((a, b) => {
+      const timeA = (a.createdAt as any)?.toMillis?.() || a.createdAt || a.updatedAt || 0;
+      const timeB = (b.createdAt as any)?.toMillis?.() || b.createdAt || b.updatedAt || 0;
+      const titleA = `${a.trade || ""} ${a.subcategory || ""}`.trim().toLowerCase();
+      const titleB = `${b.trade || ""} ${b.subcategory || ""}`.trim().toLowerCase();
+
+      if (sortBy === "newest") return timeB - timeA;
+      if (sortBy === "oldest") return timeA - timeB;
+      if (sortBy === "a_z") return titleA.localeCompare(titleB);
+      if (sortBy === "z_a") return titleB.localeCompare(titleA);
+      return 0;
+    });
+  };
+
+  const filterAndSortJobs = (list: JobRequest[]) => {
+    if (!searchTerm.trim()) return sortJobsList(list);
+    const term = searchTerm.toLowerCase().trim();
+    const filtered = list.filter(j => {
+      const trade = (j.trade || "").toLowerCase();
+      const sub = (j.subcategory || "").toLowerCase();
+      const neighborhood = (j.neighborhood || "").toLowerCase();
+      const desc = (j.description || "").toLowerCase();
+      const status = (j.status || "").toLowerCase();
+      const custName = ((j as any).customerName || "").toLowerCase();
+      const reqId = (j.requestId || "").toLowerCase();
+      return trade.includes(term) || sub.includes(term) || neighborhood.includes(term) || desc.includes(term) || status.includes(term) || custName.includes(term) || reqId.includes(term);
+    });
+    return sortJobsList(filtered);
+  };
+
+  const filteredBroadcasts = filterAndSortJobs(upForGrabsJobs);
+  const filteredRequests = filterAndSortJobs(requests);
+
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Job Requests</h1>
-        <div className="mb-12 w-full block">
-          <p className="text-black font-bold text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming, active, and community broadcast jobs.</p>
+        <div className="mb-8 w-full block">
+          <p className="text-black font-bold text-sm sm:text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-yellow)] inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">Manage incoming, active, and community broadcast jobs.</p>
         </div>
 
         {outstandingBalance > 0 && (
@@ -488,45 +528,143 @@ export default function ArtisanDashboard() {
         )}
 
         {/* ============================================================== */}
-        {/* UP FOR GRABS SECTION (OPEN COMMUNITY BROADCAST JOBS) */}
+        {/* SEARCH & SORTER BAR */}
         {/* ============================================================== */}
-        <div className="mb-14">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b-4 border-black pb-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_#000] rotate-3">
-                  <Zap className="w-6 h-6 text-black fill-black" />
-                </div>
-                <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tighter">
-                  Up For Grabs
-                </h2>
-                <span className="bg-[var(--color-brutal-pink)] text-black border-2 border-black px-3 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000] -rotate-2">
-                  {upForGrabsJobs.length} {upForGrabsJobs.length === 1 ? 'JOB OPEN' : 'JOBS OPEN'}
-                </span>
+        <div className="bg-white border-4 border-black p-4 sm:p-6 shadow-[6px_6px_0_0_#000] mb-10">
+          <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Search className="w-5 h-5 text-gray-500" />
               </div>
-              <p className="text-sm font-bold text-gray-800 mt-2">
-                Broadcast jobs posted by customers seeking technicians. Claim immediately to accept and automatically add the trade to your verified skills!
-              </p>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search jobs by trade, service, neighborhood, customer..."
+                className="w-full pl-11 pr-10 py-3.5 border-4 border-black font-black text-sm sm:text-base focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 uppercase tracking-tight"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-black hover:text-[var(--color-brutal-red)] cursor-pointer"
+                >
+                  <X className="w-5 h-5 stroke-[3]" />
+                </button>
+              )}
+            </div>
+
+            {/* Sorter & Filter Tabs */}
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              {/* Sorter Dropdown */}
+              <div className="flex items-center gap-2 border-4 border-black bg-[var(--color-brutal-bg)] px-3 py-2.5 shadow-[2px_2px_0_0_#000]">
+                <ArrowUpDown className="w-4 h-4 text-black shrink-0" />
+                <label htmlFor="job-sort" className="text-xs font-black uppercase tracking-wider text-black shrink-0">
+                  Sort:
+                </label>
+                <select
+                  id="job-sort"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="bg-transparent font-black text-xs sm:text-sm uppercase focus:outline-none cursor-pointer flex-1"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="a_z">A to Z (Trade)</option>
+                  <option value="z_a">Z to A (Trade)</option>
+                </select>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex border-4 border-black bg-white shadow-[2px_2px_0_0_#000]">
+                <button
+                  onClick={() => setActiveFilterTab("all")}
+                  className={`flex-1 sm:flex-initial px-3.5 py-2 text-xs font-black uppercase transition-colors ${
+                    activeFilterTab === "all" ? "bg-black text-white" : "hover:bg-gray-100 text-black"
+                  }`}
+                >
+                  All ({filteredBroadcasts.length + filteredRequests.length})
+                </button>
+                <button
+                  onClick={() => setActiveFilterTab("broadcasts")}
+                  className={`flex-1 sm:flex-initial px-3.5 py-2 text-xs font-black uppercase border-l-2 border-black transition-colors ${
+                    activeFilterTab === "broadcasts" ? "bg-[var(--color-brutal-pink)] text-black" : "hover:bg-gray-100 text-black"
+                  }`}
+                >
+                  Broadcasts ({filteredBroadcasts.length})
+                </button>
+                <button
+                  onClick={() => setActiveFilterTab("direct")}
+                  className={`flex-1 sm:flex-initial px-3.5 py-2 text-xs font-black uppercase border-l-2 border-black transition-colors ${
+                    activeFilterTab === "direct" ? "bg-[var(--color-brutal-blue)] text-black" : "hover:bg-gray-100 text-black"
+                  }`}
+                >
+                  Direct ({filteredRequests.length})
+                </button>
+              </div>
             </div>
           </div>
 
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <GlobalSpinner text="SCANNING OPEN BROADCASTS" />
+          {searchTerm && (
+            <div className="mt-3 flex items-center justify-between text-xs font-black uppercase border-t-2 border-black pt-2">
+              <span className="text-gray-600">
+                Found {filteredBroadcasts.length + filteredRequests.length} results matching &ldquo;{searchTerm}&rdquo;
+              </span>
+              <button 
+                onClick={() => setSearchTerm("")} 
+                className="underline text-[var(--color-brutal-red)] hover:opacity-80 cursor-pointer"
+              >
+                Clear Search
+              </button>
             </div>
-          ) : upForGrabsJobs.length === 0 ? (
-            <div className="bg-white p-8 md:p-10 text-center brutal-border brutal-shadow-sm mb-12">
-              <div className="w-16 h-16 bg-[var(--color-brutal-yellow)] brutal-border flex items-center justify-center mx-auto mb-3 rotate-3 shadow-[2px_2px_0_0_#000]">
-                <Zap className="w-8 h-8 text-black fill-black" />
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* UP FOR GRABS SECTION (OPEN COMMUNITY BROADCAST JOBS) */}
+        {/* ============================================================== */}
+        {(activeFilterTab === "all" || activeFilterTab === "broadcasts") && (
+          <div className="mb-14">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b-4 border-black pb-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_#000] rotate-3">
+                    <Zap className="w-6 h-6 text-black fill-black" />
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tighter">
+                    Up For Grabs
+                  </h2>
+                  <span className="bg-[var(--color-brutal-pink)] text-black border-2 border-black px-3 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000] -rotate-2">
+                    {filteredBroadcasts.length} {filteredBroadcasts.length === 1 ? 'JOB OPEN' : 'JOBS OPEN'}
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-gray-800 mt-2">
+                  Broadcast jobs posted by customers seeking technicians. Claim immediately to accept and automatically add the trade to your verified skills!
+                </p>
               </div>
-              <h3 className="text-xl font-black text-black mb-1 uppercase">All Caught Up!</h3>
-              <p className="text-black font-bold text-sm">
-                No open broadcast jobs right now. When customers post jobs waiting for an available technician, they will appear here live for anyone to claim.
-              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-              {upForGrabsJobs.map((job) => {
+
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <GlobalSpinner text="SCANNING OPEN BROADCASTS" />
+              </div>
+            ) : filteredBroadcasts.length === 0 ? (
+              <div className="bg-white p-8 md:p-10 text-center brutal-border brutal-shadow-sm mb-12">
+                <div className="w-16 h-16 bg-[var(--color-brutal-yellow)] brutal-border flex items-center justify-center mx-auto mb-3 rotate-3 shadow-[2px_2px_0_0_#000]">
+                  <Zap className="w-8 h-8 text-black fill-black" />
+                </div>
+                <h3 className="text-xl font-black text-black mb-1 uppercase">
+                  {searchTerm ? "No Matching Broadcast Jobs" : "All Caught Up!"}
+                </h3>
+                <p className="text-black font-bold text-sm">
+                  {searchTerm
+                    ? `No open broadcast jobs matched "${searchTerm}". Try checking your spelling or changing the filter.`
+                    : "No open broadcast jobs right now. When customers post jobs waiting for an available technician, they will appear here live for anyone to claim."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+                {filteredBroadcasts.map((job) => {
                 const isSkillMatch = artisanServices.some(svc => svc.trade === job.trade && svc.subcategory === job.subcategory);
                 const currentPrice = job.offerAmount || 0;
                 const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
@@ -704,27 +842,48 @@ export default function ArtisanDashboard() {
             </div>
           )}
         </div>
+      )}
 
-        {/* ============================================================== */}
-        {/* DIRECT / ACTIVE REQUESTS SECTION */}
-        {/* ============================================================== */}
-        <h2 className="text-3xl font-black text-black mb-6 uppercase tracking-tighter border-b-4 border-black pb-2 inline-block">Recent Job Requests</h2>
-        
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <GlobalSpinner text="LOADING REQUESTS" />
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="bg-white p-12 text-center brutal-border brutal-shadow-sm">
-            <div className="w-20 h-20 bg-[var(--color-brutal-pink)] brutal-border flex items-center justify-center mx-auto mb-4 rotate-6">
-              <Mailbox className="w-12 h-12 stroke-[3] mx-auto" />
+      {/* ============================================================== */}
+      {/* DIRECT / ACTIVE REQUESTS SECTION */}
+      {/* ============================================================== */}
+      {(activeFilterTab === "all" || activeFilterTab === "direct") && (
+        <div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b-4 border-black pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[var(--color-brutal-blue)] border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_#000] -rotate-2">
+                <Wrench className="w-6 h-6 text-black" />
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tighter">
+                Recent Job Requests
+              </h2>
+              <span className="bg-[var(--color-brutal-yellow)] text-black border-2 border-black px-3 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000] rotate-2">
+                {filteredRequests.length} {filteredRequests.length === 1 ? 'REQUEST' : 'REQUESTS'}
+              </span>
             </div>
-            <h3 className="text-2xl font-black text-black mb-2 uppercase">No Requests Yet</h3>
-            <p className="text-black font-bold">When customers request your services, they will appear here.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {requests.map((req) => {
+          
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <GlobalSpinner text="LOADING REQUESTS" />
+            </div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="bg-white p-12 text-center brutal-border brutal-shadow-sm">
+              <div className="w-20 h-20 bg-[var(--color-brutal-pink)] brutal-border flex items-center justify-center mx-auto mb-4 rotate-6">
+                <Mailbox className="w-12 h-12 stroke-[3] mx-auto" />
+              </div>
+              <h3 className="text-2xl font-black text-black mb-2 uppercase">
+                {requests.length === 0 ? "No Requests Yet" : "No Matching Requests"}
+              </h3>
+              <p className="text-black font-bold">
+                {requests.length === 0 
+                  ? "When customers request your services, they will appear here." 
+                  : "Try adjusting your search query or sorting filter."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredRequests.map((req) => {
               const currentStatus = String(req.status || req.state || 'pending');
               const currentPrice = req.counterOfferAmount || req.offerAmount || (req.agreedPrice ? Math.round(req.agreedPrice / 100) : 0);
               const isAwaitingCustDeposit = (req.status === "accepted" || currentStatus === "accepted") && 
@@ -824,6 +983,8 @@ export default function ArtisanDashboard() {
           </div>
         )}
       </div>
+    )}
+  </div>
 
       {reportingJob && auth.currentUser && (
         <ReportModal 

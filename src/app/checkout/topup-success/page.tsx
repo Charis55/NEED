@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle, Loader2, Smartphone, ArrowRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { apiFetch, safeJsonParse } from "@/utils/apiBase";
@@ -31,6 +31,16 @@ function TopupSuccessContent() {
           setVerifiedAmount(data.amount);
         }
         setVerifying(false);
+        // If opened from mobile browser, attempt auto-redirect back to native app
+        if (typeof window !== "undefined") {
+          setTimeout(() => {
+            try {
+              window.location.href = "needapp://technician/dashboard";
+            } catch (e) {
+              // Ignore if deep link scheme cannot be opened
+            }
+          }, 800);
+        }
       })
       .catch((err) => {
         console.error("Top-up verification failed:", err);
@@ -66,13 +76,13 @@ function TopupSuccessContent() {
             </h1>
 
             {verifiedAmount ? (
-              <div className="my-2 px-4 py-2 bg-[var(--color-brutal-yellow)] border-2 border-black font-black text-xl text-black inline-block">
+              <div className="my-2 px-4 py-2 bg-[var(--color-brutal-yellow)] border-2 border-black font-black text-xl text-black inline-block shadow-[2px_2px_0_0_#000]">
                 +₦{(verifiedAmount / 100).toLocaleString("en-NG")} CREDITED
               </div>
             ) : null}
 
             <p className="text-base font-bold text-gray-800 my-4 border-t-4 border-b-4 border-black py-4 w-full leading-relaxed">
-              Your wallet has been funded successfully. Your updated balance is now available for platform transactions.
+              Your wallet has been funded successfully. Your updated balance is now live and available.
             </p>
 
             {errorMsg && (
@@ -80,18 +90,19 @@ function TopupSuccessContent() {
             )}
 
             <div className="w-full space-y-3 pt-2">
-              <Link 
-                href="/technician/dashboard"
-                className="w-full bg-[var(--color-brutal-yellow)] brutal-btn py-4 text-black font-black uppercase tracking-widest text-lg hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all block text-center border-4 border-black shadow-[4px_4px_0_0_#000]"
+              <a 
+                href="needapp://technician/dashboard"
+                className="w-full bg-[var(--color-brutal-green)] py-4 text-black font-black uppercase tracking-widest text-lg hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all block text-center border-4 border-black shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2"
               >
-                Back to Dashboard
-              </Link>
+                <Smartphone className="w-6 h-6 stroke-[3]" />
+                <span>RETURN TO NEED APP</span>
+              </a>
 
               <Link 
-                href="/technician/earnings"
-                className="w-full bg-white text-black font-black uppercase tracking-wider text-xs py-3 border-2 border-black hover:bg-gray-100 transition-colors block text-center"
+                href="/technician/dashboard"
+                className="w-full bg-[var(--color-brutal-yellow)] py-3 text-black font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all block text-center border-2 border-black"
               >
-                View Wallet & Earnings
+                Web Dashboard
               </Link>
             </div>
           </>
