@@ -28,53 +28,70 @@ public class CustomMessagingService extends MessagingService {
 
         String type = data.get("type");
         if ("call".equals(type)) {
-            showCallNotification(data);
+            // When app is in the foreground, the in-app IncomingCallModal displays and rings.
+            // Only show the system status-bar notification when the app is backgrounded or closed.
+            if (!MainActivity.isAppInForeground) {
+                showCallNotification(data);
+            }
         } else if ("cancel_call".equals(type)) {
-            // The caller cancelled or the call ended — dismiss any ringing notification
+            // The caller cancelled or call was declined/ended — dismiss persistent ringing notification
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            notificationManager.cancel(1001);
+            if (notificationManager != null) {
+                notificationManager.cancel(1001);
+            }
         }
     }
 
     private void showCallNotification(Map<String, String> data) {
         String title = data.get("title");
-        if (title == null) title = "Incoming Call";
+        if (title == null || title.isEmpty()) title = data.get("callerName");
+        if (title == null || title.isEmpty()) title = "Incoming Call";
         
         String body = data.get("body");
-        if (body == null) body = "Tap to answer";
+        if (body == null || body.isEmpty()) body = "Tap to answer";
+
+        String reqId = data.get("requestId");
+        if (reqId == null) reqId = data.get("jobId");
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        String channelId = "incoming_calls_v3";
+        if (notificationManager == null) return;
 
-        // Create intent to open the app
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        for (Map.Entry<String, String> entry : data.entrySet()) {
-            intent.putExtra(entry.getKey(), entry.getValue());
-        }
+        String channelId = "incoming_calls_v3";
 
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 1001, intent, flags);
+        // Tap notification body -> Open app
+        Intent mainIntent = new Intent(this, MainActivity.class);
+        mainIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            mainIntent.putExtra(entry.getKey(), entry.getValue());
+        }
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 1001, mainIntent, flags);
         
-        // Answer Intent
-        Intent answerIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("needapp://call/answer?requestId=" + data.get("requestId")));
-        answerIntent.setPackage(getPackageName());
+        // Tap "Answer" -> Open app directly with deep link and immediately answer
+        Intent answerIntent = new Intent(this, MainActivity.class);
+        answerIntent.setAction("ANSWER_CALL");
+        answerIntent.setData(Uri.parse("needapp://call/answer?requestId=" + reqId + "&jobId=" + reqId));
+        answerIntent.putExtra("action", "answer");
+        answerIntent.putExtra("requestId", reqId);
+        answerIntent.putExtra("jobId", reqId);
+        answerIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent answerPendingIntent = PendingIntent.getActivity(this, 1002, answerIntent, flags);
         
-        // Decline Intent (Background Broadcast)
+        // Tap "Decline" -> Background BroadcastReceiver terminates the call and dismisses notification
         Intent declineIntent = new Intent(this, CallActionReceiver.class);
         declineIntent.setAction("DECLINE_CALL");
-        declineIntent.putExtra("requestId", data.get("requestId"));
+        declineIntent.putExtra("requestId", reqId);
+        declineIntent.putExtra("jobId", reqId);
         PendingIntent declinePendingIntent = PendingIntent.getBroadcast(this, 1003, declineIntent, flags);
 
         Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(R.mipmap.ic_launcher) // Fallback icon
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -95,7 +112,7 @@ public class CustomMessagingService extends MessagingService {
         }
 
         Notification notification = builder.build();
-        // FLAG_INSISTENT makes the sound and vibration loop until the notification is cancelled or the tray is opened
+        // FLAG_INSISTENT makes the sound and vibration loop until answered, declined, or cancelled
         notification.flags |= Notification.FLAG_INSISTENT;
 
         notificationManager.notify(1001, notification);

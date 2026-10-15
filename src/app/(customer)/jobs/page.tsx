@@ -9,7 +9,8 @@ import { useAlert } from "@/components/AlertProvider";
 import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle, Wrench, MapPin, Clock, MessageSquare, Calendar, X, Star, CheckCircle, RefreshCw, FileText, PhoneCall } from "lucide-react";
+import { AlertTriangle, Wrench, MapPin, Clock, MessageSquare, Calendar, X, Star, CheckCircle, RefreshCw, FileText, PhoneCall, CreditCard } from "lucide-react";
+import { formatDateTime12Hour, to12HourFormat } from "@/utils/formatTime";
 
 export default function CustomerJobsPage() {
   return (
@@ -141,7 +142,7 @@ function JobsContent() {
       const reqRef = doc(db, "jobRequests", requestId);
       const updatePayload: Partial<JobRequest> = {
         rescheduledAt: Date.now(),
-        newPreferredTime: `${newDate} at ${newTime}`,
+        newPreferredTime: `${newDate} at ${to12HourFormat(newTime)}`,
         rescheduleRequestedBy: "customer",
         rescheduleStatus: "pending"
       };
@@ -293,7 +294,7 @@ function JobsContent() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
                         <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1 text-xs font-bold text-black">
-                          <Clock className="w-3 h-3" /> {req.preferredTime || "Flexible"}
+                          <Clock className="w-3 h-3" /> {formatDateTime12Hour(req.preferredTime) || "Flexible"}
                         </span>
                         {req.neighborhood && (
                           <span className="bg-white border-2 border-black px-2 py-1 flex items-center gap-1 text-xs font-bold text-black">
@@ -345,7 +346,10 @@ function JobsContent() {
                         href={`/jobs/${req.requestId}`} 
                         className="w-full bg-[var(--color-brutal-green)] border-4 border-black font-black uppercase text-center block py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
                       >
-                        <span className="flex items-center justify-center gap-2">💳 PAY DEPOSIT & FINALIZE BOOKING</span>
+                        <span className="flex items-center justify-center gap-2">
+                          <CreditCard className="w-5 h-5 stroke-[2.5]" />
+                          <span>PAY DEPOSIT & FINALIZE BOOKING</span>
+                        </span>
                       </Link>
                     )}
 

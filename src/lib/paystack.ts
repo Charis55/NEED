@@ -5,7 +5,7 @@ const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY as string;
 
 export class PaystackProvider implements PaymentProvider {
   async initializeTransaction(params: { amount: Kobo; email: string; reference: string; metadata?: Record<string, any>; callbackUrl?: string }) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://need-chi.vercel.app";
     let defaultCallbackUrl = `${baseUrl}/checkout/success`;
     if (params.metadata?.type === "wallet_topup") {
       defaultCallbackUrl = `${baseUrl}/checkout/topup-success`;

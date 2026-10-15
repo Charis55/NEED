@@ -156,6 +156,9 @@ export default function AuthForm() {
 
     if (userDoc.exists()) {
       const userData = userDoc.data() as UserAccount;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("need_user_role", userData.role || "customer");
+      }
       if (userData.role === "artisan") {
         const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
         if (artisanDoc.exists()) {

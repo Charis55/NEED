@@ -53,18 +53,19 @@ export async function POST(req: Request) {
     // Token expires in 2 hours (7200 seconds)
     const expirationTimeInSeconds = 7200;
 
-    // In agora-token v2, expiration is passed in seconds
+    // In agora-token v2, expiration is passed in seconds.
+    // Build token with User Account (String(uid)) so Agora Gateway precisely validates the participant.
     const token = RtcTokenBuilder.buildTokenWithUserAccount(
       appId,
       appCertificate,
       channelName,
-      uid, 
+      String(uid),
       role,
       expirationTimeInSeconds,
       expirationTimeInSeconds
     );
 
-    return NextResponse.json({ token }, { headers: corsHeaders });
+    return NextResponse.json({ token, joinUid: String(uid) }, { headers: corsHeaders });
   } catch (error) {
     console.error("Agora Token Generation Error:", error);
     return NextResponse.json({ error: 'Failed to generate token' }, { status: 500, headers: corsHeaders });

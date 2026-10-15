@@ -29,11 +29,23 @@ import { Capacitor } from "@capacitor/core";
 export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Instant cached redirect on mobile/web if user was previously authenticated
+    if (typeof window !== "undefined") {
+      const cachedRole = localStorage.getItem("need_user_role");
+      if (cachedRole === "artisan") {
+        router.replace("/technician/dashboard");
+        return;
+      } else if (cachedRole === "customer") {
+        router.replace("/explore");
+        return;
+      }
+    }
+  }, [router]);
 
   const backgrounds = [
     {
@@ -64,20 +76,47 @@ export default function LandingPage() {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
-            if (data.role === "artisan") {
+            const role = data.role || "customer";
+            if (typeof window !== "undefined") {
+              localStorage.setItem("need_user_role", role);
+            }
+            if (role === "artisan") {
               router.replace("/technician/dashboard");
             } else {
               router.replace("/explore");
             }
+            return;
           }
         } catch (e) {
           console.error("Error redirecting authenticated user", e);
         }
+      } else {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("need_user_role");
+        }
+        setCheckingAuth(false);
       }
     });
 
     return () => unsubscribe();
   }, [router]);
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col items-center justify-center p-6 text-black select-none">
+        <div className="border-4 border-black bg-[var(--color-brutal-yellow)] p-8 shadow-[8px_8px_0_0_#000] flex flex-col items-center gap-4 max-w-sm w-full">
+          <div className="flex items-center gap-2">
+            <span className="font-black text-4xl tracking-tighter uppercase">NEED</span>
+            <div className="w-3.5 h-3.5 bg-black animate-pulse" />
+          </div>
+          <div className="flex items-center gap-3 mt-2">
+            <div className="w-5 h-5 border-4 border-black border-t-transparent rounded-full animate-spin" />
+            <p className="font-bold text-xs uppercase tracking-wider text-black/80">Loading your profile...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col relative overflow-hidden text-black selection:bg-[var(--color-brutal-pink)] selection:text-black">

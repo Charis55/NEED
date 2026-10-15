@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDoc, doc, updateDoc, increment, or } from "firebase/firestore";
 import { JobRequest } from "@/types";
@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { sessionId } from "@/utils/sessionId";
+import { apiFetch } from "@/utils/apiBase";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -30,6 +31,12 @@ export default function GlobalCallManager() {
   const [partnerName, setPartnerName] = useState<string>("Someone");
   const [partnerPhoto, setPartnerPhoto] = useState<string | undefined>();
   const [notifiedCallId, setNotifiedCallId] = useState<string | null>(null);
+
+  const userUidRef = useRef<string | null>(null);
+  userUidRef.current = userUid;
+  const activeJobRef = useRef<JobRequest | null>(null);
+  activeJobRef.current = activeJob;
+  const lastHandledUrlRef = useRef<{ url: string; time: number } | null>(null);
 
   const clearCallNotification = async () => {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
@@ -128,33 +135,77 @@ export default function GlobalCallManager() {
   useEffect(() => {
     if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       const handleDeepLink = async (url: string) => {
-        if (url.startsWith('needapp://call/')) {
-          const urlObj = new URL(url);
-          const action = urlObj.pathname.replace('//', '/').split('/')[2]; // /call/answer -> answer
-          const reqId = urlObj.searchParams.get('requestId');
-          
-          if (reqId) {
-            if (action === 'answer') {
-              clearCallNotification();
-              try {
-                const { updateDoc, doc } = await import("firebase/firestore");
-                await updateDoc(doc(db, "jobRequests", reqId), {
-                  "activeCall.status": "ongoing",
-                  "activeCall.connectedAt": Date.now(),
-                  "activeCall.acceptedBySession": sessionId
-                });
-                playCallSound("pickup");
-              } catch (e) {
-                console.error(e);
-              }
-            } else if (action === 'decline') {
-              clearCallNotification();
-              fetch("/api/calls/end", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jobId: reqId, callerId: userUid, reason: "declined", durationMs: null }),
-              }).catch(console.error);
+        if (!url) return;
+        const now = Date.now();
+        if (lastHandledUrlRef.current && lastHandledUrlRef.current.url === url && now - lastHandledUrlRef.current.time < 5000) {
+          return;
+        }
+        lastHandledUrlRef.current = { url, time: now };
+
+        const urlLower = url.toLowerCase();
+        if (urlLower.includes('needapp://') || urlLower.includes('call/')) {
+          let reqId: string | null = null;
+          try {
+            const urlObj = new URL(url);
+            reqId = urlObj.searchParams.get('requestId') || urlObj.searchParams.get('jobId');
+          } catch (e) {
+            const match = url.match(/[?&](requestId|jobId)=([^&]+)/i);
+            if (match) reqId = decodeURIComponent(match[2]);
+          }
+
+          const targetId = reqId || activeJobRef.current?.requestId;
+          const isAnswer = urlLower.includes('answer');
+          const isDecline = urlLower.includes('decline');
+
+          if (isAnswer && targetId) {
+            clearCallNotification();
+            playCallSound("pickup");
+
+            // Optimistically accept via server API (uses adminDb - guaranteed even before auth syncs)
+            apiFetch("/api/calls/accept", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ requestId: targetId, sessionId }),
+            }).catch(err => console.warn("Failed to accept call via server:", err));
+
+            // Also update directly in Firestore for instant local reactivity
+            try {
+              const { updateDoc, doc } = await import("firebase/firestore");
+              await updateDoc(doc(db, "jobRequests", targetId), {
+                "activeCall.status": "ongoing",
+                "activeCall.connectedAt": Date.now(),
+                "activeCall.acceptedBySession": sessionId
+              });
+            } catch (e) {
+              console.warn("Client updateDoc accept fallback:", e);
             }
+          } else if (isDecline && targetId) {
+            clearCallNotification();
+            playCallSound("end");
+
+            // Directly update Firestore immediately (<50ms) so caller stops ringing right away
+            try {
+              const { updateDoc, doc } = await import("firebase/firestore");
+              await updateDoc(doc(db, "jobRequests", targetId), {
+                "activeCall.status": "ended",
+                "activeCall.endedAt": Date.now(),
+                "activeCall.endedReason": "declined",
+                lastMessageAt: Date.now(),
+              });
+            } catch (e) {
+              console.warn("Client updateDoc decline failed:", e);
+            }
+
+            apiFetch("/api/calls/decline", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                requestId: targetId,
+                jobId: targetId,
+                callerId: userUidRef.current,
+                reason: "declined"
+              }),
+            }).catch(console.error);
           }
         }
       };
@@ -167,12 +218,12 @@ export default function GlobalCallManager() {
       });
 
       // Handle warm start
-      const listener = App.addListener('appUrlOpen', (data) => {
+      const listenerPromise = App.addListener('appUrlOpen', (data) => {
         handleDeepLink(data.url);
       });
       
       return () => {
-        listener.then(l => l.remove());
+        listenerPromise.then(l => l.remove()).catch(() => {});
       };
     }
   }, []);
@@ -228,8 +279,8 @@ export default function GlobalCallManager() {
     playCallSound("end");
     clearCallNotification();
 
-    // Optimistically clear UI so user sees the dismissal instantly
-    setActiveJob(null);
+    const targetJobId = activeJob.requestId;
+    const finalReason = reason || "ended";
 
     // Compute duration for the server (it also computes it, but pass what we know client-side)
     let durationMs: number | null = null;
@@ -237,14 +288,29 @@ export default function GlobalCallManager() {
       durationMs = Math.max(0, Date.now() - activeJob.activeCall.connectedAt);
     }
 
-    // Delegate all Firestore updates, message logging, and push notifications to the server
-    fetch("/api/calls/end", {
+    // Direct client Firestore update for instant (<50ms) reaction on both caller & receiver devices
+    try {
+      await updateDoc(doc(db, "jobRequests", targetJobId), {
+        "activeCall.status": "ended",
+        "activeCall.endedAt": Date.now(),
+        "activeCall.endedReason": finalReason,
+        lastMessageAt: Date.now(),
+      });
+    } catch (firestoreErr) {
+      console.warn("Client direct updateDoc failed on endCallWithLog:", firestoreErr);
+    }
+
+    // Optimistically clear UI so user sees the dismissal instantly
+    setActiveJob(null);
+
+    // Delegate message logging, audit events, and push notifications to the server via mobile-safe apiFetch
+    apiFetch("/api/calls/end", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jobId: activeJob.requestId,
+        jobId: targetJobId,
         callerId: userUid,
-        reason: reason || "ended",
+        reason: finalReason,
         durationMs,
       }),
     }).catch(err => console.error("Failed to end call via server:", err));

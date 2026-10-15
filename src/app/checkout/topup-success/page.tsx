@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CheckCircle, Loader2, ArrowRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { apiFetch, safeJsonParse } from "@/utils/apiBase";
 
 function TopupSuccessContent() {
   const searchParams = useSearchParams();
@@ -19,12 +20,12 @@ function TopupSuccessContent() {
     }
 
     // Verify transaction with server and immediately credit wallet balance
-    fetch("/api/checkout/verify", {
+    apiFetch("/api/checkout/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reference, type: "wallet_topup" }),
     })
-      .then((res) => res.json())
+      .then((res) => safeJsonParse(res))
       .then((data) => {
         if (data.amount) {
           setVerifiedAmount(data.amount);

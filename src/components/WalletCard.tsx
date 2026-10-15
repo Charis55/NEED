@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown, X, Loader2 } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Wallet, UserPrivate } from "@/types/platform";
 import Link from "next/link";
+import { apiFetch, safeJsonParse } from "@/utils/apiBase";
 
 export default function WalletCard() {
   const { showAlert } = useAlert();
@@ -60,8 +61,8 @@ export default function WalletCard() {
     const shouldShowForm = !userPrivate?.bankAccount || showBankForm;
     if (shouldShowForm && banks.length === 0 && !fetchingBanks && showWithdrawModal) {
       setFetchingBanks(true);
-      fetch("/api/wallet/banks")
-        .then(res => res.json())
+      apiFetch("/api/wallet/banks")
+        .then(res => safeJsonParse(res))
         .then(data => {
           if (data.banks) {
             // Sort banks alphabetically
@@ -83,7 +84,7 @@ export default function WalletCard() {
     setSavingBank(true);
     try {
       const selectedBank = banks.find(b => b.code === bankCode);
-      const res = await fetch("/api/wallet/add-bank", {
+      const res = await apiFetch("/api/wallet/add-bank", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,7 +94,7 @@ export default function WalletCard() {
           bankName: selectedBank?.name || bankName
         })
       });
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       if (!res.ok) throw new Error(data.error || "Failed to add bank account");
       
       setUserPrivate(prev => ({ ...prev, userId: auth.currentUser!.uid, bankAccount: data.bankAccount }));
@@ -121,7 +122,7 @@ export default function WalletCard() {
     
     setWithdrawing(true);
     try {
-      const res = await fetch("/api/wallet/withdraw", {
+      const res = await apiFetch("/api/wallet/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,7 +130,7 @@ export default function WalletCard() {
           amount: amountKobo
         })
       });
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       if (!res.ok) throw new Error(data.error || "Withdrawal failed");
       
       setShowWithdrawModal(false);
@@ -153,15 +154,16 @@ export default function WalletCard() {
     
     setToppingUp(true);
     try {
-      const res = await fetch("/api/wallet/topup", {
+      const res = await apiFetch("/api/wallet/topup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: auth.currentUser?.uid,
+          email: auth.currentUser?.email || undefined,
           amount: amountKobo
         })
       });
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       if (!res.ok) throw new Error(data.error || "Failed to initialize top-up");
       
       if (data.authorizationUrl) {

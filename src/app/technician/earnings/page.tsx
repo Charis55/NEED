@@ -17,7 +17,16 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowDownLeft,
-  Filter
+  Filter,
+  Briefcase,
+  Wallet,
+  Landmark,
+  Smartphone,
+  Globe,
+  CreditCard,
+  Banknote,
+  Scale,
+  Layers
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAlert } from "@/components/AlertProvider";
@@ -55,12 +64,36 @@ interface WalletTxItem {
   accountName: string | null;
 }
 
-function getChannelBadge(channel?: string, type?: string) {
+interface ChannelBadgeConfig {
+  label: string;
+  iconType: "landmark" | "smartphone" | "globe" | "credit-card" | "wallet" | "banknote";
+  bg: string;
+  text: string;
+}
+
+const ChannelIcon = ({ type }: { type: ChannelBadgeConfig["iconType"] }) => {
+  switch (type) {
+    case "landmark":
+      return <Landmark className="w-3.5 h-3.5 stroke-[2.5]" />;
+    case "smartphone":
+      return <Smartphone className="w-3.5 h-3.5 stroke-[2.5]" />;
+    case "globe":
+      return <Globe className="w-3.5 h-3.5 stroke-[2.5]" />;
+    case "credit-card":
+      return <CreditCard className="w-3.5 h-3.5 stroke-[2.5]" />;
+    case "wallet":
+      return <Wallet className="w-3.5 h-3.5 stroke-[2.5]" />;
+    default:
+      return <Banknote className="w-3.5 h-3.5 stroke-[2.5]" />;
+  }
+};
+
+function getChannelBadge(channel?: string, type?: string): ChannelBadgeConfig {
   const ch = (channel || "").toLowerCase();
   if (ch.includes("transfer") || ch === "bank_transfer") {
     return {
       label: "Bank Transfer",
-      icon: "🏦",
+      iconType: "landmark",
       bg: "bg-[var(--color-brutal-teal)]",
       text: "text-black",
     };
@@ -68,7 +101,7 @@ function getChannelBadge(channel?: string, type?: string) {
   if (ch.includes("ussd")) {
     return {
       label: "USSD Code (*737#, etc.)",
-      icon: "📱",
+      iconType: "smartphone",
       bg: "bg-[var(--color-brutal-yellow)]",
       text: "text-black",
     };
@@ -76,7 +109,7 @@ function getChannelBadge(channel?: string, type?: string) {
   if (ch === "bank" || ch.includes("internet") || ch.includes("online bank")) {
     return {
       label: "Internet Banking",
-      icon: "🌐",
+      iconType: "globe",
       bg: "bg-purple-200",
       text: "text-purple-950",
     };
@@ -84,7 +117,7 @@ function getChannelBadge(channel?: string, type?: string) {
   if (ch.includes("card")) {
     return {
       label: "Debit / Credit Card",
-      icon: "💳",
+      iconType: "credit-card",
       bg: "bg-[var(--color-brutal-blue)]",
       text: "text-black",
     };
@@ -92,7 +125,7 @@ function getChannelBadge(channel?: string, type?: string) {
   if (ch.includes("wallet")) {
     return {
       label: "Wallet Balance",
-      icon: "💼",
+      iconType: "wallet",
       bg: "bg-amber-100",
       text: "text-black",
     };
@@ -100,14 +133,14 @@ function getChannelBadge(channel?: string, type?: string) {
   if (type === "topup") {
     return {
       label: "Card / Transfer",
-      icon: "💳",
+      iconType: "credit-card",
       bg: "bg-[var(--color-brutal-blue)]",
       text: "text-black",
     };
   }
   return {
     label: channel || "Direct Payment",
-    icon: "💵",
+    iconType: "banknote",
     bg: "bg-gray-200",
     text: "text-black",
   };
@@ -246,8 +279,8 @@ const WalletTxRow = ({ tx }: { tx: WalletTxItem }) => {
 
             {/* Medium / Channel indicator */}
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 border border-black shadow-[1px_1px_0_0_#000] ${channelBadge.bg} ${channelBadge.text}`}>
-                <span>{channelBadge.icon}</span>
+              <span className={`inline-flex items-center gap-1.5 text-[11px] font-black px-2 py-0.5 border border-black shadow-[1px_1px_0_0_#000] ${channelBadge.bg} ${channelBadge.text}`}>
+                <ChannelIcon type={channelBadge.iconType} />
                 <span>{channelBadge.label}</span>
               </span>
               {tx.bankName && (
@@ -288,7 +321,10 @@ const WalletTxRow = ({ tx }: { tx: WalletTxItem }) => {
           </div>
           <div className="flex justify-between py-1 border-b border-gray-200">
             <span className="text-gray-600 uppercase">Payment Medium</span>
-            <span className="font-black text-black">{channelBadge.icon} {channelBadge.label}</span>
+            <span className="font-black text-black inline-flex items-center gap-1.5">
+              <ChannelIcon type={channelBadge.iconType} />
+              <span>{channelBadge.label}</span>
+            </span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-200">
             <span className="text-gray-600 uppercase">Reference Code</span>
@@ -552,7 +588,8 @@ Date: ${new Date().toLocaleDateString()}
                 : "bg-white text-black hover:bg-[var(--color-brutal-bg)]"
             }`}
           >
-            <span>💼 Jobs & Settlements</span>
+            <Briefcase className="w-5 h-5 stroke-[2.5]" />
+            <span>Jobs & Settlements</span>
             <span className={`text-xs px-2 py-0.5 border-2 ${activeTab === 'jobs' ? 'bg-white text-black border-white' : 'bg-black text-white border-black'}`}>
               {totalJobsCount}
             </span>
@@ -565,7 +602,8 @@ Date: ${new Date().toLocaleDateString()}
                 : "bg-white text-black hover:bg-[var(--color-brutal-bg)]"
             }`}
           >
-            <span>💳 Wallet & Funding</span>
+            <Wallet className="w-5 h-5 stroke-[2.5]" />
+            <span>Wallet & Funding</span>
             <span className={`text-xs px-2 py-0.5 border-2 ${activeTab === 'wallet' ? 'bg-white text-black border-white' : 'bg-black text-white border-black'}`}>
               {walletTransactions.length}
             </span>
@@ -707,23 +745,27 @@ Date: ${new Date().toLocaleDateString()}
                 <Filter className="w-4 h-4" /> Filter:
               </span>
               {[
-                { key: "all", label: "All Activities" },
-                { key: "topup", label: "📥 Account Funding" },
-                { key: "withdrawal", label: "📤 Withdrawals" },
-                { key: "commission", label: "⚖️ Commissions" },
-              ].map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setTxFilter(f.key as any)}
-                  className={`px-3 py-1.5 text-xs font-black uppercase border-2 border-black whitespace-nowrap transition-transform ${
-                    txFilter === f.key 
-                      ? "bg-black text-white shadow-[2px_2px_0_0_#000] -translate-y-0.5" 
-                      : "bg-white text-black hover:bg-gray-100"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+                { key: "all", label: "All Activities", icon: Layers },
+                { key: "topup", label: "Account Funding", icon: ArrowDownLeft, iconColor: "text-[var(--color-brutal-green)]" },
+                { key: "withdrawal", label: "Withdrawals", icon: ArrowUpRight, iconColor: "text-[var(--color-brutal-teal)]" },
+                { key: "commission", label: "Commissions", icon: Scale, iconColor: "text-[var(--color-brutal-yellow)]" },
+              ].map(f => {
+                const IconComp = f.icon;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setTxFilter(f.key as any)}
+                    className={`px-3 py-1.5 text-xs font-black uppercase border-2 border-black whitespace-nowrap transition-transform flex items-center gap-1.5 ${
+                      txFilter === f.key 
+                        ? "bg-black text-white shadow-[2px_2px_0_0_#000] -translate-y-0.5" 
+                        : "bg-white text-black hover:bg-gray-100"
+                    }`}
+                  >
+                    <IconComp className={`w-3.5 h-3.5 stroke-[2.5] ${txFilter === f.key ? "text-white" : (f.iconColor || "text-black")}`} />
+                    <span>{f.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Transactions List */}

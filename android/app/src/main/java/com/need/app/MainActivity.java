@@ -3,22 +3,106 @@ package com.need.app;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.GeolocationPermissions;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.util.Log;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.util.PermissionHelper;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 public class MainActivity extends BridgeActivity {
 
+    public static volatile boolean isAppInForeground = false;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Register custom native plugins before super.onCreate or in onCreate
+        registerPlugin(AudioTogglePlugin.class);
         super.onCreate(savedInstanceState);
         createNotificationChannel();
+        handleCallIntent(getIntent());
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        isAppInForeground = true;
+
+        // Dismiss persistent incoming call notification when app is open and visible
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.cancel(1001);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        isAppInForeground = false;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+
+        // Forward warm-start deep links to Capacitor bridge
+        if (this.bridge != null) {
+            this.bridge.onNewIntent(intent);
+        }
+
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.cancel(1001);
+        }
+
+        handleCallIntent(intent);
+    }
+
+    private void handleCallIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        String reqId = intent.getStringExtra("requestId");
+        if (reqId == null) reqId = intent.getStringExtra("jobId");
+
+        Uri data = intent.getData();
+        boolean isAnswer = "ANSWER_CALL".equals(action) || 
+                           "answer".equals(intent.getStringExtra("action")) ||
+                           (data != null && data.toString().contains("call/answer"));
+
+        if (isAnswer) {
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.cancel(1001);
+            }
+            if (reqId == null && data != null) {
+                reqId = data.getQueryParameter("requestId");
+                if (reqId == null) reqId = data.getQueryParameter("jobId");
+            }
+            if (reqId != null && !reqId.isEmpty()) {
+                final String targetRequestId = reqId;
+                Log.d("MainActivity", "Native instant answer for requestId: " + targetRequestId);
+                try {
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+                    db.collection("jobRequests").document(targetRequestId)
+                        .update(
+                            "activeCall.status", "ongoing",
+                            "activeCall.connectedAt", System.currentTimeMillis()
+                        )
+                        .addOnSuccessListener(aVoid -> Log.d("MainActivity", "Native answer Firestore update succeeded"))
+                        .addOnFailureListener(e -> Log.w("MainActivity", "Native answer Firestore update failed: " + e.getMessage()));
+                } catch (Exception e) {
+                    Log.w("MainActivity", "Native answer Firestore error: " + e.getMessage());
+                }
+            }
+        }
     }
 
     private void createNotificationChannel() {

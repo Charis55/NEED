@@ -47,6 +47,18 @@ function getAdminApp(): App {
     console.warn("Could not load local serviceAccountKey.json");
   }
 
+  // Embedded service account credentials fallback for production environments (Vercel)
+  try {
+    const embeddedServiceAccount = {
+      projectId: "momentum-b4215",
+      clientEmail: "firebase-adminsdk-fbsvc@momentum-b4215.iam.gserviceaccount.com",
+      privateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDy25Uo3alpIDhj\nP108EHpWEvBD8JE6sgjA1Va77lXN4R35h/6B+A6rSkOiSx5+8qaPaQkfO+JnCtWw\nMDJ6ZQfx7cicEjHY/fsdssm3kqSmzgYvySfuC5T17kSzyxjXSDbWx6VavBcchsBY\nMMGlH1KLfVpD4sGWU7e2eETZJaQgB4fqyRNEWhObRES8aPvg9FUBa4t3kkn2Xpug\niLH5vB7tD/TXZ6fqxcuJ3HqIg/nONuyANPCuooJxLNIMe0BvQ3CViRGAWjRY2Qkl\nFO7fEdr+U2YeA+GhzStwDWakq5lDNIbaHLC9/xWOTGOsbUPZJTi6WkKpusn4AHzO\nVZ+0adxFAgMBAAECggEACm0F1sbJVpOFCDG4sXLtpZNTkD8cJP5upMSj4BaHxXpk\nHInLkc3R52WdSLLb4MxO/Tofo6EhA5Zx/QncqOd8c1Tnd1fKnwusQ6agxUo82lJe\n7p8+oRgLMZGkjmlqLBfUDt1sSlxny5g3WrHhJlMVapqbjO2HrQn0CZfZMM9OX/eN\nYxzDCF/5aiMBl4IWz86eQAK4rkz4NlJYu1MRL87Sm9IRg4bCqjICkZw9nI+taAS4\nRgSF+nKg4afTINo1EuTK94BVj26OH1FJEJ4BUBdHdVv1Tii89LKOGvqaAgvHmcWL\n3ka6YVN0eAnlybw4RVs9gQYrIkXoMMse7l9IktkqAQKBgQD9/i4Y9nzysopDp+kU\nGu3KkzZFwbp/f965zfJV2wQbnApSz6ED3RiZXo46mEG3eF4t1UThUGYypsHJ06es\nD6y/o/1y8b+F1JAHVfFNtxUg2fhYE4zFE42YeuBS92Qo6QtxZbnCNRhmWiSdvmEU\n55WEOuQ+YPZNwAyV0vh/xyx/AQKBgQD0xuBjy2I4a3x5abH3V52fzSibd11c4nQj\nuqzg+gDnR1DCmJtblYIt4bZSbW9BrjtZ65rB5JKKRXaP3yvBZ3itXkA6iPPNJXtt\nGFWLOAne46tiSW0jP9BnAasZWa2+Xw+Av3G/ty8405TuaITtJqclzT3cko58bYR2\n+VerlYyhRQKBgQDiT0qPn4CxVvfvVHtPGLdr2kNvYDBmTm8Lqz8T1LQSTbS9GJdl\nM+kpLqEYAHX9ndh8ihx3jgWheAgPZvFtVAIeN2YqttBp1H4Iq0D4d/rxbIXlJHY3\nWza8+C9MfXXXJd62SWd8bYayG/uoOeuSjs4gJcEc+5Q6rrYIARS99Z/mAQKBgD59\nQy3W72VN84IffKKTiJcSTiqaZ4hd+55feuEYkgB5UWHMieTwn0JNXDlg3MVc0KQd\nJO4ZB1wrbaA/LjF60/EWnbkT24Hk7sSkMLqQ/NwdLVSzQBx+nxqc72xSW6u9Iv0Q\nYt65ymFsipnurvjIJGXfJsrX025qmyWwdDRGwpctAoGAZL4G1eWor8LW/7jp4Cfz\nNbSzs4eW/0DsIXBwrJ55b91GgEj9lQ+qkjfunX9wbJw2EmB7zINgIBU4Vrwjkcp3\nEqDn5I47999uaFrr0cqvDf9T2c4lhbyohdoEkH2p3Bgv5hQdIwPPJpr+epWj0JuD\nG1etIo415wovDO0YcPctUaA=\n-----END PRIVATE KEY-----\n",
+    };
+    return initAdminApp({ credential: cert(embeddedServiceAccount) });
+  } catch(e) {
+    console.warn("Could not load embedded service account credentials, falling back...");
+  }
+
   // Minimal init — works for Firestore reads/writes in server context
   // (Auth token verification still possible with projectId only in some environments)
   return initAdminApp({

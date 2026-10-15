@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
+import { formatDateTime12Hour, to12HourFormat } from "@/utils/formatTime";
 import { reverseGeocode, geocode } from "@/utils/location";
 
 export default function CustomerManageJobPage() {
@@ -229,7 +230,7 @@ function JobsContent() {
     try {
       await updateDoc(doc(db, "jobRequests", job!.requestId), {
         rescheduledAt: Date.now(),
-        newPreferredTime: `${newDate} at ${newTime}`,
+        newPreferredTime: `${newDate} at ${to12HourFormat(newTime)}`,
         rescheduleRequestedBy: "customer",
         rescheduleStatus: "pending"
       });
@@ -911,7 +912,7 @@ function JobsContent() {
                     <p className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1 flex items-center gap-1.5">
                       <Clock className="w-4 h-4" /> Preferred Schedule
                     </p>
-                    <p className="font-black text-lg text-black uppercase">{job.preferredTime || "Flexible"}</p>
+                    <p className="font-black text-lg text-black uppercase">{formatDateTime12Hour(job.preferredTime) || "Flexible"}</p>
                   </div>
 
                   <div className="p-4 bg-gray-50 border-3 border-black flex flex-col justify-between">
@@ -959,7 +960,7 @@ function JobsContent() {
                     <div className="bg-[var(--color-brutal-yellow)] p-4 border-3 border-black">
                       <p className="font-black text-black uppercase mb-2">
                         Technician requested to reschedule to: <br />
-                        <span className="text-lg underline">{job.newPreferredTime}</span>
+                        <span className="text-lg underline">{formatDateTime12Hour(job.newPreferredTime)}</span>
                       </p>
                       <div className="flex gap-2">
                         <button

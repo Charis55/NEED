@@ -5,19 +5,29 @@ import { writeJobEvent } from "@/lib/jobEvents";
 import { JobRequestData } from "@/types/platform";
 import { getConfig } from "@/lib/platformConfig";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { reference, jobId, type: requestedType } = await req.json();
 
     if (!reference) {
-      return NextResponse.json({ error: "Missing reference" }, { status: 400 });
+      return NextResponse.json({ error: "Missing reference" }, { status: 400, headers: corsHeaders });
     }
 
     // Verify transaction with Paystack
     const verification = await paymentProvider.verifyTransaction(reference);
     
     if (verification.status !== "success") {
-      return NextResponse.json({ success: false, message: "Transaction not successful yet" });
+      return NextResponse.json({ success: false, message: "Transaction not successful yet" }, { headers: corsHeaders });
     }
 
     const amount = verification.amount;
@@ -170,12 +180,12 @@ export async function POST(req: NextRequest) {
          }).catch(console.error);
       }
 
-      return NextResponse.json({ success: true, type: "deposit", jobId: targetJobId, amount });
+      return NextResponse.json({ success: true, type: "deposit", jobId: targetJobId, amount }, { headers: corsHeaders });
     }
 
-    return NextResponse.json({ success: true, type: detectedType, amount });
+    return NextResponse.json({ success: true, type: detectedType, amount }, { headers: corsHeaders });
   } catch (error: any) {
     console.error("Checkout verify error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }

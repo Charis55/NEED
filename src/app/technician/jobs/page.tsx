@@ -11,6 +11,7 @@ import ReportModal from "@/components/ReportModal";
 import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
+import { formatDateTime12Hour } from "@/utils/formatTime";
 
 export default function ArtisanDashboard() {
   const { showAlert } = useAlert();
@@ -47,22 +48,32 @@ export default function ArtisanDashboard() {
       let broadcastResults: JobRequest[] = [];
 
       const updateCombined = () => {
-        // Direct jobs assigned to this artisan
+        // Direct jobs assigned to this artisan - sort most recently active first
         const direct = [...directResults];
-        direct.sort((a, b) => b.createdAt - a.createdAt);
-
-        // Open broadcast jobs up for grabs (unassigned to any technician)
-        const unassignedBroadcasts = broadcastResults.filter(
-          job => (!job.artisanId || job.artisanId === "") && job.status === "pending"
-        );
-
-        // Sort: jobs matching technician's skills first, then newest
-        unassignedBroadcasts.sort((a, b) => {
-          const aMatch = validServices.some(svc => svc.trade === a.trade && svc.subcategory === a.subcategory) ? 1 : 0;
-          const bMatch = validServices.some(svc => svc.trade === b.trade && svc.subcategory === b.subcategory) ? 1 : 0;
-          if (aMatch !== bMatch) return bMatch - aMatch;
-          return b.createdAt - a.createdAt;
+        direct.sort((a, b) => {
+          const aTime = a.updatedAt || a.createdAt || 0;
+          const bTime = b.updatedAt || b.createdAt || 0;
+          return bTime - aTime;
         });
+
+        // Open broadcast jobs up for grabs (STRICTLY matching technician's profile skills)
+        const unassignedBroadcasts = broadcastResults.filter(job => {
+          if (job.artisanId && job.artisanId !== "") return false;
+          if (job.status !== "pending") return false;
+
+          // Technician MUST have this trade / subcategory in their profile
+          return validServices.some(svc => {
+            if (!svc.trade || !job.trade) return false;
+            const tradeMatches = svc.trade.trim().toLowerCase() === job.trade.trim().toLowerCase();
+            if (svc.subcategory && job.subcategory) {
+              return tradeMatches && svc.subcategory.trim().toLowerCase() === job.subcategory.trim().toLowerCase();
+            }
+            return tradeMatches;
+          });
+        });
+
+        // Sort newest first
+        unassignedBroadcasts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         setRequests(direct);
         setUpForGrabsJobs(unassignedBroadcasts);
@@ -141,43 +152,11 @@ export default function ArtisanDashboard() {
         status: "accepted",
         state: requiresDeposit ? "awaiting_deposit" : "confirmed",
         depositStatus: requiresDeposit ? "pending" : (job.depositStatus || "held"),
+        updatedAt: Date.now(),
       };
 
       await updateDoc(reqRef, updatePayload);
-
-      // Auto-add trade & subcategory to technician profile if missing
-      try {
-        const artisanRef = doc(db, "artisans", user.uid);
-        const artisanSnap = await getDoc(artisanRef);
-        if (artisanSnap.exists()) {
-          const artData = artisanSnap.data();
-          const currentServices: any[] = artData.services || (artData.trade && artData.subcategory ? [{ trade: artData.trade, subcategory: artData.subcategory }] : []);
-          const alreadyHas = currentServices.some((s: any) => s.trade === job.trade && s.subcategory === job.subcategory);
-          if (!alreadyHas && job.trade && job.subcategory) {
-            const newServices = [
-              ...currentServices,
-              {
-                trade: job.trade,
-                subcategory: job.subcategory,
-                hasCertification: false,
-                certificateUrl: null,
-                isCertificateVerified: false,
-              }
-            ];
-            const newKeys = newServices.map((s: any) => `${s.trade}:${s.subcategory}`);
-            await updateDoc(artisanRef, {
-              services: newServices,
-              serviceKeys: newKeys,
-            });
-            showAlert(`Job claimed! "${job.subcategory}" was also added to your profile skills.`, "success");
-          } else {
-            showAlert("Job claimed successfully! Added to your active bookings.", "success");
-          }
-        }
-      } catch (skillErr) {
-        console.warn("Could not auto-add skill to profile:", skillErr);
-        showAlert("Job claimed successfully! Added to your active bookings.", "success");
-      }
+      showAlert("Job claimed successfully! Added to your active bookings.", "success");
 
       // Send push notification to customer
       if (job.customerId) {
@@ -225,39 +204,10 @@ export default function ArtisanDashboard() {
         state: "negotiating" as any,
         counterOfferAmount: amount,
         lastCounterBy: "artisan",
+        updatedAt: Date.now(),
       };
 
       await updateDoc(reqRef, updatePayload);
-
-      // Auto-add trade & subcategory to technician profile if missing
-      try {
-        const artisanRef = doc(db, "artisans", user.uid);
-        const artisanSnap = await getDoc(artisanRef);
-        if (artisanSnap.exists()) {
-          const artData = artisanSnap.data();
-          const currentServices: any[] = artData.services || (artData.trade && artData.subcategory ? [{ trade: artData.trade, subcategory: artData.subcategory }] : []);
-          const alreadyHas = currentServices.some((s: any) => s.trade === job.trade && s.subcategory === job.subcategory);
-          if (!alreadyHas && job.trade && job.subcategory) {
-            const newServices = [
-              ...currentServices,
-              {
-                trade: job.trade,
-                subcategory: job.subcategory,
-                hasCertification: false,
-                certificateUrl: null,
-                isCertificateVerified: false,
-              }
-            ];
-            const newKeys = newServices.map((s: any) => `${s.trade}:${s.subcategory}`);
-            await updateDoc(artisanRef, {
-              services: newServices,
-              serviceKeys: newKeys,
-            });
-          }
-        }
-      } catch (skillErr) {
-        console.warn("Could not auto-add skill to profile:", skillErr);
-      }
 
       // Send push notification to customer
       if (job.customerId) {
@@ -620,7 +570,7 @@ export default function ArtisanDashboard() {
                               <MapPin className="w-3.5 h-3.5" /> {job.neighborhood || "Location on file"}
                             </span>
                             <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2.5 py-1 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5" /> {job.preferredTime || "Flexible"}
+                              <Clock className="w-3.5 h-3.5" /> {formatDateTime12Hour(job.preferredTime) || "Flexible"}
                             </span>
                           </div>
                         </div>
@@ -821,7 +771,7 @@ export default function ArtisanDashboard() {
                         </h3>
                         <p className="text-sm text-black font-bold flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
                           <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood || "Location on file"}</span>
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {req.preferredTime || "Flexible"}</span>
+                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDateTime12Hour(req.preferredTime) || "Flexible"}</span>
                         </p>
                       </div>
                       

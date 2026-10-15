@@ -12,6 +12,7 @@ import { compressImage } from "@/utils/imageCompression";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import BookingTermsCheckbox from "@/components/BookingTermsCheckbox";
+import { to12HourFormat } from "@/utils/formatTime";
 
 export default function MultiServiceBroadcastJobPage({ 
   params,
@@ -206,7 +207,7 @@ export default function MultiServiceBroadcastJobPage({
         mediaUrl: mediaUrl || null,
         neighborhood: locationData?.name || "",
         locationCoords: { lat: locationData?.lat || 0, lng: locationData?.lng || 0 },
-        preferredTime: `${preferredDate} at ${preferredTime}`,
+        preferredTime: `${preferredDate} at ${to12HourFormat(preferredTime)}`,
         offerAmount: parsedAmount,
         agreedPrice: parsedAmount * 100,
         depositStatus: "none",

@@ -29,6 +29,7 @@ import {
   ChevronRight,
   FileCheck
 } from "lucide-react";
+import { formatDateTime12Hour, to12HourFormat } from "@/utils/formatTime";
 
 export default function TechnicianManageJobPage() {
   const params = useParams();
@@ -243,7 +244,7 @@ export default function TechnicianManageJobPage() {
     try {
       await updateDoc(doc(db, "jobRequests", job!.requestId), {
         rescheduledAt: Date.now(),
-        newPreferredTime: `${rescheduleDate} at ${rescheduleTime}`,
+        newPreferredTime: `${rescheduleDate} at ${to12HourFormat(rescheduleTime)}`,
         rescheduleRequestedBy: "artisan",
         rescheduleStatus: "pending"
       });
@@ -679,7 +680,7 @@ export default function TechnicianManageJobPage() {
                     <p className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1 flex items-center gap-1.5">
                       <Clock className="w-4 h-4" /> Preferred Schedule
                     </p>
-                    <p className="font-black text-lg text-black uppercase">{job.preferredTime || "Flexible"}</p>
+                    <p className="font-black text-lg text-black uppercase">{formatDateTime12Hour(job.preferredTime) || "Flexible"}</p>
                   </div>
 
                   <div className="p-4 bg-gray-50 border-3 border-black">
@@ -755,7 +756,7 @@ export default function TechnicianManageJobPage() {
                     <div className="bg-[var(--color-brutal-yellow)] p-4 border-3 border-black">
                       <p className="font-black text-black uppercase mb-2">
                         Customer requested to reschedule to: <br />
-                        <span className="text-lg underline">{job.newPreferredTime}</span>
+                        <span className="text-lg underline">{formatDateTime12Hour(job.newPreferredTime)}</span>
                       </p>
                       <div className="flex gap-2">
                         <button

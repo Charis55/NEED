@@ -4,6 +4,16 @@ import { getMessaging } from "firebase-admin/messaging";
 import { writeJobEvent } from "@/lib/jobEvents";
 import { FieldValue } from "firebase-admin/firestore";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * POST /api/calls/end
  *
@@ -23,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (!jobId || !callerId) {
       return NextResponse.json(
         { error: "jobId and callerId are required" },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -31,14 +41,14 @@ export async function POST(req: NextRequest) {
     const jobSnap = await jobRef.get();
 
     if (!jobSnap.exists) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      return NextResponse.json({ error: "Job not found" }, { status: 404, headers: corsHeaders });
     }
 
     const job = jobSnap.data()!;
     const activeCall = job.activeCall;
 
     if (!activeCall) {
-      return NextResponse.json({ success: true, skipped: true });
+      return NextResponse.json({ success: true, skipped: true }, { headers: corsHeaders });
     }
 
     const isVideo = activeCall.type === "video";
@@ -213,9 +223,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (error: any) {
     console.error("Error ending call:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }

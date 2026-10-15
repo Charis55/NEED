@@ -170,6 +170,10 @@ service cloud.firestore {
         ])) &&
         // GPS location updates are restricted to the assigned artisan
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['artisanLocation', 'heading', 'speed']) || isJobArtisan())
+      ) || (
+        // Allow answering or terminating a call directly from native Android intents/receivers
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeCall', 'lastMessageAt']) &&
+        (request.resource.data.activeCall.status in ['ended', 'ongoing'])
       );
 
       allow delete: if false;

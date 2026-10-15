@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { App } from "@capacitor/app";
+import { apiFetch } from "@/utils/apiBase";
+
+interface AudioTogglePlugin {
+  setAudioMode(options: { mode: "speaker" | "earpiece" | "normal" }): Promise<{ success: boolean; mode?: string }>;
+  isSpeakerphoneOn(): Promise<{ speakerOn: boolean }>;
+  startOngoingCall(options: {
+    partnerName: string;
+    isVideo: boolean;
+    connectedAt: number;
+    isMuted?: boolean;
+    isSpeaker?: boolean;
+  }): Promise<{ success: boolean }>;
+  stopOngoingCall(): Promise<{ success: boolean }>;
+}
+
+const AudioToggle = registerPlugin<AudioTogglePlugin>("AudioToggle");
 
 interface AgoraCallModalProps {
   channelName: string;
@@ -18,6 +34,9 @@ interface AgoraCallModalProps {
 export default function AgoraCallModal({ channelName, uid, isVideo, partnerName, partnerPhoto, onEndCall }: AgoraCallModalProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [joinUid, setJoinUid] = useState<string | null>(null);
+  const isJoiningRef = useRef(false);
+  const hasJoinedRef = useRef(false);
   const [joined, setJoined] = useState(false);
   const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack | null>(null);
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
@@ -25,9 +44,11 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   
   const [micMuted, setMicMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(true);
+  // Default audio calls to discrete earpiece (false); video calls to loudspeaker (true)
+  const [speakerOn, setSpeakerOn] = useState(isVideo);
   const [error, setError] = useState("");
   const [callDuration, setCallDuration] = useState(0);
+  const connectedAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
     // Play pickup sound when call connects
@@ -35,7 +56,39 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
       const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
       audio.play().catch(e => console.warn("Audio play failed:", e));
     }
+
+    return () => {
+      // Ensure audio routing is reset to normal and notification is dismissed when exiting call
+      if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+        AudioToggle.stopOngoingCall().catch(e => console.warn("AudioToggle stopOngoingCall failed on unmount:", e));
+        AudioToggle.setAudioMode({ mode: "normal" }).catch(e =>
+          console.warn("AudioToggle reset failed on unmount:", e)
+        );
+      }
+    };
   }, []);
+
+  // When call connects, set initial audio route
+  useEffect(() => {
+    if (joined && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+      AudioToggle.setAudioMode({ mode: speakerOn ? "speaker" : "earpiece" }).catch(e =>
+        console.warn("AudioToggle initial route failed:", e)
+      );
+    }
+  }, [joined]);
+
+  // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
+  useEffect(() => {
+    if (joined && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+      AudioToggle.startOngoingCall({
+        partnerName: partnerName || "Need Call",
+        isVideo,
+        connectedAt: connectedAtRef.current,
+        isMuted: micMuted,
+        isSpeaker: speakerOn,
+      }).catch(e => console.warn("AudioToggle startOngoingCall failed:", e));
+    }
+  }, [joined, micMuted, speakerOn, isVideo, partnerName]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -54,44 +107,41 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   };
 
   const toggleSpeaker = async () => {
-    if (typeof window !== 'undefined' && Capacitor.getPlatform() !== "web") {
-      if ((window as any).AudioToggle) {
-        if (speakerOn) {
-          (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.EARPIECE);
-        } else {
-          (window as any).AudioToggle.setAudioMode((window as any).AudioToggle.SPEAKER);
-        }
+    const nextSpeakerState = !speakerOn;
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      try {
+        await AudioToggle.setAudioMode({ mode: nextSpeakerState ? "speaker" : "earpiece" });
+      } catch (err) {
+        console.warn("AudioToggle setAudioMode failed:", err);
       }
     }
-    setSpeakerOn(!speakerOn);
+    setSpeakerOn(nextSpeakerState);
   };
 
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
-  const mountUid = useRef(`${uid}_${Math.random().toString(36).slice(2, 7)}`).current;
 
-  // 1. Fetch token
+  // 1. Fetch token using mobile-safe apiFetch
   useEffect(() => {
     if (!appId) {
       setError("Agora App ID is missing in environment variables (.env.local).");
       return;
     }
     
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://need-chi.vercel.app';
-    fetch(`${baseUrl}/api/agora/token`, {
+    apiFetch('/api/agora/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelName, uid: mountUid })
+      body: JSON.stringify({ channelName, uid })
     })
       .then(res => res.json())
       .then(data => {
         if (data.token) {
+          setJoinUid(data.joinUid || String(uid));
           setToken(data.token);
         } else {
           setError(data.error || "Failed to get token");
         }
       })
       .catch(e => setError("Failed to fetch token: " + e.message));
-  }, [channelName, mountUid, appId]);
+  }, [channelName, uid, appId]);
 
   // 2. Join Call and setup Tracks
   useEffect(() => {
@@ -107,6 +157,8 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
     clientRef.current = client;
 
     const initCall = async () => {
+      if (isJoiningRef.current || hasJoinedRef.current) return;
+      isJoiningRef.current = true;
       try {
         // Listeners for remote users
         client.on("user-published", async (user, mediaType) => {
@@ -142,6 +194,8 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
 
         client.on("user-left", (user) => {
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+          // In a 1-on-1 call, when remote counterparty hangs up, automatically end the call locally too
+          leaveCallRef.current();
         });
 
         // 1. Create local tracks (This prompts for permissions)
@@ -166,14 +220,29 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         // 2. Join channel AFTER permissions are granted and tracks created
         let joinSuccess = false;
         let retries = 3;
+        // Priority: try user account string first, with automatic fallback to null for wildcard numeric token
+        let currentJoinParam: string | null = joinUid || String(uid);
+        let triedFallback = false;
+
         while (!joinSuccess && retries > 0) {
           try {
-            await client.join(appId, channelName, token, mountUid);
+            await client.join(appId, channelName, token, currentJoinParam);
             joinSuccess = true;
           } catch (err: any) {
-            if (err?.code === 'UID_CONFLICT' || err?.message?.includes('UID_CONFLICT')) {
-              console.warn("UID_CONFLICT detected, retrying in 1s to allow previous connection to close...");
-              await new Promise(r => setTimeout(r, 1000));
+            console.warn(`Agora join attempt failed with param [${currentJoinParam}] (retries left: ${retries - 1}):`, err);
+            const errStr = (err?.message || '') + (err?.code || '');
+
+            // If token authorization fails due to UID mismatch (e.g. token signed for user account vs wildcard 0)
+            if (!triedFallback && (errStr.includes('invalid token') || errStr.includes('CAN_NOT_GET_GATEWAY_SERVER') || err?.code === 4096)) {
+              console.warn("Switching join parameter between account UID and wildcard null...");
+              currentJoinParam = currentJoinParam ? null : String(uid);
+              triedFallback = true;
+              continue;
+            }
+
+            if (err?.code === 'UID_CONFLICT' || errStr.includes('UID_CONFLICT')) {
+              console.warn("UID_CONFLICT detected, retrying join in 600ms...");
+              await new Promise(r => setTimeout(r, 600));
               retries--;
               if (retries === 0) throw err;
             } else {
@@ -211,12 +280,16 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         
         if (isMounted) {
           setLocalAudioTrack(localA);
+          connectedAtRef.current = Date.now();
+          hasJoinedRef.current = true;
           setJoined(true);
         }
       } catch (err: any) {
         if (!isMounted) return; // Ignore errors if unmounted (e.g., strict mode aborts)
         console.error("Agora Error:", err);
         setError("Failed to join call. Please check microphone/camera permissions. " + err?.message);
+      } finally {
+        isJoiningRef.current = false;
       }
     };
 
@@ -224,6 +297,8 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
 
     return () => {
       isMounted = false;
+      isJoiningRef.current = false;
+      hasJoinedRef.current = false;
       if (localA) {
         localA.stop();
         localA.close();
@@ -242,7 +317,7 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         client.leave().catch(console.error);
       }
     };
-  }, [token, appId, channelName, mountUid, isVideo]);
+  }, [token, appId, channelName]);
 
   const toggleMic = async () => {
     if (localAudioTrack) {
@@ -259,6 +334,12 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   };
 
   const leaveCall = async () => {
+    if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+      AudioToggle.stopOngoingCall().catch(e => console.warn("AudioToggle stopOngoingCall failed in leaveCall:", e));
+      AudioToggle.setAudioMode({ mode: "normal" }).catch(e =>
+        console.warn("AudioToggle reset failed in leaveCall:", e)
+      );
+    }
     if (typeof window !== "undefined") {
       const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3");
       audio.play().catch(e => console.warn("End call audio failed:", e));
@@ -275,6 +356,35 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
     await clientRef.current?.leave();
     onEndCall();
   };
+
+  // Wire deep link handlers for background ongoing call notification actions (End, Mute, Speaker)
+  const leaveCallRef = useRef(leaveCall);
+  leaveCallRef.current = leaveCall;
+  const toggleMicRef = useRef(toggleMic);
+  toggleMicRef.current = toggleMic;
+  const toggleSpeakerRef = useRef(toggleSpeaker);
+  toggleSpeakerRef.current = toggleSpeaker;
+
+  useEffect(() => {
+    let sub: any = null;
+    if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+      sub = App.addListener('appUrlOpen', (data) => {
+        if (!data?.url) return;
+        if (data.url.includes('call/end')) {
+          leaveCallRef.current();
+        } else if (data.url.includes('call/toggle-mute')) {
+          toggleMicRef.current();
+        } else if (data.url.includes('call/toggle-speaker')) {
+          toggleSpeakerRef.current();
+        }
+      });
+    }
+    return () => {
+      if (sub) {
+        sub.then((handle: any) => handle?.remove?.()).catch(console.warn);
+      }
+    };
+  }, []);
 
   if (error) {
     return (
