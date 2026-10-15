@@ -1,4 +1,4 @@
-import { Transaction } from "firebase-admin/firestore";
+import type { Transaction } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin";
 import { JobEvent } from "@/types/platform";
 

@@ -66,14 +66,28 @@ export function getAdminApp(): App {
     _adminApp = initAdminApp({ credential: cert(embeddedServiceAccount) });
     return _adminApp;
   } catch (e) {
+    const existing = getAdminApps();
+    if (existing.length > 0) {
+      _adminApp = existing[0];
+      return _adminApp;
+    }
     console.warn("Could not load embedded service account credentials, falling back...");
   }
 
   // 4. Minimal fallback
-  _adminApp = initAdminApp({
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "momentum-b4215",
-  });
-  return _adminApp;
+  try {
+    _adminApp = initAdminApp({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "momentum-b4215",
+    });
+    return _adminApp;
+  } catch (e) {
+    const existing = getAdminApps();
+    if (existing.length > 0) {
+      _adminApp = existing[0];
+      return _adminApp;
+    }
+    throw e;
+  }
 }
 
 export function getAdminDb(): Firestore {
@@ -93,6 +107,9 @@ export function getAdminAuth(): Auth {
 // Proxies ensure that importing `adminDb`, `adminAuth`, or `adminApp_` never crashes at module evaluation time
 export const adminApp_: App = new Proxy({} as App, {
   get(_target, prop) {
+    if (prop === "then" || prop === "catch" || prop === "toJSON" || typeof prop === "symbol") {
+      return undefined;
+    }
     const app = getAdminApp();
     const val = (app as any)[prop];
     return typeof val === "function" ? val.bind(app) : val;
@@ -101,6 +118,9 @@ export const adminApp_: App = new Proxy({} as App, {
 
 export const adminDb: Firestore = new Proxy({} as Firestore, {
   get(_target, prop) {
+    if (prop === "then" || prop === "catch" || prop === "toJSON" || typeof prop === "symbol") {
+      return undefined;
+    }
     const db = getAdminDb();
     const val = (db as any)[prop];
     return typeof val === "function" ? val.bind(db) : val;
@@ -109,6 +129,9 @@ export const adminDb: Firestore = new Proxy({} as Firestore, {
 
 export const adminAuth: Auth = new Proxy({} as Auth, {
   get(_target, prop) {
+    if (prop === "then" || prop === "catch" || prop === "toJSON" || typeof prop === "symbol") {
+      return undefined;
+    }
     const auth = getAdminAuth();
     const val = (auth as any)[prop];
     return typeof val === "function" ? val.bind(auth) : val;
