@@ -4,27 +4,37 @@ import { paymentProvider } from "@/lib/paystack";
 import { postLedgerEntry } from "@/lib/ledger";
 import { Payout, UserPrivate, Wallet } from "@/types/platform";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, amount } = await req.json();
 
     if (!userId || !amount) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 
     if (amount <= 0) {
-      return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 });
+      return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400, headers: corsHeaders });
     }
 
     // Load bank account
     const userPrivateSnap = await adminDb.collection("userPrivate").doc(userId).get();
     if (!userPrivateSnap.exists) {
-      return NextResponse.json({ error: "User details not found" }, { status: 404 });
+      return NextResponse.json({ error: "User details not found" }, { status: 404, headers: corsHeaders });
     }
     const userPrivate = userPrivateSnap.data() as UserPrivate;
     
     if (!userPrivate.bankAccount?.recipientCode) {
-      return NextResponse.json({ error: "No verified bank account found" }, { status: 400 });
+      return NextResponse.json({ error: "No verified bank account found" }, { status: 400, headers: corsHeaders });
     }
 
     // Check withdrawal limit: max 4 withdrawals in the last 7 days
@@ -44,7 +54,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (activeWithdrawals >= 4) {
-      return NextResponse.json({ error: "You have reached your weekly limit of 4 withdrawals to minimize charges. Please try again next week." }, { status: 403 });
+      return NextResponse.json({ error: "You have reached your weekly limit of 4 withdrawals to minimize charges. Please try again next week." }, { status: 403, headers: corsHeaders });
     }
 
     const reference = `with_${userId}_${Date.now()}`;
@@ -114,7 +124,7 @@ export async function POST(req: NextRequest) {
         // Status remains pending until webhook confirms, or can be mapped if immediate success
       });
 
-      return NextResponse.json({ success: true, payout: { ...newPayout, transferCode: transferData.transferCode } });
+      return NextResponse.json({ success: true, payout: { ...newPayout, transferCode: transferData.transferCode } }, { headers: corsHeaders });
       
     } catch (transferError: any) {
       // 3. Reversal if API call failed instantly
@@ -135,11 +145,11 @@ export async function POST(req: NextRequest) {
         });
       });
       
-      return NextResponse.json({ error: "Transfer failed: " + transferError.message }, { status: 500 });
+      return NextResponse.json({ error: "Transfer failed: " + transferError.message }, { status: 500, headers: corsHeaders });
     }
 
   } catch (error: any) {
     console.error("withdraw error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }

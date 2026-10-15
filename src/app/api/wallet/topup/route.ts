@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { paymentProvider } from "@/lib/paystack";
-import { adminDb } from "@/lib/firebaseAdmin";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +26,7 @@ export async function POST(req: NextRequest) {
     let email = clientEmail;
     if (!email) {
       try {
+        const { adminDb } = await import("@/lib/firebaseAdmin");
         const userSnap = await adminDb.collection("users").doc(userId).get();
         email = userSnap.data()?.email;
       } catch (err) {

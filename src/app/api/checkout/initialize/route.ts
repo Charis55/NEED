@@ -6,6 +6,16 @@ import { getConfig } from "@/lib/platformConfig";
 import { writeJobEvent } from "@/lib/jobEvents";
 import { CustomerCredit } from "@/types/platform";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -16,13 +26,13 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!customerId || !offerAmount || (!artisanId && !jobId)) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 
     // Get user email for paystack
     const customerSnap = await adminDb.collection("users").doc(customerId).get();
     if (!customerSnap.exists) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+      return NextResponse.json({ error: "Customer not found" }, { status: 404, headers: corsHeaders });
     }
     const customer = customerSnap.data();
     const email = customer?.email || "customer@need.app";
@@ -274,10 +284,13 @@ export async function POST(req: NextRequest) {
       pairJobNumber,
       completedPairCount,
       feeRatePercentApplied: ratePercent
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error("Checkout initialize error:", error);
-    return NextResponse.json({ error: error.message || "Failed to initialize checkout" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to initialize checkout" },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }

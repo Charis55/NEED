@@ -21,13 +21,23 @@ interface TxReturnItem {
   accountName: string | null;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
 
     if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+      return NextResponse.json({ error: "Missing userId" }, { status: 400, headers: corsHeaders });
     }
 
     // 1. Fetch wallet transactions for user
@@ -118,12 +128,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       transactions,
-    });
+    }, { headers: corsHeaders });
   } catch (err: any) {
     console.error("Error fetching wallet transactions:", err);
     return NextResponse.json(
       { error: err.message || "Failed to fetch transactions" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

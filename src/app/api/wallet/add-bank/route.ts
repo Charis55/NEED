@@ -3,12 +3,22 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { paymentProvider } from "@/lib/paystack";
 import { BankAccount } from "@/types/platform";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, accountNumber, bankCode, bankName } = await req.json();
 
     if (!userId || !accountNumber || !bankCode || !bankName) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 
     // Call Paystack to resolve the account
@@ -34,9 +44,9 @@ export async function POST(req: NextRequest) {
       bankAccount
     }, { merge: true });
 
-    return NextResponse.json({ success: true, bankAccount });
+    return NextResponse.json({ success: true, bankAccount }, { headers: corsHeaders });
   } catch (error: any) {
     console.error("add-bank error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
