@@ -156,6 +156,12 @@ export default function WalletCard() {
     setToppingUp(true);
     try {
       const isNative = typeof window !== "undefined" && Capacitor.isNativePlatform();
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const source = isNative ? "app" : "web";
+      const callbackUrl = isNative
+        ? undefined
+        : (origin ? `${origin}/checkout/topup-success?source=web` : undefined);
+
       const res = await apiFetch("/api/wallet/topup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -163,7 +169,8 @@ export default function WalletCard() {
           userId: auth.currentUser?.uid,
           email: auth.currentUser?.email || undefined,
           amount: amountKobo,
-          source: isNative ? "app" : "web"
+          source,
+          callbackUrl
         })
       });
       const data = await safeJsonParse(res);

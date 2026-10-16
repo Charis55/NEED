@@ -14,7 +14,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, amount, email: clientEmail, source } = body; // amount in kobo
+    const { userId, amount, email: clientEmail, source, callbackUrl: clientCallbackUrl } = body; // amount in kobo
 
     if (!userId || !amount || amount < 10000) { // Min N100
       return NextResponse.json(
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       amount,
       email,
       reference,
+      callbackUrl: clientCallbackUrl,
       metadata: {
         type: "wallet_topup",
         userId,

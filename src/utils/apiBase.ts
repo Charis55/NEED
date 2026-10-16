@@ -7,9 +7,12 @@
 export function getApiBaseUrl(): string {
   if (typeof window !== "undefined") {
     const origin = window.location.origin || "";
-    const isCapacitor = origin.includes("localhost") || 
-                        origin.includes("capacitor://") ||
-                        (window as any).Capacitor?.isNativePlatform?.();
+    const isCapacitor = Boolean(
+      (window as any).Capacitor?.isNativePlatform?.() ||
+      origin.includes("capacitor://") ||
+      origin === "http://localhost" ||
+      origin === "https://localhost"
+    );
     if (isCapacitor) {
       return process.env.NEXT_PUBLIC_APP_URL || "https://need-chi.vercel.app";
     }

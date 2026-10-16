@@ -14,11 +14,35 @@ function TopupSuccessContent() {
   const [verifying, setVerifying] = useState(true);
   const [verifiedAmount, setVerifiedAmount] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [dashboardUrl, setDashboardUrl] = useState("/technician/dashboard");
 
   // Determine if this transaction originated from the native app or web
   const isFromApp = 
     sourceParam === "app" || 
     (!sourceParam && typeof window !== "undefined" && Capacitor.isNativePlatform());
+
+  useEffect(() => {
+    // Dynamically resolve dashboard based on active session role
+    import("@/lib/firebase").then(({ auth, db }) => {
+      import("firebase/firestore").then(({ doc, getDoc }) => {
+        const unsub = auth.onAuthStateChanged(async (user) => {
+          if (user) {
+            try {
+              const uSnap = await getDoc(doc(db, "users", user.uid));
+              if (uSnap.exists() && uSnap.data()?.role === "customer") {
+                setDashboardUrl("/explore");
+              } else {
+                setDashboardUrl("/technician/dashboard");
+              }
+            } catch {
+              setDashboardUrl("/technician/dashboard");
+            }
+          }
+        });
+        return () => unsub();
+      });
+    });
+  }, []);
 
   useEffect(() => {
     if (!reference) {
@@ -108,7 +132,7 @@ function TopupSuccessContent() {
                   </a>
 
                   <Link 
-                    href="/technician/dashboard"
+                    href={dashboardUrl}
                     className="w-full bg-[var(--color-brutal-yellow)] py-3 text-black font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all block text-center border-2 border-black"
                   >
                     RETURN TO DASHBOARD
@@ -116,7 +140,7 @@ function TopupSuccessContent() {
                 </>
               ) : (
                 <Link 
-                  href="/technician/dashboard"
+                  href={dashboardUrl}
                   className="w-full bg-[var(--color-brutal-green)] py-4 text-black font-black uppercase tracking-widest text-lg hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all block text-center border-4 border-black shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2"
                 >
                   <span>RETURN TO DASHBOARD</span>

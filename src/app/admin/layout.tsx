@@ -3,13 +3,14 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldAlert, BookOpen, Settings, BarChart2, DollarSign, Award, ArrowLeft, Scale } from "lucide-react";
+import { ShieldAlert, BookOpen, Settings, BarChart2, DollarSign, Award, ArrowLeft, Scale, UserX } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
     { label: "Dashboard", href: "/admin", icon: BarChart2 },
+    { label: "Blacklist & KYC", href: "/admin/blacklist", icon: UserX },
     { label: "Leakage Cases", href: "/admin/cases", icon: ShieldAlert },
     { label: "Strike Appeals", href: "/admin/appeals", icon: Scale },
     { label: "Ledger & Debts", href: "/admin/ledger", icon: DollarSign },

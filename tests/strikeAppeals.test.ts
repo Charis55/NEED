@@ -18,6 +18,7 @@ function simulateAppealResolution(params: {
     suspended?: boolean;
     rankingMultiplier?: number;
     walletBlockedReason?: string;
+    isDocumentBlacklisted?: boolean;
     isNINBlacklisted?: boolean;
     isContactBlacklisted?: boolean;
   };
@@ -56,6 +57,7 @@ function simulateAppealResolution(params: {
       updatedUserState.deactivated = false;
       updatedUserState.suspended = false;
       updatedUserState.walletBlockedReason = "none";
+      updatedUserState.isDocumentBlacklisted = false;
       updatedUserState.isNINBlacklisted = false;
     }
     if (remainingCount < 2) {
@@ -132,6 +134,7 @@ test("strike appeal - approval drops 3rd strike and restores banned artisan & de
     deactivated: true,
     suspended: true,
     walletBlockedReason: "suspended",
+    isDocumentBlacklisted: true,
     isNINBlacklisted: true,
     rankingMultiplier: 0.6
   };
@@ -150,10 +153,11 @@ test("strike appeal - approval drops 3rd strike and restores banned artisan & de
   assert.strictEqual(res.remainingCount, 2, "Active count must drop from 3 to 2");
 
   // Account Restoration Invariant
-  assert.strictEqual(res.userState.banned, false, "Artisan must be unbanned");
-  assert.strictEqual(res.userState.deactivated, false, "Artisan must be reactivated");
+  assert.strictEqual(res.userState.banned, false, "Technician must be unbanned");
+  assert.strictEqual(res.userState.deactivated, false, "Technician must be reactivated");
   assert.strictEqual(res.userState.suspended, false, "Suspension must be lifted");
   assert.strictEqual(res.userState.walletBlockedReason, "none", "Wallet blockedReason must be none");
+  assert.strictEqual(res.userState.isDocumentBlacklisted, false, "Government document / passport must be removed from blacklist");
   assert.strictEqual(res.userState.isNINBlacklisted, false, "NIN must be removed from blacklist");
 });
 

@@ -83,16 +83,36 @@ export async function applyStrike(params: {
           blockedReason: "suspended"
         }, { merge: true });
 
-        // 3. Blacklist NIN
+        // 3. Blacklist Government Document / Passport
         const artisanData = artisanSnap.exists ? artisanSnap.data() : null;
         const privateData = userPrivateSnap.exists ? userPrivateSnap.data() : null;
-        const nin = privateData?.nin || artisanData?.nin || artisanData?.identityVerification?.referenceId;
+        const docNumber = 
+          artisanData?.identityDocumentNumber || 
+          artisanData?.identityVerificationReference || 
+          artisanData?.identityVerification?.referenceId || 
+          privateData?.documentNumber || 
+          privateData?.passportNumber ||
+          privateData?.nin || 
+          artisanData?.nin;
 
-        if (nin) {
-          const cleanNin = String(nin).replace(/\s/g, "");
-          const blacklistRef = adminDb.collection("blacklistedNINs").doc(cleanNin);
+        if (docNumber) {
+          const cleanDoc = String(docNumber).toUpperCase().replace(/\s/g, "");
+          const docType = artisanData?.identityDocumentType || "passport_or_id";
+          const blacklistRef = adminDb.collection("blacklistedDocuments").doc(cleanDoc);
           tx.set(blacklistRef, {
-            nin: cleanNin,
+            documentNumber: cleanDoc,
+            documentType: docType,
+            userId,
+            bannedAt: Date.now(),
+            reason: `Banned after ${strikeNumber} circumvention strikes: ${reason}`,
+            source: "strike_enforcement"
+          });
+
+          // Legacy backward compatibility
+          const legacyRef = adminDb.collection("blacklistedNINs").doc(cleanDoc);
+          tx.set(legacyRef, {
+            nin: cleanDoc,
+            documentNumber: cleanDoc,
             userId,
             bannedAt: Date.now(),
             reason: `Banned after ${strikeNumber} circumvention strikes: ${reason}`,
@@ -161,22 +181,33 @@ export async function applyStrike(params: {
 }
 
 /**
- * Checks whether an identity (NIN, phone, or email) is blacklisted.
+ * Checks whether an identity (document/passport, NIN, phone, or email) is blacklisted.
  */
 export async function isIdentityBlacklisted(params: {
+  documentNumber?: string;
   nin?: string;
   phone?: string;
   email?: string;
 }): Promise<{ blacklisted: boolean; reason?: string }> {
-  const { nin, phone, email } = params;
+  const { documentNumber, nin, phone, email } = params;
 
-  if (nin) {
-    const cleanNin = String(nin).replace(/\s/g, "");
-    const doc = await adminDb.collection("blacklistedNINs").doc(cleanNin).get();
-    if (doc.exists) {
+  const targetDoc = documentNumber || nin;
+  if (targetDoc) {
+    const cleanDoc = String(targetDoc).toUpperCase().replace(/\s/g, "");
+    const [docSnap, ninSnap] = await Promise.all([
+      adminDb.collection("blacklistedDocuments").doc(cleanDoc).get(),
+      adminDb.collection("blacklistedNINs").doc(cleanDoc).get()
+    ]);
+    if (docSnap.exists) {
       return {
         blacklisted: true,
-        reason: doc.data()?.reason || "This National Identification Number has been permanently blacklisted."
+        reason: docSnap.data()?.reason || "This identification document has been permanently blacklisted."
+      };
+    }
+    if (ninSnap.exists) {
+      return {
+        blacklisted: true,
+        reason: ninSnap.data()?.reason || "This identification document has been permanently blacklisted."
       };
     }
   }
@@ -187,7 +218,7 @@ export async function isIdentityBlacklisted(params: {
     if (doc.exists) {
       return {
         blacklisted: true,
-        reason: doc.data()?.reason || "This phone number has been blacklisted."
+        reason: doc.data()?.reason || "This phone number has been permanently blacklisted."
       };
     }
   }
@@ -198,12 +229,79 @@ export async function isIdentityBlacklisted(params: {
     if (doc.exists) {
       return {
         blacklisted: true,
-        reason: doc.data()?.reason || "This account has been blacklisted."
+        reason: doc.data()?.reason || "This email address has been permanently blacklisted."
       };
     }
   }
 
   return { blacklisted: false };
+}
+
+export async function isDocumentBlacklisted(documentNumber: string): Promise<{ blacklisted: boolean; reason?: string }> {
+  return isIdentityBlacklisted({ documentNumber });
+}
+
+export async function blacklistDocumentManually(params: {
+  documentNumber: string;
+  documentType?: string;
+  userId?: string;
+  reason: string;
+  adminId: string;
+}): Promise<void> {
+  const { documentNumber, documentType = "passport_or_id", userId, reason, adminId } = params;
+  const clean = String(documentNumber).toUpperCase().replace(/\s/g, "");
+
+  await adminDb.collection("blacklistedDocuments").doc(clean).set({
+    documentNumber: clean,
+    documentType,
+    userId: userId || null,
+    bannedAt: Date.now(),
+    bannedBy: adminId,
+    reason,
+    source: "manual_admin_blacklist"
+  });
+
+  if (userId) {
+    await adminDb.collection("artisans").doc(userId).set({
+      banned: true,
+      deactivated: true,
+      suspended: true,
+      identityVerificationStatus: "blacklisted"
+    }, { merge: true });
+
+    await adminDb.collection("users").doc(userId).set({
+      banned: true,
+      active: false,
+      bannedAt: Date.now(),
+      banReason: `Manually blacklisted by admin: ${reason}`
+    }, { merge: true });
+
+    await adminDb.collection("wallets").doc(userId).set({
+      blockedReason: "suspended"
+    }, { merge: true });
+  }
+
+  await adminDb.collection("auditLog").add({
+    type: "document_blacklisted",
+    actorId: adminId,
+    payload: { documentNumber: clean, documentType, userId, reason },
+    at: Date.now()
+  });
+}
+
+export async function removeDocumentFromBlacklist(documentNumber: string, adminId: string): Promise<void> {
+  const clean = String(documentNumber).toUpperCase().replace(/\s/g, "");
+  await Promise.all([
+    adminDb.collection("blacklistedDocuments").doc(clean).delete(),
+    adminDb.collection("blacklistedNINs").doc(clean).delete()
+  ]);
+
+  await adminDb.collection("auditLog").add({
+    type: "document_unblacklisted",
+    actorId: adminId,
+    payload: { documentNumber: clean },
+    at: Date.now()
+  });
 }
 
 /**
@@ -305,13 +403,22 @@ export async function reviewStrikeAppeal(params: {
             blockedReason: "none"
           }, { merge: true });
 
-          // Un-blacklist NIN if blacklisted
+          // Un-blacklist Government Document / Passport if blacklisted
           const artisanData = artisanSnap.exists ? artisanSnap.data() : null;
           const privateData = userPrivateSnap.exists ? userPrivateSnap.data() : null;
-          const nin = privateData?.nin || artisanData?.nin || artisanData?.identityVerification?.referenceId;
-          if (nin) {
-            const cleanNin = String(nin).replace(/\s/g, "");
-            tx.delete(adminDb.collection("blacklistedNINs").doc(cleanNin));
+          const docNumber = 
+            artisanData?.identityDocumentNumber || 
+            artisanData?.identityVerificationReference || 
+            artisanData?.identityVerification?.referenceId || 
+            privateData?.documentNumber || 
+            privateData?.passportNumber ||
+            privateData?.nin || 
+            artisanData?.nin;
+
+          if (docNumber) {
+            const cleanDoc = String(docNumber).toUpperCase().replace(/\s/g, "");
+            tx.delete(adminDb.collection("blacklistedDocuments").doc(cleanDoc));
+            tx.delete(adminDb.collection("blacklistedNINs").doc(cleanDoc));
           }
         }
 

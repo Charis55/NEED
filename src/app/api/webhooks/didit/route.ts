@@ -148,9 +148,27 @@ async function handleEvent(event: { vendor_data?: string; session_id?: string; s
           }
           if (idVerification.document_number) {
             update.identityVerificationReference = idVerification.document_number;
+            update.identityDocumentNumber = idVerification.document_number;
+          }
+          if (idVerification.document_type) {
+            update.identityDocumentType = idVerification.document_type;
           }
           if (idVerification.nationality) {
             update.identityNationality = idVerification.nationality;
+          }
+
+          // Check if document is blacklisted
+          if (idVerification.document_number) {
+            const { isDocumentBlacklisted } = await import("@/lib/strikes");
+            const blacklistCheck = await isDocumentBlacklisted(idVerification.document_number);
+            if (blacklistCheck.blacklisted) {
+              update.identityVerificationStatus = "blacklisted";
+              update.banned = true;
+              update.deactivated = true;
+              update.kycDeclineReasons = [`Document ${idVerification.document_number} is permanently blacklisted: ${blacklistCheck.reason || "Terms violation"}`];
+              console.warn(`Didit webhook: blocked blacklisted document ${idVerification.document_number} for user ${userId}`);
+              break;
+            }
           }
         }
 
