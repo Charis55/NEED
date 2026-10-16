@@ -6,7 +6,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -28,6 +30,7 @@ public class AudioTogglePlugin extends Plugin {
     private static final String TAG = "AudioTogglePlugin";
     private static final String ONGOING_CALL_CHANNEL_ID = "ongoing_call_channel_v1";
     private static final int ONGOING_CALL_NOTIFICATION_ID = 1005;
+    private AudioFocusRequest audioFocusRequest;
 
     private void ensureOngoingCallChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -205,37 +208,61 @@ public class AudioTogglePlugin extends Plugin {
 
         try {
             if ("earpiece".equalsIgnoreCase(mode)) {
+                // 1. Request Voice Communication Audio Focus so WebView audio is treated as phone call
+                requestCallAudioFocus(audioManager);
+
+                // 2. Set telephony communication mode
                 audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
                 audioManager.setSpeakerphoneOn(false);
 
+                // 3. On Android S+ (API 31+), route communication audio to the built-in earpiece
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
+                    AudioDeviceInfo earpieceDevice = null;
                     for (AudioDeviceInfo device : devices) {
                         if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) {
-                            audioManager.setCommunicationDevice(device);
+                            earpieceDevice = device;
                             break;
                         }
+                    }
+                    if (earpieceDevice != null) {
+                        boolean ok = audioManager.setCommunicationDevice(earpieceDevice);
+                        Log.d(TAG, "setCommunicationDevice to EARPIECE result: " + ok);
+                    } else {
+                        Log.w(TAG, "No TYPE_BUILTIN_EARPIECE found, clearing communication device");
+                        audioManager.clearCommunicationDevice();
                     }
                 }
                 Log.d(TAG, "Audio routed to EARPIECE");
 
             } else if ("speaker".equalsIgnoreCase(mode)) {
+                // 1. Request Voice Communication Audio Focus
+                requestCallAudioFocus(audioManager);
+
+                // 2. Set telephony communication mode and speakerphone
                 audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
                 audioManager.setSpeakerphoneOn(true);
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
+                    AudioDeviceInfo speakerDevice = null;
                     for (AudioDeviceInfo device : devices) {
                         if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                            audioManager.setCommunicationDevice(device);
+                            speakerDevice = device;
                             break;
                         }
+                    }
+                    if (speakerDevice != null) {
+                        boolean ok = audioManager.setCommunicationDevice(speakerDevice);
+                        Log.d(TAG, "setCommunicationDevice to SPEAKER result: " + ok);
                     }
                 }
                 Log.d(TAG, "Audio routed to SPEAKER");
 
             } else {
                 // Reset to normal mode (call ended)
+                abandonCallAudioFocus(audioManager);
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     audioManager.clearCommunicationDevice();
                 }
@@ -251,6 +278,46 @@ public class AudioTogglePlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "Failed to set audio mode: " + e.getMessage(), e);
             call.reject("Failed to set audio mode: " + e.getMessage());
+        }
+    }
+
+    private void requestCallAudioFocus(AudioManager audioManager) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (audioFocusRequest == null) {
+                    AudioAttributes playbackAttributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build();
+                    audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(playbackAttributes)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setOnAudioFocusChangeListener(focusChange -> {
+                            Log.d(TAG, "Call audio focus changed: " + focusChange);
+                        })
+                        .build();
+                }
+                audioManager.requestAudioFocus(audioFocusRequest);
+            } else {
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to request call audio focus: " + t.getMessage());
+        }
+    }
+
+    private void abandonCallAudioFocus(AudioManager audioManager) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (audioFocusRequest != null) {
+                    audioManager.abandonAudioFocusRequest(audioFocusRequest);
+                    audioFocusRequest = null;
+                }
+            } else {
+                audioManager.abandonAudioFocus(null);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to abandon call audio focus: " + t.getMessage());
         }
     }
 

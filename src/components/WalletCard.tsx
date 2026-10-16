@@ -190,111 +190,71 @@ export default function WalletCard() {
 
   return (
     <>
-      <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-8 shadow-[6px_6px_0_0_#000] mb-8 -rotate-1 relative overflow-visible">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] mb-6 relative">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-black text-sm font-black mb-2 uppercase tracking-widest">Your Wallet</p>
-            <p className="text-5xl md:text-7xl font-black text-black tracking-tighter">₦{walletBalanceNaira.toLocaleString()}</p>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-black text-xs font-black uppercase tracking-widest">Your Wallet</span>
+              <Link 
+                href="/technician/earnings?tab=wallet" 
+                className="text-[11px] font-black uppercase text-gray-800 hover:text-black underline"
+              >
+                History →
+              </Link>
+            </div>
+            <p className="text-3xl sm:text-4xl font-black text-black tracking-tight">
+              ₦{walletBalanceNaira.toLocaleString()}
+            </p>
           </div>
-          
-          {/* Action buttons (Desktop & Tablet) */}
-          <div className="hidden md:flex flex-col gap-4 w-56 shrink-0">
-            <div className="relative">
-              <button 
-                onClick={() => setShowWithdrawModal(true)}
-                className="w-full bg-[var(--color-brutal-teal)] text-black px-6 py-3.5 font-black uppercase tracking-wider border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 active:translate-x-1 active:translate-y-1 hover:bg-black hover:text-white transition-all flex items-center justify-center cursor-pointer"
-              >
-                <span>Withdraw</span>
-              </button>
-              {/* Crooked Upward Arrow Badge attached to Withdraw */}
-              <div className="absolute -top-3.5 -right-3 bg-white border-4 border-black w-11 h-11 flex items-center justify-center rotate-12 shadow-[2px_2px_0_0_#000] pointer-events-none z-10">
-                <TrendingUp className="w-7 h-7 stroke-[3] text-black" />
-              </div>
-            </div>
 
-            <div className="relative">
-              <button 
-                onClick={() => setShowTopUpModal(true)}
-                className="w-full bg-[var(--color-brutal-green)] text-black px-6 py-3.5 font-black uppercase tracking-wider border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 active:translate-x-1 active:translate-y-1 hover:bg-black hover:text-white transition-all flex items-center justify-center cursor-pointer"
-              >
-                <span>Fund Account</span>
-              </button>
-              {/* Crooked Inward/Downward Arrow Badge attached to Fund Account */}
-              <div className="absolute -bottom-3 -right-3 bg-white border-4 border-black w-11 h-11 flex items-center justify-center -rotate-12 shadow-[2px_2px_0_0_#000] pointer-events-none z-10">
-                <TrendingDown className="w-7 h-7 stroke-[3] text-black" />
-              </div>
-            </div>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <button 
+              onClick={() => setShowWithdrawModal(true)}
+              className="flex-1 sm:flex-initial bg-[var(--color-brutal-teal)] text-black px-4 sm:px-5 py-2.5 sm:py-3 font-black uppercase text-xs sm:text-sm tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 hover:bg-black hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <TrendingUp className="w-4 h-4 stroke-[3]" />
+              <span>Withdraw</span>
+            </button>
+
+            <button 
+              onClick={() => setShowTopUpModal(true)}
+              className="flex-1 sm:flex-initial bg-[var(--color-brutal-green)] text-black px-4 sm:px-5 py-2.5 sm:py-3 font-black uppercase text-xs sm:text-sm tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 hover:bg-black hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <TrendingDown className="w-4 h-4 stroke-[3]" />
+              <span>Fund Account</span>
+            </button>
           </div>
-        </div>
-
-        {/* Action buttons (Mobile) */}
-        <div className="mt-8 flex flex-col gap-3 md:hidden">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <button 
-                onClick={() => setShowWithdrawModal(true)}
-                className="w-full bg-[var(--color-brutal-teal)] text-black px-6 py-4 font-black uppercase tracking-wider border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 active:translate-x-1 active:translate-y-1 hover:bg-black hover:text-white transition-all flex items-center justify-center cursor-pointer"
-              >
-                <span>Withdraw</span>
-              </button>
-              <div className="absolute -top-3 -right-2 bg-white border-3 border-black w-9 h-9 flex items-center justify-center rotate-12 shadow-[2px_2px_0_0_#000] pointer-events-none z-10">
-                <TrendingUp className="w-5 h-5 stroke-[3] text-black" />
-              </div>
-            </div>
-
-            <div className="relative flex-1">
-              <button 
-                onClick={() => setShowTopUpModal(true)}
-                className="w-full bg-[var(--color-brutal-green)] text-black px-6 py-4 font-black uppercase tracking-wider border-4 border-black shadow-[4px_4px_0_0_#000] hover:shadow-none hover:translate-x-1 hover:translate-y-1 active:translate-x-1 active:translate-y-1 hover:bg-black hover:text-white transition-all flex items-center justify-center cursor-pointer"
-              >
-                <span>Fund Account</span>
-              </button>
-              <div className="absolute -bottom-2.5 -right-2 bg-white border-3 border-black w-9 h-9 flex items-center justify-center -rotate-12 shadow-[2px_2px_0_0_#000] pointer-events-none z-10">
-                <TrendingDown className="w-5 h-5 stroke-[3] text-black" />
-              </div>
-            </div>
-          </div>
-          <Link href="/technician/earnings?tab=wallet" className="inline-block bg-black text-white px-6 py-3 font-black uppercase text-sm tracking-widest hover:bg-white hover:text-black transition-colors border-2 border-black text-center mt-2">
-            View Payment History
-          </Link>
-        </div>
-        
-        {/* Desktop link */}
-        <div className="mt-4 hidden md:block">
-          <Link href="/technician/earnings?tab=wallet" className="inline-block bg-black text-white px-6 py-2.5 font-black uppercase text-xs tracking-widest hover:bg-white hover:text-black transition-colors border-2 border-black text-center">
-            View Payment History
-          </Link>
         </div>
       </div>
 
       {showWithdrawModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 font-sans">
-          <div className="bg-white border-4 border-black max-w-md w-full shadow-[8px_8px_0_0_var(--color-brutal-teal)] relative">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 font-sans overflow-y-auto">
+          <div className="bg-white border-4 border-black max-w-md w-full shadow-[8px_8px_0_0_var(--color-brutal-teal)] relative my-auto max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setShowWithdrawModal(false)}
-              className="absolute top-4 right-4 text-black hover:text-[var(--color-brutal-red)] transition-colors"
+              className="absolute top-3 right-3 text-black hover:text-[var(--color-brutal-red)] transition-colors z-10"
             >
-              <X className="w-8 h-8 stroke-[3]" />
+              <X className="w-7 h-7 stroke-[3]" />
             </button>
             
-            <div className="p-8">
-              <h2 className="text-3xl font-black uppercase tracking-tighter mb-6 border-b-4 border-black pb-2">
+            <div className="p-5 sm:p-7">
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter mb-4 border-b-4 border-black pb-2">
                 Withdraw Funds
               </h2>
               
               {!userPrivate?.bankAccount || showBankForm ? (
                 <form onSubmit={handleAddBank}>
-                  <p className="font-bold text-gray-700 mb-4 bg-gray-100 p-3 border-l-4 border-black">
+                  <p className="font-bold text-gray-700 mb-3 bg-gray-100 p-2.5 border-l-4 border-black text-xs sm:text-sm">
                     You need to link a bank account before withdrawing.
                   </p>
                   
-                  <div className="space-y-4 mb-6">
+                  <div className="space-y-3 mb-4">
                     <div>
-                      <label className="block text-sm font-black uppercase tracking-widest mb-1">Bank Name</label>
+                      <label className="block text-xs font-black uppercase tracking-widest mb-1">Bank Name</label>
                       <select 
                         value={bankCode}
                         onChange={(e) => setBankCode(e.target.value)}
-                        className="w-full border-4 border-black p-3 font-bold focus:outline-none focus:bg-gray-100"
+                        className="w-full border-4 border-black p-2.5 font-bold focus:outline-none focus:bg-gray-100 text-sm"
                         required
                       >
                         <option value="">Select your bank...</option>
@@ -308,13 +268,13 @@ export default function WalletCard() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-black uppercase tracking-widest mb-1">Account Number</label>
+                      <label className="block text-xs font-black uppercase tracking-widest mb-1">Account Number</label>
                       <input 
                         type="text" 
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
                         placeholder="10 digits"
-                        className="w-full border-4 border-black p-3 font-bold focus:outline-none focus:bg-gray-100"
+                        className="w-full border-4 border-black p-2.5 font-bold focus:outline-none focus:bg-gray-100 text-sm"
                         maxLength={10}
                         required
                       />
@@ -324,26 +284,26 @@ export default function WalletCard() {
                   <button 
                     type="submit" 
                     disabled={savingBank}
-                    className="w-full bg-[var(--color-brutal-green)] text-black font-black uppercase py-4 border-4 border-black hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                    className="w-full bg-[var(--color-brutal-green)] text-black font-black uppercase py-3.5 border-4 border-black hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 flex justify-center items-center gap-2 text-sm sm:text-base"
                   >
-                    {savingBank ? <Loader2 className="animate-spin w-6 h-6" /> : "Link Bank Account"}
+                    {savingBank ? <Loader2 className="animate-spin w-5 h-5" /> : "Link Bank Account"}
                   </button>
                   {userPrivate?.bankAccount && (
-                    <button type="button" onClick={() => setShowBankForm(false)} className="w-full mt-4 font-bold underline">Cancel</button>
+                    <button type="button" onClick={() => setShowBankForm(false)} className="w-full mt-3 font-bold underline text-xs">Cancel</button>
                   )}
                 </form>
               ) : (
                 <form onSubmit={handleWithdraw}>
-                  <div className="mb-6 bg-gray-100 border-4 border-black p-4">
-                    <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Withdrawing to</p>
-                    <p className="font-black text-xl">{userPrivate.bankAccount.accountName}</p>
-                    <p className="font-bold">{userPrivate.bankAccount.bankName} - {userPrivate.bankAccount.accountNumber}</p>
-                    <button type="button" onClick={() => setShowBankForm(true)} className="text-sm font-bold underline text-[var(--color-brutal-teal)] mt-2">Change Account</button>
+                  <div className="mb-4 bg-gray-100 border-3 border-black p-3 sm:p-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Withdrawing to</p>
+                    <p className="font-black text-base sm:text-lg leading-tight mt-0.5">{userPrivate.bankAccount.accountName}</p>
+                    <p className="font-bold text-xs sm:text-sm text-gray-700">{userPrivate.bankAccount.bankName} - {userPrivate.bankAccount.accountNumber}</p>
+                    <button type="button" onClick={() => setShowBankForm(true)} className="text-xs font-bold underline text-[var(--color-brutal-teal)] mt-1.5 block">Change Account</button>
                   </div>
                   
-                  <div className="mb-6">
+                  <div className="mb-4">
                     <div className="flex justify-between items-end mb-1">
-                      <label className="block text-sm font-black uppercase tracking-widest">Amount (₦)</label>
+                      <label className="block text-xs font-black uppercase tracking-widest">Amount (₦)</label>
                       <span className="text-xs font-bold text-gray-500">Max: ₦{walletBalanceNaira.toLocaleString()}</span>
                     </div>
                     <input 
@@ -352,21 +312,21 @@ export default function WalletCard() {
                       onChange={(e) => setAmountStr(e.target.value)}
                       placeholder="Amount to withdraw"
                       max={walletBalanceNaira}
-                      className="w-full border-4 border-black p-4 text-3xl font-black focus:outline-none focus:bg-gray-100"
+                      className="w-full border-4 border-black p-3 sm:p-3.5 text-xl sm:text-2xl font-black placeholder:text-sm sm:placeholder:text-base placeholder:font-black placeholder:text-gray-400 focus:outline-none focus:bg-gray-100"
                       required
                     />
                   </div>
                   
-                  <p className="text-xs font-bold text-gray-600 mb-6 bg-[var(--color-brutal-pink)] p-2 border-2 border-black">
+                  <p className="text-[11px] font-bold text-gray-800 mb-4 bg-[var(--color-brutal-pink)] p-2 border-2 border-black leading-snug">
                     Note: You are limited to 4 withdrawals per week to minimize transaction charges.
                   </p>
                   
                   <button 
                     type="submit" 
                     disabled={withdrawing || walletBalanceNaira <= 0}
-                    className="w-full bg-black text-white font-black uppercase py-4 border-4 border-black hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                    className="w-full bg-black text-white font-black uppercase py-3.5 sm:py-4 border-4 border-black hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all disabled:opacity-50 flex justify-center items-center gap-2 text-sm sm:text-base cursor-pointer"
                   >
-                    {withdrawing ? <Loader2 className="animate-spin w-6 h-6" /> : "Withdraw Now"}
+                    {withdrawing ? <Loader2 className="animate-spin w-5 h-5" /> : "Withdraw Now"}
                   </button>
                 </form>
               )}
@@ -376,22 +336,22 @@ export default function WalletCard() {
       )}
 
       {showTopUpModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 font-sans">
-          <div className="bg-white border-4 border-black max-w-md w-full shadow-[8px_8px_0_0_var(--color-brutal-green)] relative">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 font-sans overflow-y-auto">
+          <div className="bg-white border-4 border-black max-w-md w-full shadow-[8px_8px_0_0_var(--color-brutal-green)] relative my-auto max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setShowTopUpModal(false)}
-              className="absolute top-4 right-4 text-black hover:text-[var(--color-brutal-red)] transition-colors"
+              className="absolute top-3 right-3 text-black hover:text-[var(--color-brutal-red)] transition-colors z-10"
             >
-              <X className="w-8 h-8 stroke-[3]" />
+              <X className="w-7 h-7 stroke-[3]" />
             </button>
             
-            <div className="p-8">
-              <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 border-b-4 border-black pb-2 flex items-center gap-2">
-                <TrendingDown className="w-8 h-8 stroke-[3] text-[var(--color-brutal-green)]" />
+            <div className="p-5 sm:p-7">
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter mb-3 border-b-4 border-black pb-2 flex items-center gap-2">
+                <TrendingDown className="w-6 h-6 stroke-[3] text-[var(--color-brutal-green)]" />
                 Fund Account
               </h2>
               
-              <p className="text-sm font-bold text-gray-600 mb-6 uppercase">
+              <p className="text-xs sm:text-sm font-bold text-gray-700 mb-4 uppercase">
                 Top up your wallet balance instantly via Paystack to settle platform fees or maintain your account.
               </p>
 

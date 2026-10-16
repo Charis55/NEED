@@ -201,29 +201,29 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
               </div>
             ) : (
               reviews.map((review) => (
-                <div key={review.reviewId} className="bg-white border-4 border-black p-5 brutal-shadow-sm flex flex-col relative">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
+                <div key={review.reviewId} className="bg-white border-3 border-black p-3.5 sm:p-4 shadow-[3px_3px_0_0_#000] flex flex-col relative">
+                  <div className="flex justify-between items-start gap-2 mb-1.5">
+                    <div className="min-w-0 flex-1">
                       <div className="flex text-[var(--color-brutal-yellow)] mb-1">
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} className={`w-5 h-5 ${star <= review.rating ? "fill-current" : "stroke-black"}`} />
+                          <Star key={star} className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${star <= review.rating ? "fill-current" : "stroke-black"}`} />
                         ))}
                       </div>
-                      <p className="font-black uppercase text-sm">{review.jobTitle}</p>
+                      <p className="font-black uppercase text-xs sm:text-sm leading-tight truncate">{review.jobTitle}</p>
                     </div>
-                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 border border-black">
+                    <span className="text-[10px] sm:text-xs font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 border border-black shrink-0">
                       {new Date(review.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   
-                  <p className="font-medium text-black mb-4">"{review.comment}"</p>
+                  <p className="font-medium text-black text-xs sm:text-sm leading-snug mb-2 p-2 bg-gray-50 border-l-3 border-black">"{review.comment}"</p>
                   
                   {review.photos && review.photos.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                    <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar mb-1">
                       {review.photos.map((photo, i) => (
                         <div 
                           key={i} 
-                          className="w-20 h-20 flex-shrink-0 border-2 border-black bg-gray-200 cursor-pointer hover:scale-105 transition-transform"
+                          className="w-14 h-14 flex-shrink-0 border-2 border-black bg-gray-200 cursor-pointer hover:scale-105 transition-transform"
                           onClick={() => setFullscreenImage(photo)}
                         >
                           <img 
@@ -236,6 +236,16 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
                           />
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {review.artisanResponse && (
+                    <div className="mt-2 p-2.5 sm:p-3 bg-[var(--color-brutal-teal)] border-2 border-black ml-2 sm:ml-4 relative shadow-[2px_2px_0_0_#000]">
+                      <div className="absolute -top-2 -left-2 w-3.5 h-3.5 bg-black rotate-45 border border-white"></div>
+                      <h5 className="font-black uppercase text-xs mb-0.5 text-black">
+                        {artisan.name ? `${artisan.name.split(' ')[0]}'s Reply:` : "Technician Reply:"}
+                      </h5>
+                      <p className="font-bold text-black text-xs sm:text-sm leading-snug">{review.artisanResponse}</p>
                     </div>
                   )}
                 </div>

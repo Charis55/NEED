@@ -8,7 +8,7 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign, Search, ArrowUpDown } from "lucide-react";
+import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign, Search, ArrowUpDown, SlidersHorizontal } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
 import { formatDateTime12Hour } from "@/utils/formatTime";
@@ -33,6 +33,7 @@ export default function ArtisanDashboard() {
   // Search and Sort controls
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "a_z" | "z_a">("newest");
+  const [isSortOpen, setIsSortOpen] = useState(false);
   const [activeFilterTab, setActiveFilterTab] = useState<"all" | "broadcasts" | "direct">("all");
 
   useEffect(() => {
@@ -556,23 +557,49 @@ export default function ArtisanDashboard() {
 
             {/* Sorter & Filter Tabs */}
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-              {/* Sorter Dropdown */}
-              <div className="flex items-center gap-2 border-4 border-black bg-[var(--color-brutal-bg)] px-3 py-2.5 shadow-[2px_2px_0_0_#000]">
-                <ArrowUpDown className="w-4 h-4 text-black shrink-0" />
-                <label htmlFor="job-sort" className="text-xs font-black uppercase tracking-wider text-black shrink-0">
-                  Sort:
-                </label>
-                <select
-                  id="job-sort"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-transparent font-black text-xs sm:text-sm uppercase focus:outline-none cursor-pointer flex-1"
+              {/* Neobrutalist Sorter Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsSortOpen(!isSortOpen)}
+                  className="w-full sm:w-auto flex items-center justify-between sm:justify-center gap-2 border-4 border-black bg-[var(--color-brutal-pink)] px-4 py-2.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all cursor-pointer"
                 >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="a_z">A to Z (Trade)</option>
-                  <option value="z_a">Z to A (Trade)</option>
-                </select>
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-5 h-5 text-black stroke-[3]" />
+                    <span className="font-black uppercase text-xs sm:text-sm text-black">Sort</span>
+                  </div>
+                  <span className="text-[11px] font-black uppercase bg-white border border-black px-1.5 py-0.5 ml-1">
+                    {sortBy === "newest" ? "Newest" : sortBy === "oldest" ? "Oldest" : sortBy === "a_z" ? "A-Z" : "Z-A"}
+                  </span>
+                </button>
+
+                {isSortOpen && (
+                  <div className="absolute top-12 left-0 sm:left-auto sm:right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-52 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
+                    <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
+                    {[
+                      { label: "Newest First", value: "newest" },
+                      { label: "Oldest First", value: "oldest" },
+                      { label: "A to Z (Trade)", value: "a_z" },
+                      { label: "Z to A (Trade)", value: "z_a" },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(option.value as any);
+                          setIsSortOpen(false);
+                        }}
+                        className={`text-left px-2.5 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all cursor-pointer ${
+                          sortBy === option.value 
+                            ? "bg-[var(--color-brutal-yellow)] border-black" 
+                            : "border-transparent hover:border-black hover:bg-gray-100"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Filter Tabs */}
@@ -679,54 +706,54 @@ export default function ArtisanDashboard() {
                 const counterTakeHome = counterVal - counterFee;
 
                 return (
-                  <div key={job.requestId} className="bg-white border-4 border-black shadow-[6px_6px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full relative">
-                    <div className="p-6 md:p-8 flex flex-col flex-grow">
+                  <div key={job.requestId} className="bg-white border-3 sm:border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full relative">
+                    <div className="p-3.5 sm:p-5 flex flex-col flex-grow">
                       {/* Top Badges */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2.5">
                         {isSkillMatch ? (
-                          <span className="bg-[var(--color-brutal-teal)] text-black border-2 border-black px-3 py-1 text-xs font-black uppercase flex items-center gap-1.5 shadow-[2px_2px_0_0_#000]">
-                            <Sparkles className="w-3.5 h-3.5 fill-black" /> MATCHES YOUR TRADE
+                          <span className="bg-[var(--color-brutal-teal)] text-black border-2 border-black px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-black uppercase flex items-center gap-1 shadow-[2px_2px_0_0_#000]">
+                            <Sparkles className="w-3 h-3 fill-black" /> MATCHES YOUR TRADE
                           </span>
                         ) : (
-                          <span className="bg-[var(--color-brutal-pink)] text-black border-2 border-black px-3 py-1 text-xs font-black uppercase flex items-center gap-1.5 shadow-[2px_2px_0_0_#000]">
-                            <Zap className="w-3.5 h-3.5 fill-black" /> OPEN COMMUNITY JOB • EXPAND SKILLS
+                          <span className="bg-[var(--color-brutal-pink)] text-black border-2 border-black px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-black uppercase flex items-center gap-1 shadow-[2px_2px_0_0_#000]">
+                            <Zap className="w-3 h-3 fill-black" /> OPEN COMMUNITY JOB
                           </span>
                         )}
-                        <span className="bg-black text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-wider">
+                        <span className="bg-black text-white px-2 py-0.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
                           BROADCAST
                         </span>
                       </div>
 
-                      {/* Title & Price */}
-                      <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-5 border-b-4 border-black pb-5">
-                        <div>
-                          <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
+                      {/* Title & Price Header */}
+                      <div className="flex items-start justify-between gap-3 mb-3 border-b-2 sm:border-b-3 border-black pb-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base sm:text-xl font-black text-black uppercase tracking-tight truncate leading-tight">
                             {job.trade ? `${job.trade} - ${job.subcategory}` : (job.subcategory || "Broadcast Request")}
                           </h3>
-                          <div className="text-sm text-black font-bold flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
-                            <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2.5 py-1 flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5" /> {job.neighborhood || "Location on file"}
+                          <div className="text-xs text-black font-bold flex flex-wrap items-center gap-1.5 uppercase mt-1">
+                            <span className="bg-[var(--color-brutal-bg)] border border-black px-2 py-0.5 flex items-center gap-1 text-[11px]">
+                              <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate max-w-[130px] sm:max-w-none">{job.neighborhood || "Location on file"}</span>
                             </span>
-                            <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2.5 py-1 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5" /> {formatDateTime12Hour(job.preferredTime) || "Flexible"}
+                            <span className="bg-[var(--color-brutal-bg)] border border-black px-2 py-0.5 flex items-center gap-1 text-[11px]">
+                              <Clock className="w-3 h-3 shrink-0" /> {formatDateTime12Hour(job.preferredTime) || "Flexible"}
                             </span>
                           </div>
                         </div>
 
-                        {/* Price Tag */}
-                        <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 text-right min-w-[200px] shadow-[4px_4px_0_0_#000]">
-                          <p className="text-xs text-black font-black uppercase tracking-widest mb-1 bg-white inline-block px-1 border-2 border-black -rotate-2">
-                            Customer&apos;s Offer
+                        {/* Compact Price Box */}
+                        <div className="bg-[var(--color-brutal-bg)] border-2 border-black p-2 sm:p-2.5 text-right shrink-0 shadow-[2px_2px_0_0_#000] min-w-[120px] sm:min-w-[140px]">
+                          <p className="text-[10px] text-black font-black uppercase tracking-wider mb-0.5 bg-white inline-block px-1 border border-black">
+                            Offer
                           </p>
-                          <p className="text-4xl font-black text-black tracking-tighter mt-1">
+                          <p className="text-lg sm:text-2xl font-black text-black tracking-tight leading-none mt-0.5">
                             ₦{currentPrice.toLocaleString()}
                           </p>
-                          <div className="mt-2 text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t-2 border-black pt-1">
-                            Take Home: ₦{artisanTakeHome.toLocaleString()}
+                          <div className="text-[10px] sm:text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t border-black pt-0.5 mt-1">
+                            Net: ₦{artisanTakeHome.toLocaleString()}
                           </div>
                           {isPromoActive && (
-                            <p className="text-[10px] font-black text-purple-700 uppercase mt-0.5">
-                              ✨ 0% Fee Promo Active
+                            <p className="text-[9px] font-black text-purple-700 uppercase">
+                              ✨ 0% Fee Promo
                             </p>
                           )}
                         </div>
@@ -734,33 +761,33 @@ export default function ArtisanDashboard() {
 
                       {/* Description & Media */}
                       {job.description && (
-                        <div className="bg-[var(--color-brutal-yellow)] p-4 brutal-border mb-4 shadow-[2px_2px_0_0_#000]">
-                          <p className="text-black font-bold leading-relaxed text-sm line-clamp-3">
+                        <div className="bg-[var(--color-brutal-yellow)] p-2.5 sm:p-3 border-2 border-black mb-3 shadow-[2px_2px_0_0_#000]">
+                          <p className="text-black font-bold leading-snug text-xs sm:text-sm line-clamp-2">
                             {job.description}
                           </p>
                         </div>
                       )}
 
                       {job.mediaUrl && (
-                        <div className="mb-4">
+                        <div className="mb-3">
                           <a 
                             href={job.mediaUrl} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="inline-flex items-center gap-2 bg-white border-2 border-black px-3 py-1.5 text-xs font-black uppercase hover:bg-[var(--color-brutal-yellow)] transition-colors shadow-[2px_2px_0_0_#000]"
+                            className="inline-flex items-center gap-1.5 bg-white border-2 border-black px-2.5 py-1 text-[11px] sm:text-xs font-black uppercase hover:bg-[var(--color-brutal-yellow)] transition-colors shadow-[2px_2px_0_0_#000]"
                           >
-                            <span>📷 View Attached {job.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
+                            <span>📷 View {job.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
                           </a>
                         </div>
                       )}
 
                       {/* Inline Counter Form */}
                       {isCounteringThis && (
-                        <div className="mb-6 p-4 bg-[var(--color-brutal-bg)] border-3 border-black shadow-[3px_3px_0_0_#000]">
-                          <p className="text-xs font-black uppercase tracking-wider mb-2">Propose Counter Offer Amount (₦):</p>
+                        <div className="mb-4 p-3 bg-[var(--color-brutal-bg)] border-2 sm:border-3 border-black shadow-[2px_2px_0_0_#000]">
+                          <p className="text-[11px] font-black uppercase tracking-wider mb-1.5">Propose Counter Amount (₦):</p>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
-                              <span className="absolute left-3 top-3 font-black text-lg">₦</span>
+                              <span className="absolute left-2.5 top-2 font-black text-sm">₦</span>
                               <input
                                 type="text"
                                 value={counterInputs[job.requestId] || ""}
@@ -770,7 +797,7 @@ export default function ArtisanDashboard() {
                                   setCounterInputs(prev => ({ ...prev, [job.requestId]: formatted }));
                                 }}
                                 placeholder="e.g. 25,000"
-                                className="w-full pl-8 pr-3 py-2.5 font-black text-lg border-2 border-black brutal-shadow-sm focus:outline-none"
+                                className="w-full pl-7 pr-2 py-1.5 font-black text-sm border-2 border-black brutal-shadow-sm focus:outline-none"
                               />
                             </div>
                             <button
@@ -779,40 +806,40 @@ export default function ArtisanDashboard() {
                                 if (val > 0) handleCounterUpForGrabs(job, val);
                               }}
                               disabled={isClaiming || !counterVal}
-                              className="px-4 py-2 bg-black text-white font-black text-sm uppercase border-2 border-black hover:bg-white hover:text-black transition-colors disabled:opacity-50"
+                              className="px-3 py-1.5 bg-black text-white font-black text-xs uppercase border-2 border-black hover:bg-white hover:text-black transition-colors disabled:opacity-50"
                             >
                               SUBMIT
                             </button>
                             <button
                               onClick={() => setShowCounterFor(null)}
-                              className="px-3 py-2 bg-white text-black font-black text-sm uppercase border-2 border-black hover:bg-gray-100"
+                              className="px-2.5 py-1.5 bg-white text-black font-black text-xs uppercase border-2 border-black hover:bg-gray-100"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                           {counterVal > 0 && (
-                            <p className="text-xs font-black text-[var(--color-brutal-teal)] mt-2">
-                              Take home on counter: ₦{counterTakeHome.toLocaleString()}
+                            <p className="text-[11px] font-black text-[var(--color-brutal-teal)] mt-1.5">
+                              Net on counter: ₦{counterTakeHome.toLocaleString()}
                             </p>
                           )}
                         </div>
                       )}
 
                       {/* Action Buttons */}
-                      <div className="mt-auto flex flex-col sm:flex-row gap-3 pt-4 border-t-2 border-black">
+                      <div className="mt-auto flex flex-col sm:flex-row gap-2 pt-3 border-t-2 border-black">
                         <button
                           onClick={() => handleClaimUpForGrabs(job)}
                           disabled={isClaiming}
-                          className="flex-1 bg-[var(--color-brutal-green)] text-black border-4 border-black font-black uppercase text-center py-4 hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          className="flex-1 bg-[var(--color-brutal-green)] text-black border-3 border-black font-black uppercase text-center py-2.5 sm:py-3 px-3 hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0_0_#000] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 text-xs sm:text-sm"
                         >
                           {isClaiming ? (
                             <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              <span>CLAIMING JOB...</span>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>CLAIMING...</span>
                             </>
                           ) : (
                             <>
-                              <CheckCircle className="w-5 h-5 stroke-[2.5]" />
+                              <CheckCircle className="w-4 h-4 stroke-[2.5]" />
                               <span>CLAIM JOB (₦{currentPrice.toLocaleString()})</span>
                             </>
                           )}
@@ -821,18 +848,18 @@ export default function ArtisanDashboard() {
                         <button
                           onClick={() => setShowCounterFor(isCounteringThis ? null : job.requestId)}
                           disabled={isClaiming}
-                          className="bg-[var(--color-brutal-yellow)] text-black border-4 border-black font-black uppercase text-center py-4 px-5 hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          className="bg-[var(--color-brutal-yellow)] text-black border-3 border-black font-black uppercase text-center py-2.5 sm:py-3 px-3 hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0_0_#000] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 text-xs sm:text-sm"
                         >
-                          <Wrench className="w-5 h-5" />
+                          <Wrench className="w-4 h-4" />
                           <span>COUNTER</span>
                         </button>
 
                         <Link
                           href={`/technician/jobs/${job.requestId}`}
-                          className="bg-white text-black border-4 border-black font-black uppercase text-center py-4 px-4 hover:bg-black hover:text-white transition-colors shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-1"
+                          className="bg-white text-black border-3 border-black font-black uppercase text-center py-2.5 sm:py-3 px-3 hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0_0_#000] flex items-center justify-center gap-1 text-xs sm:text-sm"
                           title="View Details"
                         >
-                          <ArrowRight className="w-5 h-5" />
+                          <ArrowRight className="w-4 h-4" />
                         </Link>
                       </div>
                     </div>
@@ -901,12 +928,12 @@ export default function ArtisanDashboard() {
               const dynamicTakeHome = typingVal - dynamicFee;
 
               return (
-                <div key={req.requestId} className="bg-white brutal-border brutal-shadow-sm hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
-                  <div className="p-6 md:p-8 flex flex-col flex-grow">
-                    <div className="flex flex-col xl:flex-row xl:justify-between xl:items-start gap-4 mb-6 border-b-4 border-black pb-6">
-                      <div>
-                        <span className={`inline-block px-4 py-2 text-xs font-black uppercase tracking-widest mb-3 brutal-border
-                          ${isAwaitingCustDeposit ? 'bg-[var(--color-brutal-yellow)] text-black border-4 border-black' : ''}
+                <div key={req.requestId} className="bg-white border-3 sm:border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
+                  <div className="p-3.5 sm:p-5 flex flex-col flex-grow">
+                    <div className="flex items-start justify-between gap-3 mb-3 border-b-2 sm:border-b-3 border-black pb-3">
+                      <div className="min-w-0 flex-1">
+                        <span className={`inline-block px-2.5 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1.5 border-2 border-black shadow-[2px_2px_0_0_#000]
+                          ${isAwaitingCustDeposit ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
                           ${!isAwaitingCustDeposit && currentStatus === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
                           ${!isAwaitingCustDeposit && currentStatus === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
                           ${!isAwaitingCustDeposit && currentStatus === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' : ''}
@@ -918,62 +945,62 @@ export default function ArtisanDashboard() {
                           ${currentStatus === 'cancelled' ? 'bg-gray-800 text-white' : ''}
                         `}>
                           {isAwaitingCustDeposit 
-                            ? 'ACCEPTED • AWAITING CUSTOMER DEPOSIT'
+                            ? 'ACCEPTED • AWAITING DEPOSIT'
                             : currentStatus === 'countered' 
                               ? (req.lastCounterBy === 'customer' ? 'ACTION REQUIRED' : 'AWAITING CUSTOMER') 
                               : currentStatus === 'declined' 
-                                ? (req.declinedBy === 'artisan' ? 'TECHNICIAN DECLINED' : 'CUSTOMER DECLINED') 
+                                ? (req.declinedBy === 'artisan' ? 'TECH DECLINED' : 'CUSTOMER DECLINED') 
                                 : currentStatus.replace('_', ' ')}
                         </span>
-                        <h3 className="text-3xl font-black text-black mb-1 uppercase tracking-tighter">
+                        <h3 className="text-base sm:text-xl font-black text-black uppercase tracking-tight truncate leading-tight">
                           {req.trade ? `${req.trade} - ${req.subcategory}` : (req.isBroadcast ? "Broadcast Request" : req.subcategory || "Service Request")}
                         </h3>
-                        <p className="text-sm text-black font-bold flex flex-wrap items-center gap-2 uppercase tracking-widest mt-2">
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.neighborhood || "Location on file"}</span>
-                          <span className="bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDateTime12Hour(req.preferredTime) || "Flexible"}</span>
+                        <p className="text-xs text-black font-bold flex flex-wrap items-center gap-1.5 uppercase mt-1">
+                          <span className="bg-[var(--color-brutal-bg)] border border-black px-2 py-0.5 flex items-center gap-1 text-[11px]"><MapPin className="w-3 h-3 shrink-0" /> <span className="truncate max-w-[130px] sm:max-w-none">{req.neighborhood || "Location on file"}</span></span>
+                          <span className="bg-[var(--color-brutal-bg)] border border-black px-2 py-0.5 flex items-center gap-1 text-[11px]"><Clock className="w-3 h-3 shrink-0" /> {formatDateTime12Hour(req.preferredTime) || "Flexible"}</span>
                         </p>
                       </div>
                       
-                      {/* Price Tag */}
-                      <div className="bg-[var(--color-brutal-bg)] brutal-border p-4 text-right min-w-[200px] shadow-[4px_4px_0_0_#000]">
-                        <p className="text-xs text-black font-black uppercase tracking-widest mb-1 bg-white inline-block px-1 border-2 border-black -rotate-2">
-                          {currentStatus === "countered" ? "Counter Offer" : "Customer's Offer"}
+                      {/* Compact Price Tag */}
+                      <div className="bg-[var(--color-brutal-bg)] border-2 border-black p-2 sm:p-2.5 text-right shrink-0 shadow-[2px_2px_0_0_#000] min-w-[120px] sm:min-w-[140px]">
+                        <p className="text-[10px] text-black font-black uppercase tracking-wider mb-0.5 bg-white inline-block px-1 border border-black">
+                          {currentStatus === "countered" ? "Counter" : "Offer"}
                         </p>
-                        <p className="text-4xl font-black text-black tracking-tighter mt-1">₦{currentPrice.toLocaleString()}</p>
-                        <div className="mt-2 text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t-2 border-black pt-1">
-                          Take Home: ₦{artisanTakeHome.toLocaleString()}
+                        <p className="text-lg sm:text-2xl font-black text-black tracking-tight leading-none mt-0.5">₦{currentPrice.toLocaleString()}</p>
+                        <div className="text-[10px] sm:text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t border-black pt-0.5 mt-1">
+                          Net: ₦{artisanTakeHome.toLocaleString()}
                         </div>
                       </div>
                     </div>
 
                     {req.description && (
-                      <div className="bg-[var(--color-brutal-yellow)] p-4 brutal-border mb-6 shadow-[2px_2px_0_0_#000]">
-                        <p className="text-black font-bold leading-relaxed text-sm line-clamp-2">{req.description}</p>
+                      <div className="bg-[var(--color-brutal-yellow)] p-2.5 sm:p-3 border-2 border-black mb-3 shadow-[2px_2px_0_0_#000]">
+                        <p className="text-black font-bold leading-snug text-xs sm:text-sm line-clamp-2">{req.description}</p>
                       </div>
                     )}
 
                     {currentStatus === "cancelled" && req.cancelledReason && (
-                      <div className="bg-red-100 p-4 brutal-border mb-6 shadow-[2px_2px_0_0_#000] border-red-500">
-                        <p className="font-black text-red-900 flex items-center gap-2 mb-1 uppercase tracking-widest text-xs"><AlertTriangle className="w-4 h-4" /> Job Cancelled</p>
-                        <p className="font-bold text-red-800 text-sm">{req.cancelledReason}</p>
+                      <div className="bg-red-100 p-2.5 sm:p-3 border-2 border-black mb-3 shadow-[2px_2px_0_0_#000] border-red-500">
+                        <p className="font-black text-red-900 flex items-center gap-1.5 mb-1 uppercase tracking-wider text-[11px]"><AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Job Cancelled</p>
+                        <p className="font-bold text-red-800 text-xs">{req.cancelledReason}</p>
                       </div>
                     )}
 
-                    <div className="mt-auto flex flex-col gap-3 pt-4 border-t-2 border-black">
+                    <div className="mt-auto flex flex-col gap-2 pt-3 border-t-2 border-black">
                       {["accepted", "confirmed", "en_route", "arrived", "in_progress", "payment_pending", "completed"].includes(currentStatus) && (
                         <Link 
                           href={`/chat/${req.requestId}`} 
-                          className="w-full bg-white border-4 border-black font-black uppercase text-center block py-4 hover:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none"
+                          className="w-full bg-white border-3 border-black font-black uppercase text-center block py-2.5 sm:py-3 hover:bg-[var(--color-brutal-bg)] transition-colors shadow-[2px_2px_0_0_#000] text-xs sm:text-sm"
                         >
-                          <span className="flex items-center justify-center gap-2"><MessageSquare className="w-5 h-5" /> CHAT WITH CUSTOMER</span>
+                          <span className="flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4" /> CHAT WITH CUSTOMER</span>
                         </Link>
                       )}
 
                       <Link 
                         href={`/technician/jobs/${req.requestId}`} 
-                        className="w-full bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-center block py-4 hover:bg-black hover:text-white transition-colors brutal-shadow-sm"
+                        className="w-full bg-[var(--color-brutal-yellow)] border-3 border-black font-black uppercase text-center block py-2.5 sm:py-3 hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0_0_#000] text-xs sm:text-sm"
                       >
-                        <span className="flex items-center justify-center gap-2"><Wrench className="w-5 h-5" /> MANAGE BOOKING</span>
+                        <span className="flex items-center justify-center gap-1.5"><Wrench className="w-4 h-4" /> MANAGE BOOKING</span>
                       </Link>
                     </div>
                   </div>

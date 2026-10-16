@@ -46,6 +46,8 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   const [videoMuted, setVideoMuted] = useState(false);
   // Default audio calls to discrete earpiece (false); video calls to loudspeaker (true)
   const [speakerOn, setSpeakerOn] = useState(isVideo);
+  const speakerOnRef = useRef(speakerOn);
+  speakerOnRef.current = speakerOn;
   const [error, setError] = useState("");
   const [callDuration, setCallDuration] = useState(0);
   const connectedAtRef = useRef<number>(Date.now());
@@ -182,6 +184,14 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           }
           if (mediaType === "audio") {
             user.audioTrack?.play();
+            // Re-assert audio routing immediately after remote audio begins playing in WebView
+            if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+              setTimeout(() => {
+                AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(e =>
+                  console.warn("AudioToggle re-route on audio play failed:", e)
+                );
+              }, 250);
+            }
           }
         });
 

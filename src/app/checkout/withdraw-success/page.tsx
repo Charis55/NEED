@@ -34,7 +34,7 @@ function WithdrawSuccessContent() {
         </p>
 
         {reference ? (
-          <p className="text-[11px] font-mono text-gray-500 uppercase mb-4">
+          <p className="text-[11px] font-mono text-gray-500 uppercase mb-4 break-all max-w-full px-2 text-center">
             REF: {reference}
           </p>
         ) : null}

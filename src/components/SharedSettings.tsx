@@ -14,7 +14,7 @@ import ImageCropper from "@/components/ImageCropper";
 import UserAvatar from "@/components/UserAvatar";
 import AccountStrikesSection from "@/components/AccountStrikesSection";
 import CustomerCreditsCard from "@/components/CustomerCreditsCard";
-import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle, Pencil } from "lucide-react";
+import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle, Pencil, ArrowLeft, ChevronRight, Wrench, ShieldCheck } from "lucide-react";
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 
@@ -27,6 +27,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
   const { showAlert } = useAlert();
 
   const [activeTab, setActiveTab] = useState<"profile" | "credits" | "notifications" | "about">("profile");
+  const [accountSubmenu, setAccountSubmenu] = useState<null | "profile" | "services" | "security">(null);
 
   const [authUser, setAuthUser] = useState<User | null>(null);
 
@@ -493,7 +494,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       {/* Tabs */}
       <div className="flex w-full border-b-4 border-black mb-8 relative">
         <button
-          onClick={() => setActiveTab("profile")}
+          onClick={() => { setActiveTab("profile"); setAccountSubmenu(null); }}
           className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "profile" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
             }`}
         >
@@ -501,7 +502,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         </button>
         {!isArtisan && (
           <button
-            onClick={() => setActiveTab("credits")}
+            onClick={() => { setActiveTab("credits"); setAccountSubmenu(null); }}
             className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "credits" ? "bg-[var(--color-brutal-green)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
               }`}
           >
@@ -509,14 +510,14 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
           </button>
         )}
         <button
-          onClick={() => setActiveTab("notifications")}
+          onClick={() => { setActiveTab("notifications"); setAccountSubmenu(null); }}
           className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "notifications" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
             }`}
         >
           Alerts
         </button>
         <button
-          onClick={() => setActiveTab("about")}
+          onClick={() => { setActiveTab("about"); setAccountSubmenu(null); }}
           className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg transition-colors ${activeTab === "about" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
             }`}
         >
@@ -526,30 +527,126 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       <div className="max-w-4xl mx-auto">
         {activeTab === "profile" && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* Profile Picture Change Section */}
-            <div className="flex flex-col items-center mb-8">
-              <div className="relative mb-4">
-                <div className="w-32 h-32 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                  {uploadingImage ? (
-                    <div className="w-full h-full flex items-center justify-center bg-black/10">
-                      <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* SUBMENU: MAIN LIST (when no submenu is selected) */}
+            {accountSubmenu === null && (
+              <div className="space-y-6">
+                {/* User Overview Header Card */}
+                <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-5 sm:p-6 shadow-[6px_6px_0_0_#000] flex items-center gap-4 sm:gap-6">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 border-black overflow-hidden bg-white shadow-[2px_2px_0_0_#000] shrink-0">
+                    <UserAvatar photoURL={photoURL} name={firstName || "User"} className="w-full h-full text-2xl sm:text-3xl font-black text-black" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h2 className="text-xl sm:text-2xl font-black uppercase text-black truncate leading-tight">
+                        {firstName ? `${firstName} ${lastName}`.trim() : "My Account"}
+                      </h2>
+                      <span className="bg-black text-white px-2 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider">
+                        {isArtisan ? "Technician" : "Customer"}
+                      </span>
                     </div>
-                  ) : (
-                    <UserAvatar photoURL={photoURL} name={firstName || "User"} className="w-full h-full text-4xl text-black font-black" />
-                  )}
+                    <p className="text-xs sm:text-sm font-bold text-gray-800 truncate">{email || "No email"}</p>
+                    {phone && <p className="text-xs font-bold text-gray-700 mt-0.5">{phone}</p>}
+                  </div>
                 </div>
-                <label className="absolute bottom-0 right-0 w-10 h-10 bg-[var(--color-brutal-pink)] border-4 border-black rounded-full flex justify-center items-center cursor-pointer hover:scale-110 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-transform">
-                  <Camera className="w-5 h-5 stroke-[3]" />
-                  <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
-                </label>
-              </div>
-              <p className="font-black uppercase text-sm text-gray-500">Tap icon to change</p>
-            </div>
 
-            <form onSubmit={handleUniversalSave}>
-              <div className="bg-[var(--color-brutal-teal)] border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-8">
-                <h2 className="text-xl font-black uppercase text-black mb-4">Personal Details</h2>
+                {/* Neobrutalist Settings Submenu List */}
+                <div className="space-y-3 sm:space-y-4">
+                  {/* 1. Profile Details */}
+                  <button
+                    type="button"
+                    onClick={() => setAccountSubmenu("profile")}
+                    className="w-full bg-white border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] transition-all flex items-center justify-between text-left group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5 sm:gap-4">
+                      <div className="w-12 h-12 bg-[var(--color-brutal-pink)] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] group-hover:rotate-6 transition-transform">
+                        <UserIcon className="w-6 h-6 stroke-[2.5] text-black" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-base sm:text-lg uppercase text-black leading-tight">Profile</h3>
+                        <p className="font-bold text-xs sm:text-sm text-gray-600">Personal info, photo & contact details</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  {/* 2. Manage Services */}
+                  <button
+                    type="button"
+                    onClick={() => setAccountSubmenu("services")}
+                    className="w-full bg-white border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] transition-all flex items-center justify-between text-left group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5 sm:gap-4">
+                      <div className="w-12 h-12 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] group-hover:rotate-6 transition-transform">
+                        <Wrench className="w-6 h-6 stroke-[2.5] text-black" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-base sm:text-lg uppercase text-black leading-tight">Manage Services</h3>
+                        <p className="font-bold text-xs sm:text-sm text-gray-600">
+                          {isArtisan
+                            ? `${artisanServices.length} active service${artisanServices.length === 1 ? '' : 's'} & certifications`
+                            : "Service skills, trades & technician offerings"}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  {/* 3. Account Security & Actions */}
+                  <button
+                    type="button"
+                    onClick={() => setAccountSubmenu("security")}
+                    className="w-full bg-white border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] transition-all flex items-center justify-between text-left group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5 sm:gap-4">
+                      <div className="w-12 h-12 bg-[var(--color-brutal-teal)] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] group-hover:rotate-6 transition-transform">
+                        <ShieldCheck className="w-6 h-6 stroke-[2.5] text-black" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-base sm:text-lg uppercase text-black leading-tight">Account Security & Actions</h3>
+                        <p className="font-bold text-xs sm:text-sm text-gray-600">Password reset, standing, sign out & delete</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SUBMENU 1: PROFILE DETAILS */}
+            {accountSubmenu === "profile" && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-200">
+                <button
+                  type="button"
+                  onClick={() => setAccountSubmenu(null)}
+                  className="inline-flex items-center gap-2 bg-white border-3 border-black px-3.5 py-1.5 font-black text-xs sm:text-sm uppercase shadow-[2px_2px_0_0_#000] hover:bg-[var(--color-brutal-yellow)] transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4 stroke-[3]" /> Back to Account
+                </button>
+
+                {/* Profile Picture Change Section */}
+                <div className="flex flex-col items-center mb-6">
+                  <div className="relative mb-3">
+                    <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                      {uploadingImage ? (
+                        <div className="w-full h-full flex items-center justify-center bg-black/10">
+                          <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : (
+                        <UserAvatar photoURL={photoURL} name={firstName || "User"} className="w-full h-full text-4xl text-black font-black" />
+                      )}
+                    </div>
+                    <label className="absolute bottom-0 right-0 w-9 h-9 sm:w-10 sm:h-10 bg-[var(--color-brutal-pink)] border-3 border-black rounded-full flex justify-center items-center cursor-pointer hover:scale-110 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-transform">
+                      <Camera className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3]" />
+                      <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
+                    </label>
+                  </div>
+                  <p className="font-black uppercase text-xs sm:text-sm text-gray-500">Tap icon to change</p>
+                </div>
+
+                <form onSubmit={handleUniversalSave}>
+                  <div className="bg-[var(--color-brutal-teal)] border-4 border-black p-5 sm:p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mb-6">
+                    <h2 className="text-xl font-black uppercase text-black mb-4">Personal Details</h2>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -604,11 +701,35 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                 </div>
               </div>
 
-              {/* Manage Services (Appended to Account Tab) */}
-              {isArtisan && (
-                <div className="bg-[var(--color-brutal-bg)] p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mt-8">
-                  <h2 className="text-2xl font-black uppercase text-black mb-4">Manage Services</h2>
-                  <p className="text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 sm:py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-lg sm:text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {loading ? "SAVING CHANGES..." : "SAVE CHANGES"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* SUBMENU 2: MANAGE SERVICES */}
+        {accountSubmenu === "services" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-200">
+            <button
+              type="button"
+              onClick={() => setAccountSubmenu(null)}
+              className="inline-flex items-center gap-2 bg-white border-3 border-black px-3.5 py-1.5 font-black text-xs sm:text-sm uppercase shadow-[2px_2px_0_0_#000] hover:bg-[var(--color-brutal-yellow)] transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 stroke-[3]" /> Back to Account
+            </button>
+
+            {isArtisan ? (
+              <form onSubmit={handleUniversalSave}>
+                <div className="bg-[var(--color-brutal-bg)] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                  <h2 className="text-xl sm:text-2xl font-black uppercase text-black mb-2">Manage Services</h2>
+                  <p className="text-xs sm:text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
                     You can add, edit, or remove services and attach certificates. Adding specific services improves your matching rate.
                   </p>
                   {/* Existing Services List */}
@@ -861,67 +982,97 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                     </button>
                   )}
 
+                    <div className="pt-4">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-4 sm:py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-lg sm:text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {loading ? "SAVING CHANGES..." : "SAVE CHANGES"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <div className="bg-white border-4 border-black p-6 sm:p-8 shadow-[6px_6px_0_0_#000]">
+                  <div className="w-14 h-14 bg-[var(--color-brutal-yellow)] border-3 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0_0_#000]">
+                    <Wrench className="w-7 h-7 stroke-[2.5] text-black" />
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black uppercase text-black mb-2">Offer Services on Need</h2>
+                  <p className="text-xs sm:text-sm font-bold text-gray-700 leading-relaxed mb-6">
+                    You are currently signed in as a Customer. To offer your trade skills, manage bookings, and earn on Need, apply to become a verified technician.
+                  </p>
+                  <Link
+                    href="/signup?role=artisan"
+                    className="inline-block bg-[var(--color-brutal-green)] text-black border-4 border-black font-black uppercase text-center py-3 px-6 shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all text-xs sm:text-sm"
+                  >
+                    Apply as a Technician
+                  </Link>
                 </div>
               )}
+            </div>
+          )}
 
-              <div className="pt-2">
+          {/* SUBMENU 3: ACCOUNT SECURITY & ACTIONS */}
+          {accountSubmenu === "security" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-200">
+              <button
+                type="button"
+                onClick={() => setAccountSubmenu(null)}
+                className="inline-flex items-center gap-2 bg-white border-3 border-black px-3.5 py-1.5 font-black text-xs sm:text-sm uppercase shadow-[2px_2px_0_0_#000] hover:bg-[var(--color-brutal-yellow)] transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 stroke-[3]" /> Back to Account
+              </button>
+
+              {/* Account Status & Security */}
+              {authUser && (
+                <AccountStrikesSection
+                  userId={authUser.uid}
+                  userType={isArtisan ? "artisan" : "customer"}
+                />
+              )}
+
+              <div className="bg-white border-4 border-black p-5 sm:p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-4">
+                <h2 className="text-xl font-black uppercase text-black mb-4">Account Security & Actions</h2>
+
                 <button
-                  type="submit"
+                  type="button"
+                  className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none text-xs sm:text-sm cursor-pointer"
+                  onClick={async () => {
+                    if (!authUser || !authUser.email) {
+                      showAlert("No email associated with this account.", "error");
+                      return;
+                    }
+                    try {
+                      await sendPasswordResetEmail(auth, authUser.email);
+                      showAlert(`Password reset email sent to ${authUser.email}.`, "success");
+                    } catch (error: unknown) {
+                      showAlert((error as Error).message || "Failed to send password reset email.", "error");
+                    }
+                  }}
                   disabled={loading}
-                  className="w-full py-5 bg-[var(--color-brutal-green)] border-4 border-black font-black text-xl uppercase text-black hover:-translate-y-1 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "SAVING CHANGES..." : "SAVE CHANGES"}
+                  CHANGE PASSWORD
+                </button>
+
+                <SignOutButton className="w-full py-4 bg-gray-200 border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all text-xs sm:text-sm cursor-pointer">
+                  SIGN OUT
+                </SignOutButton>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={loading}
+                  className={`w-full py-4 border-4 border-black font-black uppercase transition-all ${deleteConfirm
+                      ? "bg-[var(--color-brutal-red)] text-white hover:bg-red-700 animate-pulse"
+                      : "bg-white text-[var(--color-brutal-red)] hover:bg-[var(--color-brutal-red)] hover:text-white"
+                    } hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-xs sm:text-sm cursor-pointer`}
+                >
+                  {deleteConfirm ? "CLICK AGAIN TO CONFIRM DELETE" : "DELETE ACCOUNT"}
                 </button>
               </div>
-            </form>
-
-            {/* Account Status & Security */}
-            {authUser && (
-              <AccountStrikesSection
-                userId={authUser.uid}
-                userType={isArtisan ? "artisan" : "customer"}
-              />
-            )}
-
-            <div className="bg-white border-4 border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-4">
-              <h2 className="text-xl font-black uppercase text-black mb-4">Account Security & Actions</h2>
-
-              <button
-                type="button"
-                className="w-full py-4 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
-                onClick={async () => {
-                  if (!authUser || !authUser.email) {
-                    showAlert("No email associated with this account.", "error");
-                    return;
-                  }
-                  try {
-                    await sendPasswordResetEmail(auth, authUser.email);
-                    showAlert(`Password reset email sent to ${authUser.email}.`, "success");
-                  } catch (error: unknown) {
-                    showAlert((error as Error).message || "Failed to send password reset email.", "error");
-                  }
-                }}
-                disabled={loading}
-              >
-                CHANGE PASSWORD
-              </button>
-
-              <SignOutButton className="w-full py-4 bg-gray-200 border-4 border-black font-black uppercase text-black hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-                SIGN OUT
-              </SignOutButton>
-
-              <button
-                type="button"
-                onClick={handleDeleteAccount}
-                disabled={loading}
-                className={`w-full py-4 border-4 border-black font-black uppercase transition-all ${deleteConfirm
-                    ? "bg-[var(--color-brutal-red)] text-white hover:bg-red-700 animate-pulse"
-                    : "bg-white text-[var(--color-brutal-red)] hover:bg-[var(--color-brutal-red)] hover:text-white"
-                  } hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]`}
-              >
-                {deleteConfirm ? "CLICK AGAIN TO CONFIRM DELETE" : "DELETE ACCOUNT"}
-              </button>
             </div>
+          )}
           </div>
         )}
 

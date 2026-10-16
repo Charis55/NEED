@@ -274,40 +274,40 @@ export default function PerformancePage() {
               <p className="font-bold text-gray-600 mt-2">Complete jobs to start collecting feedback from customers.</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {reviews.map(review => (
-                <div key={review.reviewId} className="bg-white border-4 border-black p-6 brutal-shadow-sm flex flex-col md:flex-row gap-6">
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-black uppercase text-xl leading-none">{review.jobTitle || "Job Completed"}</h4>
-                      <span className="text-xs font-bold bg-[var(--color-brutal-bg)] border-2 border-black px-2 py-1">
+                <div key={review.reviewId} className="bg-white border-3 border-black p-3.5 sm:p-4 shadow-[3px_3px_0_0_#000]">
+                  <div>
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <h4 className="font-black uppercase text-sm sm:text-base leading-tight truncate flex-1">{review.jobTitle || "Job Completed"}</h4>
+                      <span className="text-[10px] sm:text-xs font-bold bg-[var(--color-brutal-bg)] border border-black px-1.5 py-0.5 shrink-0">
                         {new Date(review.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                     
-                    <div className="flex gap-1 mb-4">
+                    <div className="flex gap-1 mb-2">
                       {[1,2,3,4,5].map(star => (
-                        <Star key={star} className={`w-5 h-5 ${star <= review.rating ? 'fill-[var(--color-brutal-yellow)]' : 'fill-transparent stroke-gray-400'} stroke-black stroke-[2]`} />
+                        <Star key={star} className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${star <= review.rating ? 'fill-[var(--color-brutal-yellow)]' : 'fill-transparent stroke-gray-400'} stroke-black stroke-[2]`} />
                       ))}
                     </div>
                     
-                    <p className="font-bold text-lg leading-relaxed mb-4 p-4 bg-gray-50 border-l-4 border-black">"{review.comment}"</p>
+                    <p className="font-bold text-xs sm:text-sm leading-snug mb-2.5 p-2 sm:p-2.5 bg-gray-50 border-l-3 border-black">"{review.comment}"</p>
                     
                     {review.photos && review.photos.length > 0 && (
-                      <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                      <div className="flex gap-2 mb-2.5 overflow-x-auto pb-1">
                         {review.photos.map((photo, idx) => (
-                          <div key={idx} className="w-20 h-20 border-2 border-black relative shrink-0">
-                            <Image src={photo} alt="Review photo" fill sizes="80px" className="object-cover" />
+                          <div key={idx} className="w-14 h-14 border-2 border-black relative shrink-0">
+                            <Image src={photo} alt="Review photo" fill sizes="56px" className="object-cover" />
                           </div>
                         ))}
                       </div>
                     )}
                     
                     {review.artisanResponse ? (
-                      <div className="mt-4 p-4 bg-[var(--color-brutal-teal)] border-4 border-black ml-4 md:ml-8 relative">
-                        <div className="absolute -top-4 -left-4 w-8 h-8 bg-black rotate-45 border-4 border-white"></div>
-                        <h5 className="font-black uppercase mb-1">Your Reply:</h5>
-                        <p className="font-bold text-black text-sm">{review.artisanResponse}</p>
+                      <div className="mt-2 p-2.5 sm:p-3 bg-[var(--color-brutal-teal)] border-2 border-black ml-2 sm:ml-4 relative shadow-[2px_2px_0_0_#000]">
+                        <div className="absolute -top-2 -left-2 w-3.5 h-3.5 bg-black rotate-45 border border-white"></div>
+                        <h5 className="font-black uppercase text-xs mb-0.5">Your Reply:</h5>
+                        <p className="font-bold text-black text-xs sm:text-sm">{review.artisanResponse}</p>
                       </div>
                     ) : (
                       <div className="mt-4">
