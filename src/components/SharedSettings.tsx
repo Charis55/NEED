@@ -570,27 +570,27 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                     <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
                   </button>
 
-                  {/* 2. Manage Services */}
-                  <button
-                    type="button"
-                    onClick={() => setAccountSubmenu("services")}
-                    className="w-full bg-white border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] transition-all flex items-center justify-between text-left group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3.5 sm:gap-4">
-                      <div className="w-12 h-12 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] group-hover:rotate-6 transition-transform">
-                        <Wrench className="w-6 h-6 stroke-[2.5] text-black" />
+                  {/* 2. Manage Services (Technicians only) */}
+                  {isArtisan && (
+                    <button
+                      type="button"
+                      onClick={() => setAccountSubmenu("services")}
+                      className="w-full bg-white border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] transition-all flex items-center justify-between text-left group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3.5 sm:gap-4">
+                        <div className="w-12 h-12 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] group-hover:rotate-6 transition-transform">
+                          <Wrench className="w-6 h-6 stroke-[2.5] text-black" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-base sm:text-lg uppercase text-black leading-tight">Manage Services</h3>
+                          <p className="font-bold text-xs sm:text-sm text-gray-600">
+                            {artisanServices.length} active service{artisanServices.length === 1 ? '' : 's'} & certifications
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-black text-base sm:text-lg uppercase text-black leading-tight">Manage Services</h3>
-                        <p className="font-bold text-xs sm:text-sm text-gray-600">
-                          {isArtisan
-                            ? `${artisanServices.length} active service${artisanServices.length === 1 ? '' : 's'} & certifications`
-                            : "Service skills, trades & technician offerings"}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                      <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  )}
 
                   {/* 3. Account Security & Actions */}
                   <button
@@ -714,8 +714,8 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
           </div>
         )}
 
-        {/* SUBMENU 2: MANAGE SERVICES */}
-        {accountSubmenu === "services" && (
+        {/* SUBMENU 2: MANAGE SERVICES (Technicians only) */}
+        {accountSubmenu === "services" && isArtisan && (
           <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-200">
             <button
               type="button"
@@ -725,8 +725,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               <ArrowLeft className="w-4 h-4 stroke-[3]" /> Back to Account
             </button>
 
-            {isArtisan ? (
-              <form onSubmit={handleUniversalSave}>
+            <form onSubmit={handleUniversalSave}>
                 <div className="bg-[var(--color-brutal-bg)] p-5 sm:p-6 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
                   <h2 className="text-xl sm:text-2xl font-black uppercase text-black mb-2">Manage Services</h2>
                   <p className="text-xs sm:text-sm font-bold text-black border-l-4 border-black pl-3 mb-6">
@@ -993,23 +992,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                     </div>
                   </div>
                 </form>
-              ) : (
-                <div className="bg-white border-4 border-black p-6 sm:p-8 shadow-[6px_6px_0_0_#000]">
-                  <div className="w-14 h-14 bg-[var(--color-brutal-yellow)] border-3 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0_0_#000]">
-                    <Wrench className="w-7 h-7 stroke-[2.5] text-black" />
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase text-black mb-2">Offer Services on Need</h2>
-                  <p className="text-xs sm:text-sm font-bold text-gray-700 leading-relaxed mb-6">
-                    You are currently signed in as a Customer. To offer your trade skills, manage bookings, and earn on Need, apply to become a verified technician.
-                  </p>
-                  <Link
-                    href="/signup?role=artisan"
-                    className="inline-block bg-[var(--color-brutal-green)] text-black border-4 border-black font-black uppercase text-center py-3 px-6 shadow-[4px_4px_0_0_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all text-xs sm:text-sm"
-                  >
-                    Apply as a Technician
-                  </Link>
-                </div>
-              )}
             </div>
           )}
 
