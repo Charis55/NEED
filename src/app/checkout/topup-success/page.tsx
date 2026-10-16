@@ -5,13 +5,20 @@ import { CheckCircle, Loader2, Smartphone, ArrowRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { apiFetch, safeJsonParse } from "@/utils/apiBase";
+import { Capacitor } from "@capacitor/core";
 
 function TopupSuccessContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference") || searchParams.get("trxref");
+  const sourceParam = searchParams.get("source");
   const [verifying, setVerifying] = useState(true);
   const [verifiedAmount, setVerifiedAmount] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Determine if this transaction originated from the native app or web
+  const isFromApp = 
+    sourceParam === "app" || 
+    (!sourceParam && typeof window !== "undefined" && Capacitor.isNativePlatform());
 
   useEffect(() => {
     if (!reference) {
@@ -31,8 +38,8 @@ function TopupSuccessContent() {
           setVerifiedAmount(data.amount);
         }
         setVerifying(false);
-        // If opened from mobile browser, attempt auto-redirect back to native app
-        if (typeof window !== "undefined") {
+        // Only if initiated from native mobile app, attempt auto-redirect back to app
+        if (isFromApp && typeof window !== "undefined") {
           setTimeout(() => {
             try {
               window.location.href = "needapp://technician/dashboard";
@@ -47,7 +54,7 @@ function TopupSuccessContent() {
         setErrorMsg("Could not verify automatically. Please check your balance in the dashboard.");
         setVerifying(false);
       });
-  }, [reference]);
+  }, [reference, isFromApp]);
 
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col items-center justify-center p-6 font-sans">
@@ -90,20 +97,32 @@ function TopupSuccessContent() {
             )}
 
             <div className="w-full space-y-3 pt-2">
-              <a 
-                href="needapp://technician/dashboard"
-                className="w-full bg-[var(--color-brutal-green)] py-4 text-black font-black uppercase tracking-widest text-lg hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all block text-center border-4 border-black shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2"
-              >
-                <Smartphone className="w-6 h-6 stroke-[3]" />
-                <span>RETURN TO NEED APP</span>
-              </a>
+              {isFromApp ? (
+                <>
+                  <a 
+                    href="needapp://technician/dashboard"
+                    className="w-full bg-[var(--color-brutal-green)] py-4 text-black font-black uppercase tracking-widest text-lg hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all block text-center border-4 border-black shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2"
+                  >
+                    <Smartphone className="w-6 h-6 stroke-[3]" />
+                    <span>RETURN TO NEED APP</span>
+                  </a>
 
-              <Link 
-                href="/technician/dashboard"
-                className="w-full bg-[var(--color-brutal-yellow)] py-3 text-black font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all block text-center border-2 border-black"
-              >
-                Web Dashboard
-              </Link>
+                  <Link 
+                    href="/technician/dashboard"
+                    className="w-full bg-[var(--color-brutal-yellow)] py-3 text-black font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all block text-center border-2 border-black"
+                  >
+                    RETURN TO DASHBOARD
+                  </Link>
+                </>
+              ) : (
+                <Link 
+                  href="/technician/dashboard"
+                  className="w-full bg-[var(--color-brutal-green)] py-4 text-black font-black uppercase tracking-widest text-lg hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all block text-center border-4 border-black shadow-[4px_4px_0_0_#000] flex items-center justify-center gap-2"
+                >
+                  <span>RETURN TO DASHBOARD</span>
+                  <ArrowRight className="w-6 h-6 stroke-[3]" />
+                </Link>
+              )}
             </div>
           </>
         )}

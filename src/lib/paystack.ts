@@ -8,7 +8,8 @@ export class PaystackProvider implements PaymentProvider {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://need-chi.vercel.app";
     let defaultCallbackUrl = `${baseUrl}/checkout/success`;
     if (params.metadata?.type === "wallet_topup") {
-      defaultCallbackUrl = `${baseUrl}/checkout/topup-success`;
+      const source = params.metadata?.source || "web";
+      defaultCallbackUrl = `${baseUrl}/checkout/topup-success?source=${source}`;
     } else if (params.metadata?.type === "deposit" || params.metadata?.jobId) {
       defaultCallbackUrl = `${baseUrl}/checkout/success?type=deposit&jobId=${params.metadata?.jobId || ""}`;
     }

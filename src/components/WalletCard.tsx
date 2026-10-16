@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown, X, Loader2 } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Wallet, UserPrivate } from "@/types/platform";
 import Link from "next/link";
+import { Capacitor } from "@capacitor/core";
 import { apiFetch, safeJsonParse } from "@/utils/apiBase";
 
 export default function WalletCard() {
@@ -154,13 +155,15 @@ export default function WalletCard() {
     
     setToppingUp(true);
     try {
+      const isNative = typeof window !== "undefined" && Capacitor.isNativePlatform();
       const res = await apiFetch("/api/wallet/topup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: auth.currentUser?.uid,
           email: auth.currentUser?.email || undefined,
-          amount: amountKobo
+          amount: amountKobo,
+          source: isNative ? "app" : "web"
         })
       });
       const data = await safeJsonParse(res);
