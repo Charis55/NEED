@@ -14,7 +14,7 @@ import ImageCropper from "@/components/ImageCropper";
 import UserAvatar from "@/components/UserAvatar";
 import AccountStrikesSection from "@/components/AccountStrikesSection";
 import CustomerCreditsCard from "@/components/CustomerCreditsCard";
-import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle, Pencil, ArrowLeft, ChevronRight, Wrench, ShieldCheck } from "lucide-react";
+import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle, Pencil, ArrowLeft, ChevronRight, Wrench, ShieldCheck, Coins } from "lucide-react";
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 
@@ -27,7 +27,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
   const { showAlert } = useAlert();
 
   const [activeTab, setActiveTab] = useState<"profile" | "credits" | "notifications" | "about">("profile");
-  const [accountSubmenu, setAccountSubmenu] = useState<null | "profile" | "services" | "security">(null);
+  const [accountSubmenu, setAccountSubmenu] = useState<null | "profile" | "services" | "credits" | "security">(null);
 
   const [authUser, setAuthUser] = useState<User | null>(null);
 
@@ -86,6 +86,22 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
     messagingNotifications: true,
     locationEnabled: true
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam === "credits" && !isArtisan) {
+        setActiveTab("profile");
+        setAccountSubmenu("credits");
+      } else if (tabParam === "services" && isArtisan) {
+        setActiveTab("profile");
+        setAccountSubmenu("services");
+      } else if (tabParam === "security") {
+        setActiveTab("profile");
+        setAccountSubmenu("security");
+      }
+    }
+  }, [isArtisan]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -500,15 +516,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         >
           Account
         </button>
-        {!isArtisan && (
-          <button
-            onClick={() => { setActiveTab("credits"); setAccountSubmenu(null); }}
-            className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "credits" ? "bg-[var(--color-brutal-green)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
-              }`}
-          >
-            Credits
-          </button>
-        )}
         <button
           onClick={() => { setActiveTab("notifications"); setAccountSubmenu(null); }}
           className={`flex-1 py-3 md:py-4 font-black uppercase text-xs sm:text-sm md:text-lg border-r-4 border-black transition-colors ${activeTab === "notifications" ? "bg-[var(--color-brutal-yellow)] text-black" : "bg-white text-gray-400 hover:bg-gray-100"
@@ -552,7 +559,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
                 {/* Neobrutalist Settings Submenu List */}
                 <div className="space-y-3 sm:space-y-4">
-                  {/* 1. Profile Details */}
+                  {/* 1. Profile Details (Both) */}
                   <button
                     type="button"
                     onClick={() => setAccountSubmenu("profile")}
@@ -592,7 +599,29 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
                     </button>
                   )}
 
-                  {/* 3. Account Security & Actions */}
+                  {/* 2. Credits (Customers only) */}
+                  {!isArtisan && (
+                    <button
+                      type="button"
+                      onClick={() => setAccountSubmenu("credits")}
+                      className="w-full bg-white border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_0_#000] transition-all flex items-center justify-between text-left group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3.5 sm:gap-4">
+                        <div className="w-12 h-12 bg-[var(--color-brutal-green)] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000] group-hover:rotate-6 transition-transform">
+                          <Coins className="w-6 h-6 stroke-[2.5] text-black" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-base sm:text-lg uppercase text-black leading-tight">Credits</h3>
+                          <p className="font-bold text-xs sm:text-sm text-gray-600">
+                            Bonus, reward & refund credits balance
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-6 h-6 stroke-[3] text-black shrink-0 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  )}
+
+                  {/* 3. Account Security & Actions (Both) */}
                   <button
                     type="button"
                     onClick={() => setAccountSubmenu("security")}
@@ -995,6 +1024,21 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
             </div>
           )}
 
+          {/* SUBMENU 2: CREDITS (Customers only) */}
+          {accountSubmenu === "credits" && !isArtisan && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-200">
+              <button
+                type="button"
+                onClick={() => setAccountSubmenu(null)}
+                className="inline-flex items-center gap-2 bg-white border-3 border-black px-3.5 py-1.5 font-black text-xs sm:text-sm uppercase shadow-[2px_2px_0_0_#000] hover:bg-[var(--color-brutal-yellow)] transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4 stroke-[3]" /> Back to Account
+              </button>
+
+              {authUser && <CustomerCreditsCard customerId={authUser.uid} />}
+            </div>
+          )}
+
           {/* SUBMENU 3: ACCOUNT SECURITY & ACTIONS */}
           {accountSubmenu === "security" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-200">
@@ -1055,12 +1099,6 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
               </div>
             </div>
           )}
-          </div>
-        )}
-
-        {activeTab === "credits" && !isArtisan && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {authUser && <CustomerCreditsCard customerId={authUser.uid} />}
           </div>
         )}
 

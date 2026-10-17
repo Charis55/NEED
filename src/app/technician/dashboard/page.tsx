@@ -391,20 +391,23 @@ export default function ArtisanDashboard() {
         {/* Active Jobs Section (Top 2 Most Recent) */}
         {activeJobs.length > 0 && (
           <div className="mb-8">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-tighter flex items-center gap-2 shrink-0">
-                <span className="bg-[var(--color-brutal-yellow)] border-2 border-black w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full animate-pulse shrink-0"></span>
-                <span className="whitespace-nowrap flex items-center gap-1.5">
+            <div className="flex items-center justify-between gap-2 sm:gap-4 mb-4 max-w-full overflow-hidden">
+              <h2 className="text-base sm:text-2xl md:text-3xl font-black uppercase tracking-tight flex items-center gap-1.5 sm:gap-2 shrink min-w-0">
+                <span className="bg-[var(--color-brutal-yellow)] border-2 border-black w-3 h-3 sm:w-4 sm:h-4 rounded-full animate-pulse shrink-0"></span>
+                <span className="whitespace-nowrap flex items-center gap-1">
                   <span>Active Jobs</span>
                   <span className="text-gray-700 font-bold">({activeJobs.length})</span>
                 </span>
               </h2>
               <Link 
                 href="/technician/jobs" 
-                className="inline-flex items-center gap-1.5 bg-white hover:bg-black text-black hover:text-white px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs md:text-sm font-black uppercase tracking-wider border-2 sm:border-3 border-black shadow-[2px_2px_0_0_#000] sm:shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 bg-white hover:bg-black text-black hover:text-white px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs md:text-sm font-black uppercase tracking-wider border-2 sm:border-3 border-black shadow-[2px_2px_0_0_#000] sm:shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap shrink-0"
               >
-                <span className="underline decoration-1 sm:decoration-2 underline-offset-2">View All Requests</span>
-                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3] shrink-0" />
+                <span className="underline decoration-1 sm:decoration-2 underline-offset-2">
+                  <span className="inline sm:hidden">All Requests</span>
+                  <span className="hidden sm:inline">View All Requests</span>
+                </span>
+                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 stroke-[3] shrink-0" />
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">

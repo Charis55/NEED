@@ -68,12 +68,36 @@ export default function GlobalCallManager() {
     const updateCombined = (artisanJobs: JobRequest[], customerJobs: JobRequest[]) => {
       const combined = [...artisanJobs, ...customerJobs];
       
-      // Find if there's any active call
+      // Find if there's any active call (filter out stale / expired calls)
+      const now = Date.now();
       let foundJob: JobRequest | null = null;
       for (const data of combined) {
-        if (data.activeCall && (data.activeCall.status === "ringing" || data.activeCall.status === "ongoing")) {
-          foundJob = data;
-          break; // just handle one active call at a time
+        if (data.activeCall) {
+          if (data.activeCall.status === "ringing") {
+            const ringingAge = now - (data.activeCall.timestamp || 0);
+            if (ringingAge > 45000) {
+              // Stale ringing call: auto-end in background if user is caller
+              if (data.activeCall.callerId === userUid) {
+                updateDoc(doc(db, "jobRequests", data.requestId), {
+                  "activeCall.status": "ended",
+                  "activeCall.endedAt": now,
+                  "activeCall.endedReason": "missed"
+                }).catch(() => {});
+              }
+              continue;
+            }
+            foundJob = data;
+            break;
+          }
+          if (data.activeCall.status === "ongoing") {
+            const ongoingAge = now - (data.activeCall.bothConnectedAt || data.activeCall.connectedAt || data.activeCall.timestamp || 0);
+            if (ongoingAge > 2 * 60 * 60 * 1000) {
+              // Ignore stale ongoing call older than 2 hours
+              continue;
+            }
+            foundJob = data;
+            break;
+          }
         }
       }
 
@@ -159,46 +183,58 @@ export default function GlobalCallManager() {
 
           if (isAnswer && targetId) {
             clearCallNotification();
-            playCallSound("pickup");
 
-            // Optimistically accept via server API (uses adminDb - guaranteed even before auth syncs)
-            apiFetch("/api/calls/accept", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ requestId: targetId, sessionId }),
-            }).catch(err => console.warn("Failed to accept call via server:", err));
-
-            // Immediately load the job doc and update state so the call modal opens instantaneously
             try {
               const { doc, getDoc, updateDoc } = await import("firebase/firestore");
               const jobSnap = await getDoc(doc(db, "jobRequests", targetId));
-              if (jobSnap.exists()) {
-                const jobData = jobSnap.data() as JobRequest;
-                const currentUid = userUidRef.current || auth.currentUser?.uid || (jobData.artisanId !== jobData.activeCall?.callerId ? jobData.artisanId : jobData.customerId);
-                
-                const updatedJob: JobRequest = {
-                  ...jobData,
-                  activeCall: {
-                    ...(jobData.activeCall || {
-                      channelName: targetId,
-                      callerId: "",
-                      type: "audio",
-                      status: "ongoing",
-                      timestamp: Date.now()
-                    }),
-                    status: "ongoing",
-                    connectedAt: Date.now(),
-                    acceptedBySession: sessionId,
-                  }
-                };
+              if (!jobSnap.exists()) {
+                console.log("[GlobalCallManager] Job not found for call accept:", targetId);
+                return;
+              }
+              const jobData = jobSnap.data() as JobRequest;
 
-                if (!userUidRef.current && currentUid) {
-                  setUserUid(currentUid);
+              // CRITICAL GUARD: Only auto-accept if the call is ACTIVELY RINGING and not expired (<45s)
+              const isActivelyRinging = jobData.activeCall?.status === "ringing" && 
+                (Date.now() - (jobData.activeCall.timestamp || 0) < 45000);
+
+              if (!isActivelyRinging) {
+                console.log("[GlobalCallManager] Ignoring stale or non-ringing call launch URL for", targetId);
+                return;
+              }
+
+              playCallSound("pickup");
+
+              // Optimistically accept via server API (uses adminDb - guaranteed even before auth syncs)
+              apiFetch("/api/calls/accept", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requestId: targetId, sessionId }),
+              }).catch(err => console.warn("Failed to accept call via server:", err));
+
+              const currentUid = userUidRef.current || auth.currentUser?.uid || (jobData.artisanId !== jobData.activeCall?.callerId ? jobData.artisanId : jobData.customerId);
+              
+              const updatedJob: JobRequest = {
+                ...jobData,
+                activeCall: {
+                  ...(jobData.activeCall || {
+                    channelName: targetId,
+                    callerId: "",
+                    type: "audio",
+                    status: "ongoing",
+                    timestamp: Date.now()
+                  }),
+                  status: "ongoing",
+                  connectedAt: Date.now(),
+                  acceptedBySession: sessionId,
                 }
-                setActiveJob(updatedJob);
-                if (currentUid) {
-                  fetchPartnerInfo(updatedJob, currentUid);
-                }
+              };
+
+              if (!userUidRef.current && currentUid) {
+                setUserUid(currentUid);
+              }
+              setActiveJob(updatedJob);
+              if (currentUid) {
+                fetchPartnerInfo(updatedJob, currentUid);
               }
 
               await updateDoc(doc(db, "jobRequests", targetId), {
@@ -240,10 +276,19 @@ export default function GlobalCallManager() {
         }
       };
 
-      // Handle cold start
+      // Handle cold start (deduplicate against session reloads)
       App.getLaunchUrl().then((launchData) => {
         if (launchData && launchData.url) {
-          handleDeepLink(launchData.url);
+          const handledKey = "need_handled_launch_url";
+          const previouslyHandled = typeof sessionStorage !== "undefined" && sessionStorage.getItem(handledKey) === launchData.url;
+          if (!previouslyHandled) {
+            if (typeof sessionStorage !== "undefined") {
+              sessionStorage.setItem(handledKey, launchData.url);
+            }
+            handleDeepLink(launchData.url);
+          } else {
+            console.log("[GlobalCallManager] Skipping already-handled launch URL on reload:", launchData.url);
+          }
         }
       });
 

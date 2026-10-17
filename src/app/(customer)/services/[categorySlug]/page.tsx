@@ -254,16 +254,30 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       </div>
 
       {selectedSubServices.length > 0 && (
-        <div className="fixed bottom-[110px] md:bottom-[90px] left-0 right-0 p-4 md:p-6 bg-[var(--color-brutal-bg)] border-t-4 border-black z-40 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_-4px_0_0_#000]">
-          <div className="flex flex-col">
-            <span className="text-xl font-black uppercase text-black">{selectedSubServices.length} Service{selectedSubServices.length > 1 ? 's' : ''} Selected</span>
-            <span className="text-sm font-bold text-gray-700">Find technicians offering these services</span>
+        <div className="fixed bottom-[96px] md:bottom-[84px] left-4 right-4 max-w-xl mx-auto p-3.5 sm:p-4 bg-[var(--color-brutal-yellow)] border-4 border-black z-40 flex items-center justify-between gap-3 shadow-[6px_6px_0_0_#000] animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="bg-black text-white text-[11px] sm:text-xs font-black uppercase px-2 py-0.5 tracking-wider border-2 border-black shrink-0">
+                {selectedSubServices.length} SELECTED
+              </span>
+              <button 
+                type="button"
+                onClick={() => setSelectedSubServices([])}
+                className="text-[10px] sm:text-[11px] font-black uppercase text-black hover:text-[var(--color-brutal-red)] underline cursor-pointer shrink-0"
+              >
+                Clear
+              </button>
+            </div>
+            <span className="text-xs sm:text-sm font-black uppercase text-black truncate leading-tight tracking-tight">
+              Find pros for these services
+            </span>
           </div>
           <Link 
             href={`/services/${unwrappedParams.categorySlug}/swipe-multi?services=${selectedSubServices.join(',')}`}
-            className="w-full md:w-auto bg-black text-white px-8 py-4 font-black uppercase tracking-widest hover:-translate-y-1 hover:shadow-[4px_4px_0_0_var(--color-brutal-yellow)] transition-all flex items-center justify-center gap-3"
+            className="bg-black text-white hover:bg-white hover:text-black hover:border-black px-4 sm:px-6 py-2.5 sm:py-3 font-black text-xs sm:text-sm uppercase tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer whitespace-nowrap"
           >
-            FIND TECHNICIANS <ArrowRight className="w-6 h-6 stroke-[3]" />
+            <span>FIND TECHNICIANS</span>
+            <ArrowRight className="w-4 h-4 stroke-[3]" />
           </Link>
         </div>
       )}

@@ -352,28 +352,28 @@ export default function TechnicianManageJobPage() {
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Header Bar */}
-      <div className="px-6 pt-12 pb-6 bg-[var(--color-brutal-yellow)] border-b-4 border-black shadow-[0_4px_0_0_#000] sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <BackButton className="bg-white text-black brutal-border hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] active:translate-y-0 active:shadow-none transition-all w-12 h-12 flex items-center justify-center p-0 shrink-0 shadow-[2px_2px_0_0_#000]" />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase bg-black text-white px-2 py-0.5 border border-black">
+      <div className="px-3.5 sm:px-6 py-2.5 sm:py-3.5 bg-[var(--color-brutal-yellow)] border-b-4 border-black shadow-[0_4px_0_0_#000] sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <BackButton className="bg-white text-black brutal-border hover:-translate-y-0.5 active:translate-y-0 transition-all w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center p-0 shrink-0 shadow-[2px_2px_0_0_#000]" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] sm:text-xs font-black uppercase bg-black text-white px-1.5 py-0.5 border border-black shrink-0">
                   #{job.requestId.slice(-6).toUpperCase()}
                 </span>
-                <span className="text-xs font-black uppercase text-gray-700">
+                <span className="text-[10px] sm:text-xs font-black uppercase text-gray-800 shrink-0">
                   {new Date(job.createdAt).toLocaleDateString()}
                 </span>
               </div>
-              <h1 className="text-2xl md:text-3xl font-black text-black uppercase tracking-tighter leading-none mt-1">
+              <h1 className="text-xs sm:text-base md:text-xl font-black text-black uppercase tracking-tight truncate leading-tight">
                 {job.trade} - {job.subcategory}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className={`px-4 py-2 text-xs md:text-sm font-black uppercase border-4 border-black shadow-[3px_3px_0_0_#000] ${
-              isAwaitingCustDeposit ? 'bg-[var(--color-brutal-yellow)] text-black border-4 border-black' :
+          <div className="shrink-0">
+            <span className={`px-2 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-black uppercase border-2 sm:border-3 border-black shadow-[2px_2px_0_0_#000] whitespace-nowrap inline-block ${
+              isAwaitingCustDeposit ? 'bg-[var(--color-brutal-yellow)] text-black border-2 sm:border-3 border-black' :
               currentStatus === 'pending' ? 'bg-[var(--color-brutal-yellow)] text-black' :
               currentStatus === 'countered' ? 'bg-[var(--color-brutal-pink)] text-black' :
               currentStatus === 'accepted' ? 'bg-[var(--color-brutal-blue)] text-black' :
@@ -385,7 +385,7 @@ export default function TechnicianManageJobPage() {
               'bg-gray-800 text-white'
             }`}>
               {isAwaitingCustDeposit 
-                ? 'ACCEPTED • AWAITING CUSTOMER DEPOSIT'
+                ? 'AWAITING DEPOSIT'
                 : currentStatus.replace('_', ' ')}
             </span>
           </div>
