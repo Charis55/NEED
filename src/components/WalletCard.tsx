@@ -203,13 +203,14 @@ export default function WalletCard() {
       <div className="bg-[var(--color-brutal-yellow)] border-4 border-black p-4 sm:p-5 shadow-[4px_4px_0_0_#000] mb-6 relative">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
               <span className="text-black text-xs font-black uppercase tracking-widest">Your Wallet</span>
               <Link 
                 href="/technician/earnings?tab=wallet" 
-                className="text-[11px] font-black uppercase text-gray-800 hover:text-black underline"
+                className="inline-flex items-center gap-1 bg-white hover:bg-black text-black hover:text-white px-2 py-0.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
               >
-                History →
+                <span className="underline decoration-1 underline-offset-2">History</span>
+                <span className="text-xs font-black">→</span>
               </Link>
             </div>
             <p className="text-3xl sm:text-4xl font-black text-black tracking-tight">
@@ -220,17 +221,17 @@ export default function WalletCard() {
           <div className="flex items-center gap-2.5 sm:gap-3">
             <button 
               onClick={() => setShowWithdrawModal(true)}
-              className="flex-1 sm:flex-initial bg-[var(--color-brutal-teal)] text-black px-4 sm:px-5 py-2.5 sm:py-3 font-black uppercase text-xs sm:text-sm tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 hover:bg-black hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-initial sm:w-44 h-11 sm:h-12 bg-[var(--color-brutal-teal)] text-black px-3 sm:px-4 font-black uppercase text-xs sm:text-sm tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 hover:bg-black hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
-              <TrendingUp className="w-4 h-4 stroke-[3]" />
+              <TrendingUp className="w-4 h-4 stroke-[3] shrink-0" />
               <span>Withdraw</span>
             </button>
 
             <button 
               onClick={() => setShowTopUpModal(true)}
-              className="flex-1 sm:flex-initial bg-[var(--color-brutal-green)] text-black px-4 sm:px-5 py-2.5 sm:py-3 font-black uppercase text-xs sm:text-sm tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 hover:bg-black hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-initial sm:w-44 h-11 sm:h-12 bg-[var(--color-brutal-green)] text-black px-3 sm:px-4 font-black uppercase text-xs sm:text-sm tracking-wider border-3 border-black shadow-[3px_3px_0_0_#000] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 hover:bg-black hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
-              <TrendingDown className="w-4 h-4 stroke-[3]" />
+              <TrendingDown className="w-4 h-4 stroke-[3] shrink-0" />
               <span>Fund Account</span>
             </button>
           </div>
