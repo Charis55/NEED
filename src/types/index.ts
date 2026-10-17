@@ -190,6 +190,7 @@ export interface JobRequest {
     status: "ringing" | "ongoing" | "ended";
     timestamp: number;
     connectedAt?: number;
+    bothConnectedAt?: number;
     acceptedBySession?: string;
   };
   guaranteeClaimId?: string;

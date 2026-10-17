@@ -312,10 +312,11 @@ export default function GlobalCallManager() {
     const targetJobId = activeJob.requestId;
     const finalReason = reason || "ended";
 
-    // Compute duration for the server (it also computes it, but pass what we know client-side)
+    // Compute synchronized duration: prioritize bothConnectedAt (when both parties joined)
     let durationMs: number | null = null;
-    if (activeJob.activeCall.connectedAt) {
-      durationMs = Math.max(0, Date.now() - activeJob.activeCall.connectedAt);
+    const syncStartTime = activeJob.activeCall.bothConnectedAt || activeJob.activeCall.connectedAt;
+    if (syncStartTime && finalReason === "ended") {
+      durationMs = Math.max(0, Date.now() - syncStartTime);
     }
 
     // Direct client Firestore update for instant (<50ms) reaction on both caller & receiver devices
@@ -376,6 +377,17 @@ export default function GlobalCallManager() {
     }
   };
 
+  const handleBothConnected = async (jobId: string, timestamp: number) => {
+    try {
+      const { updateDoc, doc } = await import("firebase/firestore");
+      await updateDoc(doc(db, "jobRequests", jobId), {
+        "activeCall.bothConnectedAt": timestamp
+      });
+    } catch (e) {
+      console.warn("Client sync bothConnectedAt failed:", e);
+    }
+  };
+
   if (!activeJob || !activeJob.activeCall || !userUid) return null;
 
   const { activeCall } = activeJob;
@@ -416,6 +428,8 @@ export default function GlobalCallManager() {
           isVideo={activeCall.type === "video"}
           partnerName={partnerName}
           partnerPhoto={partnerPhoto}
+          bothConnectedAt={activeCall.bothConnectedAt || null}
+          onBothConnected={(timestamp) => handleBothConnected(activeJob.requestId, timestamp)}
           onEndCall={() => endCallWithLog("ended")}
         />
       )}

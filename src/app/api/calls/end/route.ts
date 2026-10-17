@@ -52,15 +52,22 @@ export async function POST(req: NextRequest) {
     }
 
     const isVideo = activeCall.type === "video";
-    const wasConnected = !!activeCall.connectedAt;
+    const syncConnectedAt = activeCall.bothConnectedAt || activeCall.connectedAt;
+    const wasConnected = !!syncConnectedAt;
 
-    // Compute duration text
+    // Compute duration text based on synchronized time
     let durationText = "Missed Call";
-    if (wasConnected && typeof durationMs === "number" && durationMs > 0) {
-      const totalSeconds = Math.floor(durationMs / 1000);
-      const m = Math.floor(totalSeconds / 60);
-      const s = totalSeconds % 60;
-      durationText = `${m}:${s.toString().padStart(2, "0")} mins`;
+    if (wasConnected && ((typeof durationMs === "number" && durationMs > 0) || activeCall.bothConnectedAt)) {
+      const finalDurationMs = typeof durationMs === "number" && durationMs > 0
+        ? durationMs
+        : (activeCall.bothConnectedAt ? Math.max(0, Date.now() - activeCall.bothConnectedAt) : 0);
+
+      if (finalDurationMs > 0) {
+        const totalSeconds = Math.floor(finalDurationMs / 1000);
+        const m = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        durationText = `${m}:${s.toString().padStart(2, "0")} mins`;
+      }
     } else if (reason === "declined") {
       durationText = "Declined Call";
     } else if (reason === "cancelled") {

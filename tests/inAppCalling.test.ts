@@ -292,4 +292,12 @@ describe("call log text format", () => {
     const log = buildCallLogText(true, duration);
     assert.ok(log.startsWith("[CALL_LOG]:video:5:"), `Expected 5:xx mins, got: ${log}`);
   });
+
+  it("synchronizes duration from bothConnectedAt accurately", () => {
+    // Both users connected 75 seconds ago
+    const bothConnectedAt = Date.now() - 75_000;
+    const duration = formatCallDuration(bothConnectedAt, "ended");
+    const log = buildCallLogText(false, duration);
+    assert.ok(log.startsWith("[CALL_LOG]:voice:1:15"), `Expected 1:15, got ${log}`);
+  });
 });

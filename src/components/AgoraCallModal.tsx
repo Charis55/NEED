@@ -28,10 +28,21 @@ interface AgoraCallModalProps {
   isVideo: boolean;
   partnerName: string;
   partnerPhoto?: string;
+  bothConnectedAt?: number | null;
+  onBothConnected?: (timestamp: number) => void;
   onEndCall: () => void;
 }
 
-export default function AgoraCallModal({ channelName, uid, isVideo, partnerName, partnerPhoto, onEndCall }: AgoraCallModalProps) {
+export default function AgoraCallModal({ 
+  channelName, 
+  uid, 
+  isVideo, 
+  partnerName, 
+  partnerPhoto, 
+  bothConnectedAt,
+  onBothConnected,
+  onEndCall 
+}: AgoraCallModalProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [joinUid, setJoinUid] = useState<string | null>(null);
@@ -50,7 +61,10 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
   speakerOnRef.current = speakerOn;
   const [error, setError] = useState("");
   const [callDuration, setCallDuration] = useState(0);
-  const connectedAtRef = useRef<number>(Date.now());
+  const syncStartTimeRef = useRef<number | null>(bothConnectedAt || null);
+
+  // Both participants are connected in the channel
+  const bothConnected = joined && remoteUsers.length > 0;
 
   useEffect(() => {
     // Play pickup sound when call connects
@@ -79,28 +93,50 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
     }
   }, [joined]);
 
-  // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
+  // Sync incoming bothConnectedAt from Firestore
   useEffect(() => {
-    if (joined && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    if (bothConnectedAt) {
+      syncStartTimeRef.current = bothConnectedAt;
+    }
+  }, [bothConnectedAt]);
+
+  // Synchronized Timer: only starts ticking when BOTH parties have connected
+  useEffect(() => {
+    if (!bothConnected) {
+      setCallDuration(0);
+      return;
+    }
+
+    let startTime = syncStartTimeRef.current || bothConnectedAt;
+    if (!startTime) {
+      startTime = Date.now();
+      syncStartTimeRef.current = startTime;
+      if (onBothConnected) {
+        onBothConnected(startTime);
+      }
+    }
+
+    // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
+    if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
       AudioToggle.startOngoingCall({
         partnerName: partnerName || "Need Call",
         isVideo,
-        connectedAt: connectedAtRef.current,
+        connectedAt: startTime,
         isMuted: micMuted,
         isSpeaker: speakerOn,
       }).catch(e => console.warn("AudioToggle startOngoingCall failed:", e));
     }
-  }, [joined, micMuted, speakerOn, isVideo, partnerName]);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (joined) {
-      interval = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    }
+    const calcElapsed = () => {
+      const activeStart = syncStartTimeRef.current || startTime || Date.now();
+      const elapsed = Math.max(0, Math.floor((Date.now() - activeStart) / 1000));
+      setCallDuration(elapsed);
+    };
+
+    calcElapsed();
+    const interval = setInterval(calcElapsed, 1000);
     return () => clearInterval(interval);
-  }, [joined]);
+  }, [bothConnected, bothConnectedAt, onBothConnected, isVideo, micMuted, speakerOn, partnerName]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -294,7 +330,9 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
         
         if (isMounted) {
           setLocalAudioTrack(localA);
-          connectedAtRef.current = Date.now();
+          if (!syncStartTimeRef.current && bothConnectedAt) {
+            syncStartTimeRef.current = bothConnectedAt;
+          }
           hasJoinedRef.current = true;
           setJoined(true);
 
@@ -442,9 +480,10 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
               <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-4 text-center bg-white px-8 py-3 border-4 border-black shadow-[8px_8px_0_0_#000]">{partnerName}</h1>
               
               <div className="h-16 flex items-center justify-center mt-8">
-                {!joined ? (
-                  <div className="text-xl font-bold uppercase tracking-widest text-black bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0_0_#000] px-6 py-2 animate-bounce">
-                    Connecting...
+                {!bothConnected ? (
+                  <div className="text-base sm:text-lg font-black uppercase tracking-wider text-black bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[4px_4px_0_0_#000] px-6 py-2 animate-pulse flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-black rounded-full animate-ping mr-1"></span>
+                    {joined ? `Connecting with ${partnerName}...` : "Connecting..."}
                   </div>
                 ) : (
                   <div className="text-4xl font-mono font-black tracking-widest bg-white px-8 py-3 border-4 border-black shadow-[6px_6px_0_0_#000]">
@@ -466,9 +505,13 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
               <div className="bg-[var(--color-brutal-blue)] text-black px-4 py-2 border-4 border-black shadow-[4px_4px_0_0_#000] font-black uppercase tracking-widest text-sm sm:text-base inline-block w-max">
                 Video Call
               </div>
-              {joined && (
+              {bothConnected ? (
                 <div className="bg-white text-black px-4 py-2 border-4 border-black shadow-[4px_4px_0_0_#000] font-mono font-black tracking-widest text-sm sm:text-base inline-block w-max">
                   {formatTime(callDuration)}
+                </div>
+              ) : (
+                <div className="bg-[var(--color-brutal-yellow)] text-black px-3 py-1.5 border-4 border-black shadow-[4px_4px_0_0_#000] font-black uppercase tracking-wider text-xs sm:text-sm inline-block w-max animate-pulse">
+                  Connecting...
                 </div>
               )}
             </div>
