@@ -140,21 +140,40 @@ export default function AuthForm() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      getRedirectResult(auth).then(async (result) => {
-        if (result?.user) {
-          await handlePostLogin(result.user);
-        }
-      }).catch(err => {
-        console.error("Redirect sign-in error:", err);
-      });
+      getRedirectResult(auth)
+        .then(async (result) => {
+          if (result?.user) {
+            setLoading(true);
+            await handlePostLogin(result.user);
+          }
+        })
+        .catch((err: any) => {
+          console.error("Redirect sign-in error:", err);
+          const code = err?.code || "";
+          if (code === "auth/unauthorized-domain") {
+            setError("This domain is not authorized in Firebase Console for Google Sign-In.");
+          } else if (code && code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+            setError(err?.message || "Google Sign-In failed during redirect.");
+          }
+          setLoading(false);
+        });
     }
   }, []);
 
-  const handlePostLogin = async (user: User, nameToSave?: string) => {
+  const handlePostLogin = async (
+    user: User,
+    nameToSave?: string,
+    explicitRole?: "customer" | "artisan",
+    isExplicitSignup?: boolean
+  ) => {
     const userDocRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
 
     if (userDoc.exists()) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("need_google_sign_in_role");
+        sessionStorage.removeItem("need_google_sign_in_is_login");
+      }
       const userData = userDoc.data() as UserAccount;
       if (typeof window !== "undefined") {
         localStorage.setItem("need_user_role", userData.role || "customer");
@@ -174,6 +193,49 @@ export default function AuthForm() {
         window.location.assign("/explore");
       }
     } else {
+      // Check if this was a sign-up flow or if pending role was stored in sessionStorage
+      let chosenRole = explicitRole;
+      let isSignupFlow = isExplicitSignup;
+
+      if (typeof window !== "undefined") {
+        const storedRole = sessionStorage.getItem("need_google_sign_in_role") as "customer" | "artisan" | null;
+        const storedIsLogin = sessionStorage.getItem("need_google_sign_in_is_login");
+        sessionStorage.removeItem("need_google_sign_in_role");
+        sessionStorage.removeItem("need_google_sign_in_is_login");
+
+        if (storedRole && storedIsLogin === "0") {
+          chosenRole = storedRole;
+          isSignupFlow = true;
+        }
+      }
+
+      if (isSignupFlow && chosenRole) {
+        const newUser: UserAccount = {
+          userId: user.uid,
+          phone: user.phoneNumber || "",
+          email: user.email || undefined,
+          displayName: user.displayName || nameToSave || "User",
+          role: chosenRole,
+          createdAt: Date.now(),
+        };
+        await setDoc(userDocRef, newUser);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("need_user_role", chosenRole);
+        }
+
+        if (chosenRole === "artisan") {
+          window.location.assign("/onboarding");
+        } else {
+          fetch('/api/emails/welcome-customer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.uid }),
+          }).catch(e => console.error("Failed to send welcome email:", e));
+          window.location.assign("/explore");
+        }
+        return;
+      }
+
       // If we just signed up with email, we passed nameToSave
       if (nameToSave && !user.displayName) {
         await updateProfile(user, { displayName: nameToSave });
@@ -189,7 +251,7 @@ export default function AuthForm() {
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       
-      let user;
+      let user: User | null = null;
 
       if (Capacitor.isNativePlatform()) {
         const result = await FirebaseAuthentication.signInWithGoogle();
@@ -200,67 +262,60 @@ export default function AuthForm() {
       } else {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const provider = new GoogleAuthProvider();
-        
+        provider.setCustomParameters({ prompt: "select_account" });
+
+        // Save intent in case of redirect fallback
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("need_google_sign_in_role", role);
+          sessionStorage.setItem("need_google_sign_in_is_login", isLogin ? "1" : "0");
+        }
+
         if (isMobile) {
           await signInWithRedirect(auth, provider);
           return; // The page will redirect
         } else {
-          const result = await signInWithPopup(auth, provider);
-          user = result.user;
+          try {
+            const result = await signInWithPopup(auth, provider);
+            user = result.user;
+          } catch (popupErr: any) {
+            // If popup blocker intervened or popup request was canceled/blocked
+            if (
+              popupErr?.code === "auth/popup-blocked" ||
+              popupErr?.code === "auth/cancelled-popup-request"
+            ) {
+              console.info("Popup blocked or interrupted, falling back to redirect sign-in...");
+              await signInWithRedirect(auth, provider);
+              return;
+            }
+            if (popupErr?.code === "auth/popup-closed-by-user") {
+              setLoading(false);
+              return;
+            }
+            throw popupErr;
+          }
         }
       }
       
       if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-          if (!isLogin) {
-            const newUser: UserAccount = {
-              userId: user.uid,
-              phone: user.phoneNumber || "",
-              email: user.email || undefined,
-              displayName: user.displayName || "User",
-              role: role,
-              createdAt: Date.now(),
-            };
-            await setDoc(userDocRef, newUser);
-            
-            if (role === "artisan") {
-              window.location.assign("/onboarding");
-            } else {
-              fetch('/api/emails/welcome-customer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.uid }),
-              }).catch(e => console.error("Failed to send welcome email:", e));
-              window.location.assign("/explore");
-            }
-          } else {
-            setStep("role");
-          }
-        } else {
-          const userData = userDoc.data() as UserAccount;
-          if (userData.role === "artisan") {
-            const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
-            if (artisanDoc.exists()) {
-              if (artisanDoc.data()?.onboardingStep !== 6) {
-                window.location.assign("/onboarding");
-              } else {
-                window.location.assign("/technician/dashboard");
-              }
-            } else {
-              setStep("role");
-            }
-          } else {
-            window.location.assign("/explore");
-          }
-        }
+        await handlePostLogin(user, undefined, role, !isLogin);
       }
     } catch (error: unknown) {
-      const err = error as Error;
-      console.warn(err);
-      setError(err.message || "Google Sign-In failed.");
+      const err = error as Error & { code?: string };
+      console.warn("Google Sign-In error:", err);
+      const code = err?.code || "";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        setError("");
+      } else if (code === "auth/popup-blocked") {
+        setError("Sign-in popup was blocked. Please allow popups or try again.");
+      } else if (code === "auth/unauthorized-domain") {
+        setError("This domain is not authorized in Firebase Console for Google Sign-In.");
+      } else if (code === "auth/account-exists-with-different-credential") {
+        setError("An account already exists with this email using a different sign-in method.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Please check your internet connection.");
+      } else {
+        setError(err.message || "Google Sign-In failed.");
+      }
       setLoading(false);
     }
   };
@@ -373,7 +428,7 @@ export default function AuthForm() {
       return;
     }
 
-    if (!profileFile) {
+    if (!profileFile && !auth.currentUser?.photoURL) {
       setError("Please upload a profile picture.");
       setLoading(false);
       return;
@@ -398,6 +453,9 @@ export default function AuthForm() {
       };
 
       await setDoc(doc(db, "users", user.uid), newUser);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("need_user_role", role);
+      }
 
       const uploadedPhotoURL = await uploadAndSetPhoto(user);
 
