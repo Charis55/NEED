@@ -8,7 +8,7 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import PayCommissionModal from "@/components/PayCommissionModal";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign, Search, ArrowUpDown, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, Calendar, X, PhoneCall, CheckCircle, Play, Wrench, Zap, Sparkles, Send, ArrowRight, Loader2, DollarSign, Search, ArrowUpDown, SlidersHorizontal, Camera, Star } from "lucide-react";
 import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
 import { formatDateTime12Hour } from "@/utils/formatTime";
@@ -870,8 +870,9 @@ export default function ArtisanDashboard() {
                             Net: ₦{artisanTakeHome.toLocaleString()}
                           </div>
                           {isPromoActive && (
-                            <p className="text-[9px] font-black text-purple-700 uppercase">
-                              ✨ 0% Fee Promo
+                            <p className="text-[9px] font-black text-purple-700 uppercase flex items-center justify-end gap-1 mt-0.5">
+                              <Sparkles className="w-2.5 h-2.5 fill-purple-700" />
+                              <span>0% Fee Promo</span>
                             </p>
                           )}
                         </div>
@@ -894,7 +895,8 @@ export default function ArtisanDashboard() {
                             rel="noopener noreferrer" 
                             className="inline-flex items-center gap-1.5 bg-white border-2 border-black px-2.5 py-1 text-[11px] sm:text-xs font-black uppercase hover:bg-[var(--color-brutal-yellow)] transition-colors shadow-[2px_2px_0_0_#000]"
                           >
-                            <span>📷 View {job.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>View {job.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
                           </a>
                         </div>
                       )}
@@ -1185,8 +1187,9 @@ export default function ArtisanDashboard() {
                               COMPLETED
                             </span>
                             {req.reviewed && (
-                              <span className="inline-block px-2 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0_0_#000] bg-[var(--color-brutal-yellow)] text-black">
-                                ★ REVIEWED
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0_0_#000] bg-[var(--color-brutal-yellow)] text-black">
+                                <Star className="w-2.5 h-2.5 fill-black text-black" />
+                                <span>REVIEWED</span>
                               </span>
                             )}
                           </div>

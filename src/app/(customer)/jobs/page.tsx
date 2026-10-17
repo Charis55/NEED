@@ -9,7 +9,7 @@ import { useAlert } from "@/components/AlertProvider";
 import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
 import ReportModal from "@/components/ReportModal";
-import { AlertTriangle, Wrench, MapPin, Clock, MessageSquare, Calendar, X, Star, CheckCircle, RefreshCw, FileText, PhoneCall, CreditCard } from "lucide-react";
+import { AlertTriangle, Wrench, MapPin, Clock, MessageSquare, Calendar, X, Star, CheckCircle, RefreshCw, FileText, PhoneCall, CreditCard, Camera } from "lucide-react";
 import { formatDateTime12Hour, to12HourFormat } from "@/utils/formatTime";
 
 export default function CustomerJobsPage() {
@@ -328,7 +328,8 @@ function JobsContent() {
                         rel="noopener noreferrer" 
                         className="inline-flex items-center gap-2 bg-white border-2 border-black px-3 py-1.5 text-xs font-black uppercase hover:bg-[var(--color-brutal-yellow)] transition-colors shadow-[2px_2px_0_0_#000]"
                       >
-                        <span>📷 View Attached {req.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>View Attached {req.mediaUrl.match(/\.(mp4|webm|mov|ogg)/i) ? "Video" : "Photo"}</span>
                       </a>
                     </div>
                   )}
