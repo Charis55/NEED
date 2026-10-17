@@ -169,12 +169,16 @@ export default function GlobalCallManager() {
         const urlLower = url.toLowerCase();
         if (urlLower.includes('needapp://') || urlLower.includes('call/')) {
           let reqId: string | null = null;
+          let deepLinkChannel: string | null = null;
           try {
             const urlObj = new URL(url);
             reqId = urlObj.searchParams.get('requestId') || urlObj.searchParams.get('jobId');
+            deepLinkChannel = urlObj.searchParams.get('channelName');
           } catch (e) {
             const match = url.match(/[?&](requestId|jobId)=([^&]+)/i);
             if (match) reqId = decodeURIComponent(match[2]);
+            const chMatch = url.match(/[?&]channelName=([^&]+)/i);
+            if (chMatch) deepLinkChannel = decodeURIComponent(chMatch[1]);
           }
 
           const targetId = reqId || activeJobRef.current?.requestId;
@@ -212,17 +216,19 @@ export default function GlobalCallManager() {
               }).catch(err => console.warn("Failed to accept call via server:", err));
 
               const currentUid = userUidRef.current || auth.currentUser?.uid || (jobData.artisanId !== jobData.activeCall?.callerId ? jobData.artisanId : jobData.customerId);
+              const targetChannel = jobData.activeCall?.channelName || deepLinkChannel || targetId;
               
               const updatedJob: JobRequest = {
                 ...jobData,
                 activeCall: {
                   ...(jobData.activeCall || {
-                    channelName: targetId,
+                    channelName: targetChannel,
                     callerId: "",
                     type: "audio",
                     status: "ongoing",
                     timestamp: Date.now()
                   }),
+                  channelName: targetChannel,
                   status: "ongoing",
                   connectedAt: Date.now(),
                   acceptedBySession: sessionId,

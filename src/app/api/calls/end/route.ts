@@ -51,6 +51,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, skipped: true }, { headers: corsHeaders });
     }
 
+    // Idempotency guard: If call has already been ended and logged, avoid duplicate messages
+    if (activeCall.status === "ended") {
+      return NextResponse.json({ success: true, skipped: true, reason: "already_ended" }, { headers: corsHeaders });
+    }
+
     const isVideo = activeCall.type === "video";
     const syncConnectedAt = activeCall.bothConnectedAt || activeCall.connectedAt;
     const wasConnected = !!syncConnectedAt || reason === "ended" || (typeof durationMs === "number" && durationMs > 0);

@@ -173,6 +173,7 @@ export async function POST(req: NextRequest) {
             callerName: callerName || "Someone",
             title: callerName || "Incoming Call",
             body: `Incoming ${callType} call`,
+            channelName: `${jobId}_${now}`,
           },
           android: { priority: "high" },
           apns: {

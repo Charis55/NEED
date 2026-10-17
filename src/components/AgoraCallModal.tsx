@@ -65,7 +65,7 @@ export default function AgoraCallModal({
   const [callDuration, setCallDuration] = useState(0);
   const callDurationRef = useRef(0);
   callDurationRef.current = callDuration;
-  const syncStartTimeRef = useRef<number | null>(bothConnectedAt || connectedAt || null);
+  const localJoinedAtRef = useRef<number | null>(null);
 
   // Both participants are connected in the channel
   const bothConnected = joined && remoteUsers.length > 0;
@@ -97,32 +97,12 @@ export default function AgoraCallModal({
     }
   }, [joined]);
 
-  // Synchronize incoming timestamps without wiping active duration
+  // Clean, monotonic in-call timer: counts smoothly from 0 for the duration of the call on this device
   useEffect(() => {
-    if (bothConnectedAt) {
-      syncStartTimeRef.current = bothConnectedAt;
-    } else if (connectedAt && !syncStartTimeRef.current) {
-      syncStartTimeRef.current = connectedAt;
-    }
-  }, [bothConnectedAt, connectedAt]);
+    if (!joined) return;
 
-  // Call is active once the local user joins and the call is answered / connected
-  const isCallActive = joined && (bothConnected || !!bothConnectedAt || !!connectedAt);
-
-  // Synchronized Timer: starts ticking as soon as call is active on either side
-  useEffect(() => {
-    if (!isCallActive) {
-      return;
-    }
-
-    let startTime = bothConnectedAt || syncStartTimeRef.current || connectedAt;
-    if (!startTime) {
-      startTime = Date.now();
-      syncStartTimeRef.current = startTime;
-    }
-
-    if (onBothConnected && !bothConnectedAt) {
-      onBothConnected(startTime);
+    if (!localJoinedAtRef.current) {
+      localJoinedAtRef.current = Date.now();
     }
 
     // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
@@ -130,23 +110,22 @@ export default function AgoraCallModal({
       AudioToggle.startOngoingCall({
         partnerName: partnerName || "Need Call",
         isVideo,
-        connectedAt: startTime,
+        connectedAt: localJoinedAtRef.current,
         isMuted: micMuted,
         isSpeaker: speakerOn,
       }).catch(e => console.warn("AudioToggle startOngoingCall failed:", e));
     }
 
     const calcElapsed = () => {
-      const activeStart = bothConnectedAt || syncStartTimeRef.current || startTime || connectedAt;
-      if (!activeStart) return;
-      const elapsed = Math.max(0, Math.floor((Date.now() - activeStart) / 1000));
+      if (!localJoinedAtRef.current) return;
+      const elapsed = Math.max(0, Math.floor((Date.now() - localJoinedAtRef.current) / 1000));
       setCallDuration(elapsed);
     };
 
     calcElapsed();
     const interval = setInterval(calcElapsed, 1000);
     return () => clearInterval(interval);
-  }, [isCallActive, bothConnectedAt, connectedAt, onBothConnected, isVideo, micMuted, speakerOn, partnerName]);
+  }, [joined, isVideo, micMuted, speakerOn, partnerName]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -257,8 +236,6 @@ export default function AgoraCallModal({
 
         client.on("user-left", (user) => {
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-          // In a 1-on-1 call, when remote counterparty hangs up, automatically end the call locally too
-          leaveCallRef.current();
         });
 
         // 1. Create local tracks with discrete voice filtering (AEC, ANS, AGC)
@@ -360,8 +337,8 @@ export default function AgoraCallModal({
         
         if (isMounted) {
           setLocalAudioTrack(localA);
-          if (!syncStartTimeRef.current) {
-            syncStartTimeRef.current = bothConnectedAt || connectedAt || Date.now();
+          if (!localJoinedAtRef.current) {
+            localJoinedAtRef.current = Date.now();
           }
           hasJoinedRef.current = true;
           setJoined(true);

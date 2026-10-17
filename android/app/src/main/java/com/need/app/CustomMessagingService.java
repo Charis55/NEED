@@ -99,12 +99,15 @@ public class CustomMessagingService extends MessagingService {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 1001, mainIntent, flags);
         
         // Tap "Answer" -> Open app directly with deep link and immediately answer
+        String chName = data.get("channelName");
+        if (chName == null || chName.isEmpty()) chName = reqId;
         Intent answerIntent = new Intent(this, MainActivity.class);
         answerIntent.setAction("ANSWER_CALL");
-        answerIntent.setData(Uri.parse("needapp://call/answer?requestId=" + reqId + "&jobId=" + reqId));
+        answerIntent.setData(Uri.parse("needapp://call/answer?requestId=" + reqId + "&jobId=" + reqId + "&channelName=" + chName));
         answerIntent.putExtra("action", "answer");
         answerIntent.putExtra("requestId", reqId);
         answerIntent.putExtra("jobId", reqId);
+        answerIntent.putExtra("channelName", chName);
         answerIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent answerPendingIntent = PendingIntent.getActivity(this, 1002, answerIntent, flags);
         
