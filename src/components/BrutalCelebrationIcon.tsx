@@ -7,8 +7,8 @@ interface BrutalCelebrationIconProps {
 
 /**
  * Context-specific Neo-brutalist celebration icon depicting full job completion.
- * Features hard black outlines, geometric confetti stars, diamonds, streamers,
- * and a celebration party horn with flat brutalist fills (no cheap emojis).
+ * Features a bold golden victory trophy with handles, a prominent completion checkmark,
+ * geometric pedestal base, and celebratory sparkle stars with thick 3.5px black outlines.
  */
 export default function BrutalCelebrationIcon({ className = "w-8 h-8", size }: BrutalCelebrationIconProps) {
   const style = size ? { width: size, height: size } : undefined;
@@ -22,97 +22,108 @@ export default function BrutalCelebrationIcon({ className = "w-8 h-8", size }: B
       style={style}
       aria-hidden="true"
     >
-      {/* Confetti Zig-zag streamer */}
+      {/* Celebration Star - Top Left */}
       <path
-        d="M38 20L44 14L41 8L48 4"
-        stroke="#000"
-        strokeWidth="2.5"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-      {/* Secondary streamer */}
-      <path
-        d="M48 28L56 26L54 20L60 17"
-        stroke="#000"
-        strokeWidth="2.5"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-
-      {/* 4-point brutalist star (Yellow) */}
-      <path
-        d="M46 6L47.5 12L53.5 13.5L47.5 15L46 21L44.5 15L38.5 13.5L44.5 12Z"
+        d="M9 3L11 8L16 10L11 12L9 17L7 12L2 10L7 8Z"
         fill="#FFE600"
         stroke="#000"
         strokeWidth="2"
         strokeLinejoin="miter"
       />
 
-      {/* 4-point brutalist star (Cyan) */}
+      {/* Celebration Star - Top Right */}
       <path
-        d="M26 8L27 12L31 13L27 14L26 18L25 14L21 13L25 12Z"
+        d="M55 3L57 8L62 10L57 12L55 17L53 12L48 10L53 8Z"
         fill="#00F0FF"
         stroke="#000"
         strokeWidth="2"
         strokeLinejoin="miter"
       />
 
-      {/* Diamond confetti (Pink) */}
-      <rect
-        x="51"
-        y="32"
-        width="6"
-        height="6"
-        transform="rotate(45 51 32)"
-        fill="#FF6B8B"
+      {/* Confetti spark dots */}
+      <circle cx="8" cy="38" r="2.5" fill="#000" />
+      <circle cx="56" cy="38" r="2.5" fill="#000" />
+      <circle cx="15" cy="52" r="2" fill="#FF6B8B" stroke="#000" strokeWidth="1.5" />
+      <circle cx="49" cy="52" r="2" fill="#00F0FF" stroke="#000" strokeWidth="1.5" />
+
+      {/* Left Trophy Handle */}
+      <path
+        d="M20 18C11 18 8 28 19 32"
         stroke="#000"
-        strokeWidth="2"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        fill="none"
       />
-      {/* Diamond confetti (Green) */}
+
+      {/* Right Trophy Handle */}
+      <path
+        d="M44 18C53 18 56 28 45 32"
+        stroke="#000"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* Trophy Chalice / Cup Body */}
+      <path
+        d="M19 14C19 28 25 36 32 36C39 36 45 28 45 14H19Z"
+        fill="#FFE600"
+        stroke="#000"
+        strokeWidth="3.5"
+        strokeLinejoin="round"
+      />
+
+      {/* Trophy Rim */}
       <rect
-        x="32"
-        y="2"
-        width="5"
+        x="17"
+        y="10"
+        width="30"
         height="5"
-        transform="rotate(25 32 2)"
-        fill="#4ADE80"
-        stroke="#000"
-        strokeWidth="2"
-      />
-
-      {/* Confetti Dots */}
-      <circle cx="20" cy="18" r="2" fill="#000" />
-      <circle cx="58" cy="28" r="2" fill="#000" />
-      <circle cx="40" cy="28" r="2.5" fill="#FFE600" stroke="#000" strokeWidth="1.5" />
-
-      {/* Party Popper Cone Base (Yellow) */}
-      <path
-        d="M10 54L34 30L42 38L18 62L10 54Z"
         fill="#FFE600"
         stroke="#000"
-        strokeWidth="2.5"
+        strokeWidth="3.5"
+      />
+
+      {/* Victory / Completion Checkmark in center of cup */}
+      <path
+        d="M26 23L30 27L38 18"
+        stroke="#000"
+        strokeWidth="3.5"
+        strokeLinecap="square"
         strokeLinejoin="miter"
       />
 
-      {/* Middle Stripe (Pink) */}
-      <path
-        d="M18 46L30 34L36 40L24 52L18 46Z"
+      {/* Trophy Stem */}
+      <rect
+        x="28"
+        y="36"
+        width="8"
+        height="9"
         fill="#FF6B8B"
         stroke="#000"
-        strokeWidth="2.5"
-        strokeLinejoin="miter"
+        strokeWidth="3"
       />
 
-      {/* Horn Mouth Rim (Cyan) */}
-      <ellipse
-        cx="38"
-        cy="34"
-        rx="6"
-        ry="4"
-        transform="rotate(-45 38 34)"
+      {/* Trophy Pedestal Tier 1 */}
+      <rect
+        x="22"
+        y="45"
+        width="20"
+        height="6"
         fill="#00F0FF"
         stroke="#000"
-        strokeWidth="2.5"
+        strokeWidth="3"
+      />
+
+      {/* Trophy Base Tier 2 */}
+      <rect
+        x="14"
+        y="51"
+        width="36"
+        height="7"
+        fill="#000"
+        stroke="#000"
+        strokeWidth="2"
       />
     </svg>
   );

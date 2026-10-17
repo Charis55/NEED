@@ -613,8 +613,8 @@ export default function TechnicianManageJobPage() {
               {/* Status: Completed */}
               {currentStatus === "completed" && (
                 <div className="p-6 sm:p-8 bg-[var(--color-brutal-green)] border-4 border-black text-center shadow-[4px_4px_0_0_#000]">
-                  <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-[var(--color-brutal-yellow)] border-3 sm:border-4 border-black shadow-[3px_3px_0_0_#000] rotate-2 mx-auto mb-3">
-                    <BrutalCelebrationIcon className="w-9 h-9 sm:w-10 sm:h-10 text-black" />
+                  <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white border-4 border-black shadow-[4px_4px_0_0_#000] -rotate-2 mx-auto mb-4 p-2">
+                    <BrutalCelebrationIcon className="w-12 h-12 sm:w-14 sm:h-14" />
                   </div>
                   <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-black mb-1.5">
                     Job Fully Completed!
