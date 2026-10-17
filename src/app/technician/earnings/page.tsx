@@ -237,10 +237,10 @@ const WalletTxRow = ({ tx }: { tx: WalletTxItem }) => {
     } else if (tx.payoutStatus === "reversed") {
       statusBadge = { label: "REVERSED", bg: "bg-purple-300", text: "text-black" };
     } else {
-      statusBadge = { label: "PAID OUT", bg: "bg-[var(--color-brutal-teal)]", text: "text-black" };
+      statusBadge = { label: "PAID OUT", bg: "bg-[var(--color-brutal-red)]", text: "text-white" };
     }
   } else if (tx.type === "commission_charge") {
-    statusBadge = { label: "COMMISSION SETTLED", bg: "bg-black", text: "text-white" };
+    statusBadge = { label: "COMMISSION SETTLED", bg: "bg-[var(--color-brutal-yellow)]", text: "text-black" };
   }
 
   // Type title
@@ -251,6 +251,19 @@ const WalletTxRow = ({ tx }: { tx: WalletTxItem }) => {
   else if (tx.type === "deposit_release_to_artisan") typeTitle = "Job Escrow Released";
   else if (tx.type === "withdrawal_reversal") typeTitle = "Withdrawal Reversal (Refund)";
 
+  // Activity-specific figure coloring:
+  // Account funding (money in): Green
+  // Withdrawals (money out): Red
+  // Commissions (platform fee): Yellow
+  let figureColor = "text-black";
+  if (tx.type === "topup" || isCredit) {
+    figureColor = "text-[var(--color-brutal-green)]";
+  } else if (tx.type === "withdrawal") {
+    figureColor = "text-[var(--color-brutal-red)]";
+  } else if (tx.type === "commission_charge") {
+    figureColor = "text-amber-500";
+  }
+
   return (
     <div className="border-4 border-black mb-3 bg-white shadow-[3px_3px_0_0_#000] flex flex-col">
       <div 
@@ -259,14 +272,14 @@ const WalletTxRow = ({ tx }: { tx: WalletTxItem }) => {
       >
         <div className="flex items-start gap-3">
           <div className={`w-11 h-11 border-2 border-black flex items-center justify-center shrink-0 ${
-            tx.type === 'topup' ? 'bg-[var(--color-brutal-green)]' : tx.type === 'withdrawal' ? 'bg-[var(--color-brutal-teal)]' : 'bg-[var(--color-brutal-yellow)]'
+            tx.type === 'topup' ? 'bg-[var(--color-brutal-green)]' : tx.type === 'withdrawal' ? 'bg-[var(--color-brutal-red)]' : 'bg-[var(--color-brutal-yellow)]'
           } shadow-[2px_2px_0_0_#000]`}>
             {tx.type === 'topup' ? (
               <TrendingDown className="w-6 h-6 stroke-[3] text-black" />
             ) : tx.type === 'withdrawal' ? (
-              <TrendingUp className="w-6 h-6 stroke-[3] text-black" />
+              <TrendingUp className="w-6 h-6 stroke-[3] text-white" />
             ) : (
-              <DollarSign className="w-6 h-6 stroke-[3] text-black" />
+              <Scale className="w-6 h-6 stroke-[3] text-black" />
             )}
           </div>
           <div>
@@ -303,7 +316,7 @@ const WalletTxRow = ({ tx }: { tx: WalletTxItem }) => {
         </div>
 
         <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center border-t-2 md:border-t-0 border-dashed border-gray-300 pt-2 md:pt-0">
-          <span className={`font-black text-xl md:text-2xl tracking-tight ${isCredit ? 'text-[var(--color-brutal-green)]' : 'text-black'}`}>
+          <span className={`font-black text-xl md:text-2xl tracking-tight ${figureColor}`}>
             {isCredit ? `+₦${amountNaira.toLocaleString()}` : `-₦${amountNaira.toLocaleString()}`}
           </span>
           <div className="flex items-center gap-1 text-xs font-black text-gray-500 mt-0.5">
@@ -552,6 +565,10 @@ Date: ${new Date().toLocaleDateString()}
     .filter(tx => tx.type === "withdrawal" && tx.payoutStatus !== "failed")
     .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
+  const totalCommissionPaid = walletTransactions
+    .filter(tx => tx.type === "commission_charge")
+    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
   const totalJobsCount = periods.reduce((sum, p) => sum + p.jobs.length, 0);
 
   if (loading) return <div className="h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center"><GlobalSpinner text="LOADING PAYMENT HISTORY" /></div>;
@@ -711,7 +728,7 @@ Date: ${new Date().toLocaleDateString()}
         {activeTab === "wallet" && (
           <div className="space-y-6">
             {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
               <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0_0_#000]">
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-8 h-8 bg-[var(--color-brutal-green)] border-2 border-black flex items-center justify-center">
@@ -727,15 +744,28 @@ Date: ${new Date().toLocaleDateString()}
 
               <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0_0_#000]">
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 bg-[var(--color-brutal-teal)] border-2 border-black flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-black stroke-[3]" />
+                  <div className="w-8 h-8 bg-[var(--color-brutal-red)] border-2 border-black flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-white stroke-[3]" />
                   </div>
                   <span className="text-xs font-black uppercase tracking-wider text-gray-600">Total Withdrawn</span>
                 </div>
-                <p className="text-3xl font-black text-black">
+                <p className="text-3xl font-black text-[var(--color-brutal-red)]">
                   ₦{(totalWithdrawn / 100).toLocaleString()}
                 </p>
                 <p className="text-[11px] font-bold text-gray-500 mt-0.5">Transferred to linked bank accounts</p>
+              </div>
+
+              <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0_0_#000]">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 bg-[var(--color-brutal-yellow)] border-2 border-black flex items-center justify-center">
+                    <Scale className="w-5 h-5 text-black stroke-[3]" />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-wider text-gray-600">Total Commission Paid</span>
+                </div>
+                <p className="text-3xl font-black text-amber-500">
+                  ₦{(totalCommissionPaid / 100).toLocaleString()}
+                </p>
+                <p className="text-[11px] font-bold text-gray-500 mt-0.5">Platform service fees settled</p>
               </div>
             </div>
 
@@ -747,8 +777,8 @@ Date: ${new Date().toLocaleDateString()}
               {[
                 { key: "all", label: "All Activities", icon: Layers },
                 { key: "topup", label: "Account Funding", icon: ArrowDownLeft, iconColor: "text-[var(--color-brutal-green)]" },
-                { key: "withdrawal", label: "Withdrawals", icon: ArrowUpRight, iconColor: "text-[var(--color-brutal-teal)]" },
-                { key: "commission", label: "Commissions", icon: Scale, iconColor: "text-[var(--color-brutal-yellow)]" },
+                { key: "withdrawal", label: "Withdrawals", icon: ArrowUpRight, iconColor: "text-[var(--color-brutal-red)]" },
+                { key: "commission", label: "Commissions", icon: Scale, iconColor: "text-amber-500" },
               ].map(f => {
                 const IconComp = f.icon;
                 return (
