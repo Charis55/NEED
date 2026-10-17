@@ -51,6 +51,25 @@ export default function GlobalSearch({ variant = "brutalist" }: { variant?: "bru
     }
   }, [query]);
 
+  const [placeholder, setPlaceholder] = useState("SEARCH FOR A JOB OR SERVICE");
+
+  useEffect(() => {
+    const updatePlaceholder = () => {
+      const width = window.innerWidth;
+      if (width < 440) {
+        setPlaceholder("SEARCH FOR A JOB OR SERVICE");
+      } else if (width < 768) {
+        setPlaceholder("SEARCH FOR A JOB (E.G. PLUMBING)");
+      } else {
+        setPlaceholder("SEARCH FOR A JOB (E.G. WASHING MACHINE)");
+      }
+    };
+
+    updatePlaceholder();
+    window.addEventListener("resize", updatePlaceholder);
+    return () => window.removeEventListener("resize", updatePlaceholder);
+  }, []);
+
   return (
     <div ref={wrapperRef} className="relative z-50">
       <div className="relative">
@@ -60,11 +79,11 @@ export default function GlobalSearch({ variant = "brutalist" }: { variant?: "bru
               type="text" 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="SEARCH FOR A JOB (E.G. WASHING MACHINE)"
-              className="w-full bg-white border-4 border-black px-6 py-4 pr-16 text-xl font-black uppercase text-black placeholder:text-gray-400 focus:outline-none focus:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm"
+              placeholder={placeholder}
+              className="w-full bg-white border-4 border-black px-3.5 sm:px-6 py-3 sm:py-4 pr-14 sm:pr-20 text-sm sm:text-base md:text-lg lg:text-xl font-black uppercase text-black placeholder:text-gray-400 placeholder:font-black placeholder:text-xs min-[380px]:placeholder:text-sm md:placeholder:text-base lg:placeholder:text-xl focus:outline-none focus:bg-[var(--color-brutal-bg)] transition-colors brutal-shadow-sm tracking-tight"
             />
-            <div className="absolute right-0 top-0 bottom-0 w-16 bg-[var(--color-brutal-yellow)] border-l-4 border-black flex items-center justify-center pointer-events-none">
-              <Search className="w-8 h-8 text-black stroke-[3]" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-16 bg-[var(--color-brutal-yellow)] border-l-4 border-black flex items-center justify-center pointer-events-none">
+              <Search className="w-6 h-6 sm:w-8 sm:h-8 text-black stroke-[3]" />
             </div>
           </>
         ) : (
