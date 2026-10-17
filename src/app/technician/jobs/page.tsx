@@ -32,9 +32,26 @@ export default function ArtisanDashboard() {
   
   // Search and Sort controls
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "a_z" | "z_a">("newest");
+  const [searchPlaceholder, setSearchPlaceholder] = useState("Search jobs, trades or areas...");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "closest_due" | "farthest_due" | "a_z" | "z_a">("newest");
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [activeFilterTab, setActiveFilterTab] = useState<"all" | "broadcasts" | "direct">("all");
+
+  useEffect(() => {
+    const updatePlaceholder = () => {
+      const width = window.innerWidth;
+      if (width < 440) {
+        setSearchPlaceholder("Search trade, service, area...");
+      } else if (width < 768) {
+        setSearchPlaceholder("Search by trade, service or neighborhood...");
+      } else {
+        setSearchPlaceholder("Search jobs by trade, service, neighborhood, customer...");
+      }
+    };
+    updatePlaceholder();
+    window.addEventListener("resize", updatePlaceholder);
+    return () => window.removeEventListener("resize", updatePlaceholder);
+  }, []);
 
   useEffect(() => {
     let unsubs: (() => void)[] = [];
@@ -158,6 +175,7 @@ export default function ArtisanDashboard() {
         status: "accepted",
         state: requiresDeposit ? "awaiting_deposit" : "confirmed",
         depositStatus: requiresDeposit ? "pending" : (job.depositStatus || "held"),
+        acceptedAt: Date.now(),
         updatedAt: Date.now(),
       };
 
@@ -253,7 +271,9 @@ export default function ArtisanDashboard() {
       const updatePayload: Partial<JobRequest> = { 
         status: newStatus,
         state: newStatus === "accepted" && requiresDeposit ? "awaiting_deposit" : (newStatus as any),
-        ...(newStatus === "accepted" && requiresDeposit ? { depositStatus: "pending" } : {})
+        ...(newStatus === "accepted" && requiresDeposit ? { depositStatus: "pending" } : {}),
+        ...(newStatus === "accepted" ? { acceptedAt: Date.now() } : {}),
+        updatedAt: Date.now(),
       };
       if (req?.isBroadcast && user) {
         updatePayload.artisanId = user.uid;
@@ -375,7 +395,9 @@ export default function ArtisanDashboard() {
           const platformFeeRate = isPromoActive ? 0 : 0.20;
           return { 
             ...r, 
-            status: newStatus, 
+            status: newStatus,
+            ...(newStatus === "accepted" ? { acceptedAt: Date.now() } : {}),
+            updatedAt: Date.now(),
             ...(newStatus === "countered" ? { counterOfferAmount: counterAmt, platformFee: counterAmt! * platformFeeRate, lastCounterBy: "artisan" } : {}) 
           };
         }
@@ -467,16 +489,83 @@ export default function ArtisanDashboard() {
   
   const [showPayModal, setShowPayModal] = useState(false);
 
-  // Sorter and Search filter logic
+  // Helper: get the most recent action/acceptance timestamp for a job
+  const getJobActionTime = (job: JobRequest): number => {
+    const toMs = (val: any) => {
+      if (!val) return 0;
+      if (typeof val === "number") return val;
+      if (typeof val.toMillis === "function") return val.toMillis();
+      if (typeof val.toDate === "function") return val.toDate().getTime();
+      const parsed = new Date(val).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
+    // Prioritize acceptedAt, then updatedAt, then createdAt
+    return toMs(job.acceptedAt) || toMs(job.updatedAt) || toMs(job.createdAt) || 0;
+  };
+
+  // Helper: parse preferred due date/time to timestamp for closest/farthest sorting
+  const getJobDueTime = (job: JobRequest): number => {
+    const str = job.preferredTime;
+    if (!str) return 0;
+
+    // Check for "YYYY-MM-DD" format (with optional "at HH:MM AM/PM" or "at HH:MM")
+    const dateMatch = str.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (dateMatch) {
+      const year = parseInt(dateMatch[1], 10);
+      const month = parseInt(dateMatch[2], 10) - 1;
+      const day = parseInt(dateMatch[3], 10);
+      
+      let hours = 12;
+      let minutes = 0;
+      const timeMatch = str.match(/(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?/);
+      if (timeMatch) {
+        hours = parseInt(timeMatch[1], 10);
+        minutes = parseInt(timeMatch[2], 10);
+        const meridian = timeMatch[3]?.toUpperCase();
+        if (meridian === "PM" && hours < 12) hours += 12;
+        if (meridian === "AM" && hours === 12) hours = 0;
+      }
+      const d = new Date(year, month, day, hours, minutes);
+      const ms = d.getTime();
+      if (!isNaN(ms)) return ms;
+    }
+
+    const parsed = Date.parse(str);
+    if (!isNaN(parsed)) return parsed;
+
+    return 0;
+  };
+
+  // Universal Sorter logic across all sections
   const sortJobsList = (list: JobRequest[]) => {
     return [...list].sort((a, b) => {
-      const timeA = (a.createdAt as any)?.toMillis?.() || a.createdAt || a.updatedAt || 0;
-      const timeB = (b.createdAt as any)?.toMillis?.() || b.createdAt || b.updatedAt || 0;
+      const actionA = getJobActionTime(a);
+      const actionB = getJobActionTime(b);
       const titleA = `${a.trade || ""} ${a.subcategory || ""}`.trim().toLowerCase();
       const titleB = `${b.trade || ""} ${b.subcategory || ""}`.trim().toLowerCase();
 
-      if (sortBy === "newest") return timeB - timeA;
-      if (sortBy === "oldest") return timeA - timeB;
+      if (sortBy === "newest") {
+        return actionB - actionA;
+      }
+      if (sortBy === "oldest") {
+        return actionA - actionB;
+      }
+      if (sortBy === "closest_due") {
+        const dueA = getJobDueTime(a);
+        const dueB = getJobDueTime(b);
+        if (dueA === 0 && dueB === 0) return actionB - actionA;
+        if (dueA === 0) return 1;
+        if (dueB === 0) return -1;
+        return dueA - dueB; // soonest first
+      }
+      if (sortBy === "farthest_due") {
+        const dueA = getJobDueTime(a);
+        const dueB = getJobDueTime(b);
+        if (dueA === 0 && dueB === 0) return actionB - actionA;
+        if (dueA === 0) return 1;
+        if (dueB === 0) return -1;
+        return dueB - dueA; // farthest future first
+      }
       if (sortBy === "a_z") return titleA.localeCompare(titleB);
       if (sortBy === "z_a") return titleB.localeCompare(titleA);
       return 0;
@@ -499,8 +588,13 @@ export default function ArtisanDashboard() {
     return sortJobsList(filtered);
   };
 
+  // Partition requests into active (ongoing/pending) and completed
+  const activeRequests = requests.filter(r => r.status !== "completed");
+  const completedRequests = requests.filter(r => r.status === "completed");
+
   const filteredBroadcasts = filterAndSortJobs(upForGrabsJobs);
-  const filteredRequests = filterAndSortJobs(requests);
+  const filteredActiveRequests = filterAndSortJobs(activeRequests);
+  const filteredCompletedRequests = filterAndSortJobs(completedRequests);
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
@@ -535,15 +629,15 @@ export default function ArtisanDashboard() {
           <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
             {/* Search Input */}
             <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <Search className="w-5 h-5 text-gray-500" />
+              <div className="absolute inset-y-0 left-0 pl-3 sm:pl-3.5 flex items-center pointer-events-none">
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
               </div>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search jobs by trade, service, neighborhood, customer..."
-                className="w-full pl-11 pr-10 py-3.5 border-4 border-black font-black text-sm sm:text-base focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 uppercase tracking-tight"
+                placeholder={searchPlaceholder}
+                className="w-full pl-10 sm:pl-11 pr-10 py-3 sm:py-3.5 border-4 border-black font-black text-sm sm:text-base focus:outline-none focus:bg-[var(--color-brutal-yellow)] transition-colors placeholder:text-gray-500 placeholder:normal-case placeholder:font-bold placeholder:text-xs sm:placeholder:text-sm uppercase tracking-tight"
               />
               {searchTerm && (
                 <button
@@ -569,16 +663,28 @@ export default function ArtisanDashboard() {
                     <span className="font-black uppercase text-xs sm:text-sm text-black">Sort</span>
                   </div>
                   <span className="text-[11px] font-black uppercase bg-white border border-black px-1.5 py-0.5 ml-1">
-                    {sortBy === "newest" ? "Newest" : sortBy === "oldest" ? "Oldest" : sortBy === "a_z" ? "A-Z" : "Z-A"}
+                    {sortBy === "newest" 
+                      ? "Newest" 
+                      : sortBy === "oldest" 
+                        ? "Oldest" 
+                        : sortBy === "closest_due" 
+                          ? "Closest Due" 
+                          : sortBy === "farthest_due" 
+                            ? "Farthest Due" 
+                            : sortBy === "a_z" 
+                              ? "A-Z" 
+                              : "Z-A"}
                   </span>
                 </button>
 
                 {isSortOpen && (
-                  <div className="absolute top-12 left-0 sm:left-auto sm:right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-52 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
+                  <div className="absolute top-12 left-0 sm:left-auto sm:right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-56 sm:w-60 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
                     <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
                     {[
                       { label: "Newest First", value: "newest" },
                       { label: "Oldest First", value: "oldest" },
+                      { label: "Closest Due Date", value: "closest_due" },
+                      { label: "Farthest Due Date", value: "farthest_due" },
                       { label: "A to Z (Trade)", value: "a_z" },
                       { label: "Z to A (Trade)", value: "z_a" },
                     ].map(option => (
@@ -610,7 +716,7 @@ export default function ArtisanDashboard() {
                     activeFilterTab === "all" ? "bg-black text-white" : "hover:bg-gray-100 text-black"
                   }`}
                 >
-                  All ({filteredBroadcasts.length + filteredRequests.length})
+                  All ({filteredBroadcasts.length + filteredActiveRequests.length + filteredCompletedRequests.length})
                 </button>
                 <button
                   onClick={() => setActiveFilterTab("broadcasts")}
@@ -626,7 +732,7 @@ export default function ArtisanDashboard() {
                     activeFilterTab === "direct" ? "bg-[var(--color-brutal-blue)] text-black" : "hover:bg-gray-100 text-black"
                   }`}
                 >
-                  Direct ({filteredRequests.length})
+                  Direct ({filteredActiveRequests.length + filteredCompletedRequests.length})
                 </button>
               </div>
             </div>
@@ -635,7 +741,7 @@ export default function ArtisanDashboard() {
           {searchTerm && (
             <div className="mt-3 flex items-center justify-between text-xs font-black uppercase border-t-2 border-black pt-2">
               <span className="text-gray-600">
-                Found {filteredBroadcasts.length + filteredRequests.length} results matching &ldquo;{searchTerm}&rdquo;
+                Found {filteredBroadcasts.length + filteredActiveRequests.length + filteredCompletedRequests.length} results matching &ldquo;{searchTerm}&rdquo;
               </span>
               <button 
                 onClick={() => setSearchTerm("")} 
@@ -885,7 +991,7 @@ export default function ArtisanDashboard() {
                 Recent Job Requests
               </h2>
               <span className="bg-[var(--color-brutal-yellow)] text-black border-2 border-black px-3 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000] rotate-2">
-                {filteredRequests.length} {filteredRequests.length === 1 ? 'REQUEST' : 'REQUESTS'}
+                {filteredActiveRequests.length} {filteredActiveRequests.length === 1 ? 'REQUEST' : 'REQUESTS'}
               </span>
             </div>
           </div>
@@ -894,23 +1000,23 @@ export default function ArtisanDashboard() {
             <div className="flex justify-center py-20">
               <GlobalSpinner text="LOADING REQUESTS" />
             </div>
-          ) : filteredRequests.length === 0 ? (
+          ) : filteredActiveRequests.length === 0 ? (
             <div className="bg-white p-12 text-center brutal-border brutal-shadow-sm">
               <div className="w-20 h-20 bg-[var(--color-brutal-pink)] brutal-border flex items-center justify-center mx-auto mb-4 rotate-6">
                 <Mailbox className="w-12 h-12 stroke-[3] mx-auto" />
               </div>
               <h3 className="text-2xl font-black text-black mb-2 uppercase">
-                {requests.length === 0 ? "No Requests Yet" : "No Matching Requests"}
+                {activeRequests.length === 0 ? "No Active Requests" : "No Matching Requests"}
               </h3>
               <p className="text-black font-bold">
-                {requests.length === 0 
+                {activeRequests.length === 0 
                   ? "When customers request your services, they will appear here." 
                   : "Try adjusting your search query or sorting filter."}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {filteredRequests.map((req) => {
+              {filteredActiveRequests.map((req) => {
               const currentStatus = String(req.status || req.state || 'pending');
               const currentPrice = req.counterOfferAmount || req.offerAmount || (req.agreedPrice ? Math.round(req.agreedPrice / 100) : 0);
               const isAwaitingCustDeposit = (req.status === "accepted" || currentStatus === "accepted") && 
@@ -940,7 +1046,6 @@ export default function ArtisanDashboard() {
                           ${currentStatus === 'en_route' ? 'bg-[var(--color-brutal-pink)] text-black' : ''}
                           ${currentStatus === 'in_progress' ? 'bg-[#bbf7d0] text-black' : ''}
                           ${currentStatus === 'payment_pending' ? 'bg-[var(--color-brutal-yellow)] text-black' : ''}
-                          ${currentStatus === 'completed' ? 'bg-[var(--color-brutal-teal)] text-black' : ''}
                           ${currentStatus === 'declined' ? 'bg-[var(--color-brutal-red)] text-white' : ''}
                           ${currentStatus === 'cancelled' ? 'bg-gray-800 text-white' : ''}
                         `}>
@@ -987,7 +1092,7 @@ export default function ArtisanDashboard() {
                     )}
 
                     <div className="mt-auto flex flex-col gap-2 pt-3 border-t-2 border-black">
-                      {["accepted", "confirmed", "en_route", "arrived", "in_progress", "payment_pending", "completed"].includes(currentStatus) && (
+                      {["accepted", "confirmed", "en_route", "arrived", "in_progress", "payment_pending"].includes(currentStatus) && (
                         <Link 
                           href={`/chat/${req.requestId}`} 
                           className="w-full bg-white border-3 border-black font-black uppercase text-center block py-2.5 sm:py-3 hover:bg-[var(--color-brutal-bg)] transition-colors shadow-[2px_2px_0_0_#000] text-xs sm:text-sm"
@@ -1009,6 +1114,122 @@ export default function ArtisanDashboard() {
             })}
           </div>
         )}
+
+        {/* ============================================================== */}
+        {/* COMPLETED JOBS SECTION */}
+        {/* ============================================================== */}
+        <div className="mt-14">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b-4 border-black pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[var(--color-brutal-green)] border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_#000] rotate-2">
+                <CheckCircle className="w-6 h-6 text-black" />
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tighter">
+                Completed Jobs
+              </h2>
+              <span className="bg-[var(--color-brutal-teal)] text-black border-2 border-black px-3 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000] -rotate-1">
+                {filteredCompletedRequests.length} {filteredCompletedRequests.length === 1 ? 'JOB COMPLETED' : 'JOBS COMPLETED'}
+              </span>
+            </div>
+            <p className="text-sm font-bold text-gray-800 mt-2 md:mt-0">
+              All jobs you have successfully delivered and settled on the platform.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <GlobalSpinner text="LOADING COMPLETED JOBS" />
+            </div>
+          ) : filteredCompletedRequests.length === 0 ? (
+            <div className="bg-white p-8 md:p-10 text-center brutal-border brutal-shadow-sm mb-12">
+              <div className="w-16 h-16 bg-[var(--color-brutal-teal)] brutal-border flex items-center justify-center mx-auto mb-3 rotate-2 shadow-[2px_2px_0_0_#000]">
+                <CheckCircle className="w-8 h-8 text-black" />
+              </div>
+              <h3 className="text-xl font-black text-black mb-1 uppercase">
+                {searchTerm ? "No Matching Completed Jobs" : "No Completed Jobs Yet"}
+              </h3>
+              <p className="text-black font-bold text-sm">
+                {searchTerm
+                  ? `No completed jobs matched "${searchTerm}".`
+                  : "Jobs you finish and receive payment for will be archived here."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+              {filteredCompletedRequests.map((req) => {
+                const finalPrice = req.agreedPrice ? Math.round(req.agreedPrice / 100) : (req.counterOfferAmount || req.offerAmount || 0);
+                const isPromoActive = promoDaysLeft !== null && promoDaysLeft > 0;
+                const platformFeeRate = isPromoActive ? 0 : 0.20;
+                const platformFee = req.platformFee ?? (finalPrice * platformFeeRate);
+                const artisanTakeHome = finalPrice - platformFee;
+
+                return (
+                  <div key={req.requestId} className="bg-white border-3 sm:border-4 border-black shadow-[4px_4px_0_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] transition-transform flex flex-col h-full">
+                    <div className="p-3.5 sm:p-5 flex flex-col flex-grow">
+                      <div className="flex items-start justify-between gap-3 mb-3 border-b-2 sm:border-b-3 border-black pb-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                            <span className="inline-block px-2.5 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0_0_#000] bg-[var(--color-brutal-teal)] text-black">
+                              COMPLETED
+                            </span>
+                            {req.reviewed && (
+                              <span className="inline-block px-2 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0_0_#000] bg-[var(--color-brutal-yellow)] text-black">
+                                ★ REVIEWED
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-base sm:text-xl font-black text-black uppercase tracking-tight truncate leading-tight">
+                            {req.trade ? `${req.trade} - ${req.subcategory}` : (req.isBroadcast ? "Broadcast Request" : req.subcategory || "Service Request")}
+                          </h3>
+                          <p className="text-xs text-black font-bold flex flex-wrap items-center gap-1.5 uppercase mt-1">
+                            <span className="bg-[var(--color-brutal-bg)] border border-black px-2 py-0.5 flex items-center gap-1 text-[11px]">
+                              <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate max-w-[130px] sm:max-w-none">{req.neighborhood || "Location on file"}</span>
+                            </span>
+                            <span className="bg-[var(--color-brutal-bg)] border border-black px-2 py-0.5 flex items-center gap-1 text-[11px]">
+                              <Clock className="w-3 h-3 shrink-0" /> {formatDateTime12Hour(req.completedAt ? new Date(req.completedAt).toISOString() : req.preferredTime) || "Completed"}
+                            </span>
+                          </p>
+                        </div>
+                        
+                        {/* Final Price Tag */}
+                        <div className="bg-[var(--color-brutal-bg)] border-2 border-black p-2 sm:p-2.5 text-right shrink-0 shadow-[2px_2px_0_0_#000] min-w-[120px] sm:min-w-[140px]">
+                          <p className="text-[10px] text-black font-black uppercase tracking-wider mb-0.5 bg-white inline-block px-1 border border-black">
+                            Final Price
+                          </p>
+                          <p className="text-lg sm:text-2xl font-black text-black tracking-tight leading-none mt-0.5">₦{finalPrice.toLocaleString()}</p>
+                          <div className="text-[10px] sm:text-xs font-black uppercase text-[var(--color-brutal-teal)] border-t border-black pt-0.5 mt-1">
+                            Earned: ₦{artisanTakeHome.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {req.description && (
+                        <div className="bg-gray-100 p-2.5 sm:p-3 border-2 border-black mb-3 shadow-[2px_2px_0_0_#000]">
+                          <p className="text-black font-bold leading-snug text-xs sm:text-sm line-clamp-2">{req.description}</p>
+                        </div>
+                      )}
+
+                      <div className="mt-auto flex flex-col sm:flex-row gap-2 pt-3 border-t-2 border-black">
+                        <Link 
+                          href={`/chat/${req.requestId}`} 
+                          className="flex-1 bg-white border-3 border-black font-black uppercase text-center block py-2.5 sm:py-3 hover:bg-[var(--color-brutal-bg)] transition-colors shadow-[2px_2px_0_0_#000] text-xs sm:text-sm"
+                        >
+                          <span className="flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4" /> CHAT ARCHIVE</span>
+                        </Link>
+                        <Link 
+                          href={`/technician/jobs/${req.requestId}`} 
+                          className="flex-1 bg-[var(--color-brutal-yellow)] border-3 border-black font-black uppercase text-center block py-2.5 sm:py-3 hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0_0_#000] text-xs sm:text-sm"
+                        >
+                          <span className="flex items-center justify-center gap-1.5"><Wrench className="w-4 h-4" /> DETAILS & RECEIPT</span>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     )}
   </div>

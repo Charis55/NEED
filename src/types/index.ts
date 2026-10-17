@@ -178,6 +178,7 @@ export interface JobRequest {
   proofOfPaymentAt?: number;
   paidToPlatform?: boolean;
   createdAt: number;
+  acceptedAt?: number;
   updatedAt?: number;
   completedAt: number | null;
   reviewed?: boolean;
