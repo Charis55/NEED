@@ -138,6 +138,8 @@ export default function TechnicianManageJobPage() {
         status: newStatus,
         state: newStatus === "accepted" && requiresDeposit ? "awaiting_deposit" : (newStatus as any),
         ...(newStatus === "accepted" && requiresDeposit ? { depositStatus: "pending" } : {}),
+        ...(newStatus === "accepted" ? { acceptedAt: Date.now() } : {}),
+        updatedAt: Date.now(),
         ...extraPayload
       };
 

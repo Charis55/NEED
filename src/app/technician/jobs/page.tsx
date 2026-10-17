@@ -499,8 +499,8 @@ export default function ArtisanDashboard() {
       const parsed = new Date(val).getTime();
       return isNaN(parsed) ? 0 : parsed;
     };
-    // Prioritize acceptedAt, then updatedAt, then createdAt
-    return toMs(job.acceptedAt) || toMs(job.updatedAt) || toMs(job.createdAt) || 0;
+    // Prioritize completedAt (if completed), then acceptedAt, then updatedAt, then createdAt
+    return toMs(job.completedAt) || toMs(job.acceptedAt) || toMs(job.updatedAt) || toMs(job.createdAt) || 0;
   };
 
   // Helper: parse preferred due date/time to timestamp for closest/farthest sorting
@@ -530,7 +530,19 @@ export default function ArtisanDashboard() {
       if (!isNaN(ms)) return ms;
     }
 
-    const parsed = Date.parse(str);
+    // Check for "DD/MM/YYYY" or "DD-MM-YYYY"
+    const dmyMatch = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+      const d = new Date(year, month, day, 12, 0);
+      const ms = d.getTime();
+      if (!isNaN(ms)) return ms;
+    }
+
+    const cleanStr = str.replace(/\s+at\s+/i, " ");
+    const parsed = Date.parse(cleanStr);
     if (!isNaN(parsed)) return parsed;
 
     return 0;
@@ -545,26 +557,26 @@ export default function ArtisanDashboard() {
       const titleB = `${b.trade || ""} ${b.subcategory || ""}`.trim().toLowerCase();
 
       if (sortBy === "newest") {
-        return actionB - actionA;
+        return actionA - actionB;
       }
       if (sortBy === "oldest") {
-        return actionA - actionB;
+        return actionB - actionA;
       }
       if (sortBy === "closest_due") {
         const dueA = getJobDueTime(a);
         const dueB = getJobDueTime(b);
-        if (dueA === 0 && dueB === 0) return actionB - actionA;
+        if (dueA === 0 && dueB === 0) return actionA - actionB;
         if (dueA === 0) return 1;
         if (dueB === 0) return -1;
-        return dueA - dueB; // soonest first
+        return dueB - dueA;
       }
       if (sortBy === "farthest_due") {
         const dueA = getJobDueTime(a);
         const dueB = getJobDueTime(b);
-        if (dueA === 0 && dueB === 0) return actionB - actionA;
+        if (dueA === 0 && dueB === 0) return actionA - actionB;
         if (dueA === 0) return 1;
         if (dueB === 0) return -1;
-        return dueB - dueA; // farthest future first
+        return dueA - dueB;
       }
       if (sortBy === "a_z") return titleA.localeCompare(titleB);
       if (sortBy === "z_a") return titleB.localeCompare(titleA);
