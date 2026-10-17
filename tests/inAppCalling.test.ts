@@ -39,11 +39,13 @@ interface Job {
 // ─── Logic under test (pure functions extracted from the route) ────────────────
 
 const ALLOWED_STATES = [
+  "accepted",
   "confirmed",
   "en_route",
   "arrived",
   "in_progress",
   "awaiting_customer_confirmation",
+  "completed",
 ];
 
 type InitiateCallResult =
@@ -142,6 +144,13 @@ describe("call state gate", () => {
     const result = initiateCall(makeJob({ state: "cancelled" }), "cust_1", "audio");
     assert.ok("code" in result);
     assert.equal((result as any).code, "CALL_STATE_GATE");
+  });
+
+  it("allows calls when job is accepted", () => {
+    const result = initiateCall(makeJob({ state: "accepted" }), "cust_1", "audio");
+    assert.ok("success" in result);
+    assert.equal((result as any).success, true);
+    assert.equal((result as any).receiverId, "artisan_1");
   });
 
   it("allows calls when job is confirmed", () => {

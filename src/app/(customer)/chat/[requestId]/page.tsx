@@ -9,7 +9,7 @@ import { JobRequest, ArtisanProfile, Review } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import UserAvatar from "@/components/UserAvatar";
-import { ChevronLeft, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check, Phone, Video } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check, Phone, Video } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import { sessionId } from "@/utils/sessionId";
@@ -758,23 +758,46 @@ export default function ChatPage() {
           <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-lg md:text-2xl font-black text-black pointer-events-none" />
         </div>
         
-        <div 
-          className="flex-1 min-w-0 flex flex-col items-start justify-center cursor-pointer"
-          onClick={() => {
-            if (isCustomerViewing && artisan) {
-              setShowProfileModal(true);
-            }
-          }}
-        >
-          <div className="flex items-center gap-1.5 md:gap-2 w-full flex-wrap">
-            <h2 className="font-black text-black text-base md:text-2xl uppercase leading-tight truncate max-w-[45vw] md:max-w-none hover:underline">{chatPartnerName}</h2>
+        <div className="flex-1 min-w-0 flex flex-col items-start justify-center">
+          <div 
+            className="flex items-center gap-1.5 md:gap-2 w-full flex-wrap cursor-pointer"
+            onClick={() => {
+              if (isCustomerViewing && artisan) {
+                setShowProfileModal(true);
+              }
+            }}
+          >
+            <h2 className="font-black text-black text-base md:text-2xl uppercase leading-tight truncate max-w-[45vw] md:max-w-none hover:underline">
+              {chatPartnerName}
+            </h2>
             {job?.status === "completed" && (
-              <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-[10px] md:text-xs px-2 md:px-3 py-0.5 md:py-1 uppercase font-black shrink-0 shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000]">Done</span>
+              <span className="bg-[var(--color-brutal-green)] text-black border-2 border-black text-[10px] md:text-xs px-2 md:px-3 py-0.5 md:py-1 uppercase font-black shrink-0 shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000]">
+                Done
+              </span>
             )}
           </div>
-          <p className="text-black font-bold text-[10px] md:text-sm bg-white border-2 border-black px-1 md:px-1.5 py-0.5 inline-block shadow-[1px_1px_0_0_#000] md:shadow-[2px_2px_0_0_#000] truncate max-w-full leading-tight mt-0.5 md:mt-1">
-            {job?.services && job.services.length > 1 ? `${job.services.length} Services` : job?.subcategory}
-          </p>
+          
+          {/* Clickable Job Badge linking directly to Manage Booking */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isCustomerViewing) {
+                router.push(`/jobs/${requestId}`);
+              } else {
+                router.push(`/technician/jobs/${requestId}`);
+              }
+            }}
+            className="text-black font-black text-[10px] md:text-xs bg-white border-2 border-black px-1.5 md:px-2 py-0.5 shadow-[1.5px_1.5px_0_0_#000] md:shadow-[2px_2px_0_0_#000] hover:bg-[var(--color-brutal-yellow)] transition-all flex items-center gap-1 text-left mt-0.5 md:mt-1 cursor-pointer max-w-full active:translate-x-0.5 active:translate-y-0.5"
+            title="Click to view & manage this booking"
+          >
+            <span className="break-words leading-snug">
+              {job?.services && job.services.length > 1 
+                ? `${job.services.length} Services: ${job.services.map(s => s.subcategory).join(", ")}` 
+                : (job?.subcategory || job?.trade || "View Booking")}
+            </span>
+            <ChevronRight className="w-3 h-3 shrink-0 stroke-[3] text-black" />
+          </button>
         </div>
 
         <div className="flex items-center gap-1 md:gap-2 ml-1 md:ml-2 shrink-0">

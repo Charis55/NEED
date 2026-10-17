@@ -208,8 +208,12 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           leaveCallRef.current();
         });
 
-        // 1. Create local tracks (This prompts for permissions)
-        localA = await AgoraRTC.createMicrophoneAudioTrack();
+        // 1. Create local tracks with discrete voice filtering (AEC, ANS, AGC)
+        localA = await AgoraRTC.createMicrophoneAudioTrack({
+          AEC: true,
+          ANS: true,
+          AGC: true,
+        });
         if (!isMounted) {
           localA.stop();
           localA.close();
@@ -293,6 +297,10 @@ export default function AgoraCallModal({ channelName, uid, isVideo, partnerName,
           connectedAtRef.current = Date.now();
           hasJoinedRef.current = true;
           setJoined(true);
+
+          if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+            AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(console.warn);
+          }
         }
       } catch (err: any) {
         if (!isMounted) return; // Ignore errors if unmounted (e.g., strict mode aborts)

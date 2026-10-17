@@ -56,7 +56,34 @@ public class CustomMessagingService extends MessagingService {
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager == null) return;
 
-        String channelId = "incoming_calls_v3";
+        String channelId = "incoming_calls_v4";
+
+        Uri ringtoneUri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_RINGTONE);
+        if (ringtoneUri == null) {
+            ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel callChannel = notificationManager.getNotificationChannel(channelId);
+            if (callChannel == null) {
+                callChannel = new NotificationChannel(
+                    channelId,
+                    "Incoming Calls",
+                    NotificationManager.IMPORTANCE_HIGH
+                );
+                callChannel.setDescription("Rings for incoming audio/video calls");
+                callChannel.enableVibration(true);
+                callChannel.setShowBadge(true);
+                
+                AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .build();
+                        
+                callChannel.setSound(ringtoneUri, audioAttributes);
+                notificationManager.createNotificationChannel(callChannel);
+            }
+        }
 
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -87,8 +114,6 @@ public class CustomMessagingService extends MessagingService {
         declineIntent.putExtra("requestId", reqId);
         declineIntent.putExtra("jobId", reqId);
         PendingIntent declinePendingIntent = PendingIntent.getBroadcast(this, 1003, declineIntent, flags);
-
-        Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.mipmap.ic_launcher)

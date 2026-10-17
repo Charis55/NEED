@@ -33,8 +33,14 @@ export async function POST(req: Request) {
       const jobSnap = await adminDb.collection("jobRequests").doc(channelName).get();
       if (jobSnap.exists) {
         const job = jobSnap.data();
-        const allowedStates = ["confirmed", "en_route", "arrived", "in_progress", "awaiting_customer_confirmation", "completed"];
-        if (job && !allowedStates.includes(job.state)) {
+        const allowedStates = ["accepted", "confirmed", "en_route", "arrived", "in_progress", "awaiting_customer_confirmation", "completed"];
+        const jobState = job?.state || job?.status || "";
+        const isAllowed = 
+          allowedStates.includes(jobState) ||
+          allowedStates.includes(job?.status || "") ||
+          allowedStates.includes(job?.state || "");
+
+        if (job && !isAllowed) {
           return NextResponse.json(
             { error: "Calls are only available after the booking is confirmed." },
             { status: 403, headers: corsHeaders }

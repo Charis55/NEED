@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  getFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging, Messaging } from "firebase/messaging";
 import { getAnalytics, Analytics } from "firebase/analytics";
@@ -19,7 +24,20 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Enable persistent on-device IndexedDB cache so all queries, profiles, and chats load instantly on mobile
+let db: ReturnType<typeof getFirestore>;
+try {
+  if (typeof window !== "undefined") {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } else {
+    db = getFirestore(app);
+  }
+} catch (e) {
+  db = getFirestore(app);
+}
 const storage = getStorage(app);
 
 let messaging: Messaging | null = null;

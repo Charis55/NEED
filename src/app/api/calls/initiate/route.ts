@@ -16,11 +16,13 @@ import { writeJobEvent } from "@/lib/jobEvents";
  */
 
 const ALLOWED_STATES = [
+  "accepted",
   "confirmed",
   "en_route",
   "arrived",
   "in_progress",
   "awaiting_customer_confirmation",
+  "completed",
 ];
 
 export async function POST(req: NextRequest) {
@@ -50,9 +52,14 @@ export async function POST(req: NextRequest) {
 
     const job = jobSnap.data()!;
 
-    // 1. State gate — calls only allowed once job is active
-    const jobState = job.state || job.status;
-    if (!ALLOWED_STATES.includes(jobState)) {
+    // 1. State gate — calls only allowed once job is active/confirmed/accepted
+    const jobState = job.state || job.status || "";
+    const isAllowed = 
+      ALLOWED_STATES.includes(jobState) ||
+      ALLOWED_STATES.includes(job.status || "") ||
+      ALLOWED_STATES.includes(job.state || "");
+
+    if (!isAllowed) {
       return NextResponse.json(
         {
           error: `Calls are only available once a job is confirmed. Current state: ${jobState}`,

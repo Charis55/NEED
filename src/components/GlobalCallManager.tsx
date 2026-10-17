@@ -168,9 +168,39 @@ export default function GlobalCallManager() {
               body: JSON.stringify({ requestId: targetId, sessionId }),
             }).catch(err => console.warn("Failed to accept call via server:", err));
 
-            // Also update directly in Firestore for instant local reactivity
+            // Immediately load the job doc and update state so the call modal opens instantaneously
             try {
-              const { updateDoc, doc } = await import("firebase/firestore");
+              const { doc, getDoc, updateDoc } = await import("firebase/firestore");
+              const jobSnap = await getDoc(doc(db, "jobRequests", targetId));
+              if (jobSnap.exists()) {
+                const jobData = jobSnap.data() as JobRequest;
+                const currentUid = userUidRef.current || auth.currentUser?.uid || (jobData.artisanId !== jobData.activeCall?.callerId ? jobData.artisanId : jobData.customerId);
+                
+                const updatedJob: JobRequest = {
+                  ...jobData,
+                  activeCall: {
+                    ...(jobData.activeCall || {
+                      channelName: targetId,
+                      callerId: "",
+                      type: "audio",
+                      status: "ongoing",
+                      timestamp: Date.now()
+                    }),
+                    status: "ongoing",
+                    connectedAt: Date.now(),
+                    acceptedBySession: sessionId,
+                  }
+                };
+
+                if (!userUidRef.current && currentUid) {
+                  setUserUid(currentUid);
+                }
+                setActiveJob(updatedJob);
+                if (currentUid) {
+                  fetchPartnerInfo(updatedJob, currentUid);
+                }
+              }
+
               await updateDoc(doc(db, "jobRequests", targetId), {
                 "activeCall.status": "ongoing",
                 "activeCall.connectedAt": Date.now(),
@@ -320,6 +350,19 @@ export default function GlobalCallManager() {
     if (!activeJob) return;
 
     clearCallNotification();
+    playCallSound("pickup");
+
+    const updatedJob: JobRequest = {
+      ...activeJob,
+      activeCall: {
+        ...activeJob.activeCall!,
+        status: "ongoing",
+        connectedAt: Date.now(),
+        acceptedBySession: sessionId
+      }
+    };
+    setActiveJob(updatedJob);
+
     try {
       // Accept: directly update Firestore (no server logic needed — state gate
       // is already enforced on initiation; accept just flips status to "ongoing")
@@ -328,7 +371,6 @@ export default function GlobalCallManager() {
         "activeCall.connectedAt": Date.now(),
         "activeCall.acceptedBySession": sessionId
       });
-      playCallSound("pickup");
     } catch (e) {
       console.error("Failed to accept call", e);
     }

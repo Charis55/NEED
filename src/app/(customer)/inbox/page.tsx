@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, orderBy, onSnapshot, updateDoc } from "firebase/firestore";
 import { JobRequest, ArtisanProfile, UserAccount } from "@/types";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import { useAlert } from "@/components/AlertProvider";
 import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
-import { MessageCircle, Search, Filter, SlidersHorizontal } from "lucide-react";
+import { MessageCircle, Search, Filter, SlidersHorizontal, Trash2 } from "lucide-react";
 import AuthGate from "@/components/AuthGate";
 
 interface ChatListItem {
@@ -27,11 +28,17 @@ export default function InboxPage() {
 }
 
 function InboxContent() {
+  const router = useRouter();
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<"ongoing" | "completed" | "az" | "za">("ongoing");
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<ChatListItem | null>(null);
+  const [hiddenChatIds, setHiddenChatIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef(false);
   const { showAlert } = useAlert();
 
   useEffect(() => {
@@ -87,6 +94,10 @@ function InboxContent() {
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
+        try {
+          const raw = localStorage.getItem("need_hidden_chats_" + user.uid);
+          if (raw) setHiddenChatIds(JSON.parse(raw));
+        } catch (e) {}
         setupListener();
       } else {
         setLoading(false);
@@ -99,7 +110,60 @@ function InboxContent() {
     };
   }, [showAlert]);
 
+  const startLongPress = (item: ChatListItem) => {
+    isLongPressRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      if (typeof window !== "undefined" && window.navigator?.vibrate) {
+        try { window.navigator.vibrate(60); } catch (e) {}
+      }
+      setChatToDelete(item);
+    }, 500);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleClickItem = (requestId: string) => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    router.push(`/chat/${requestId}`);
+  };
+
+  const handleDeleteChat = async () => {
+    if (!chatToDelete || !auth.currentUser) return;
+    setDeleting(true);
+    const targetId = chatToDelete.job.requestId;
+    const uid = auth.currentUser.uid;
+    const updated = [...hiddenChatIds, targetId];
+    setHiddenChatIds(updated);
+    try {
+      localStorage.setItem("need_hidden_chats_" + uid, JSON.stringify(updated));
+    } catch (e) {}
+
+    try {
+      await updateDoc(doc(db, "jobRequests", targetId), {
+        [`hiddenFor.${uid}`]: true
+      });
+    } catch (err) {
+      console.warn("Could not sync hiddenFor to Firestore:", err);
+    }
+    setDeleting(false);
+    setChatToDelete(null);
+    showAlert("Chat deleted from your inbox", "success");
+  };
+
+  const user = auth.currentUser;
   const filteredList = chatList.filter(({ job, artisan, artisanUser }) => {
+    if (user && job.hiddenFor?.[user.uid]) return false;
+    if (hiddenChatIds.includes(job.requestId)) return false;
     const name = (artisan?.name || artisanUser?.displayName || artisanUser?.firstName || "Technician").toLowerCase();
     const trade = (job.services ? job.services.map(s => `${s.trade} ${s.subcategory}`).join(" ") : (job.subcategory || job.trade || "")).toLowerCase();
     const dateStr = new Date(job.createdAt).toLocaleDateString('en-GB').toLowerCase();
@@ -193,50 +257,113 @@ function InboxContent() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedList.map((item) => (
-            <Link key={item.job.requestId} href={`/chat/${item.job.requestId}`}>
-              <div className="bg-white border-4 border-black p-4 brutal-shadow flex items-center hover:-translate-y-1 transition-transform group cursor-pointer">
-                
-                {/* Artisan Avatar */}
-                <div className="relative mr-4 shrink-0">
-                  <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
-                    <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 flex items-center justify-center">
-                      <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.profilePictureUrl} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || "Technician"} className="w-full h-full text-2xl text-black font-black" />
-                    </div>
+            <div
+              key={item.job.requestId}
+              onClick={() => handleClickItem(item.job.requestId)}
+              onMouseDown={() => startLongPress(item)}
+              onMouseUp={cancelLongPress}
+              onMouseLeave={cancelLongPress}
+              onTouchStart={() => startLongPress(item)}
+              onTouchEnd={cancelLongPress}
+              onTouchMove={cancelLongPress}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setChatToDelete(item);
+              }}
+              className="bg-white border-4 border-black p-4 brutal-shadow flex items-center hover:-translate-y-1 active:scale-[0.99] transition-all group cursor-pointer select-none relative"
+            >
+              {/* Artisan Avatar */}
+              <div className="relative mr-4 shrink-0 pointer-events-none">
+                <div className="w-16 h-16 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] group-hover:bg-[var(--color-brutal-pink)] transition-colors">
+                  <div className="w-14 h-14 rounded-full border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 flex items-center justify-center">
+                    <UserAvatar photoURL={item.artisanUser?.photoURL || item.artisan?.profilePictureUrl} name={item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || "Technician"} className="w-full h-full text-2xl text-black font-black" />
                   </div>
-                  {/* Unread Badge */}
-                  {item.unreadCount > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-[var(--color-brutal-red)] border-2 border-black w-6 h-6 rounded-full flex items-center justify-center">
-                      <span className="text-white font-black text-xs">{item.unreadCount}</span>
-                    </div>
+                </div>
+                {/* Unread Badge */}
+                {item.unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-[var(--color-brutal-red)] border-2 border-black w-6 h-6 rounded-full flex items-center justify-center">
+                    <span className="text-white font-black text-xs">{item.unreadCount}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Details */}
+              <div className="flex-1 min-w-0 pointer-events-none">
+                <div className="flex justify-between items-start mb-1">
+                  <h3 className="font-black text-black text-lg truncate uppercase">
+                    {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || "Technician"}
+                  </h3>
+                  <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
+                    {new Date(item.job.createdAt).toLocaleDateString('en-GB')}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <p className="text-sm font-bold text-gray-600 truncate mr-2">
+                    {item.job.services && item.job.services.length > 1 ? `${item.job.services.length} Services` : item.job.subcategory}
+                  </p>
+                  
+                  {item.job.status === "completed" && (
+                    <span className="text-[10px] font-black text-white bg-[var(--color-brutal-blue)] border-2 border-black px-2 py-0.5 uppercase tracking-wider shrink-0">
+                      COMPLETED
+                    </span>
                   )}
                 </div>
-
-                {/* Chat Details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-black text-black text-lg truncate uppercase">
-                      {item.artisan?.name || item.artisanUser?.displayName || (item.artisanUser?.firstName ? `${item.artisanUser.firstName} ${item.artisanUser.lastName || ''}`.trim() : null) || "Technician"}
-                    </h3>
-                    <span className="text-xs font-bold text-gray-500 bg-gray-100 border-2 border-black px-2 py-0.5 shrink-0 ml-2">
-                      {new Date(item.job.createdAt).toLocaleDateString('en-GB')}
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-bold text-gray-600 truncate mr-2">
-                      {item.job.services && item.job.services.length > 1 ? `${item.job.services.length} Services` : item.job.subcategory}
-                    </p>
-                    
-                    {item.job.status === "completed" && (
-                      <span className="text-[10px] font-black text-white bg-[var(--color-brutal-blue)] border-2 border-black px-2 py-0.5 uppercase tracking-wider shrink-0">
-                        COMPLETED
-                      </span>
-                    )}
-                  </div>
-                </div>
               </div>
-            </Link>
+
+              {/* Delete button (shortcut for desktop mouse or tap) */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setChatToDelete(item);
+                }}
+                className="opacity-0 group-hover:opacity-100 focus:opacity-100 absolute top-2 right-2 p-1.5 bg-white border-2 border-black shadow-[2px_2px_0_0_#000] hover:bg-[var(--color-brutal-red)] hover:text-white transition-all cursor-pointer z-10"
+                title="Delete chat from inbox"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete Chat Confirmation Modal */}
+      {chatToDelete && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-white border-4 border-black p-6 sm:p-8 max-w-md w-full shadow-[8px_8px_0_0_#000] animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-[var(--color-brutal-red)] border-3 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0_0_#000]">
+                <Trash2 className="w-5 h-5 text-white stroke-[3]" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black">
+                Delete Chat?
+              </h2>
+            </div>
+            <p className="font-bold text-gray-800 text-sm mb-6 leading-relaxed">
+              Are you sure you want to delete this chat with <span className="font-black text-black uppercase underline decoration-2">{chatToDelete.artisan?.name || chatToDelete.artisanUser?.displayName || "Technician"}</span>?
+              <br /><br />
+              <span className="text-xs text-gray-500 font-semibold block bg-gray-100 p-2.5 border-2 border-black">
+                This removes the chat from your inbox view. The other person can still view their chat history, and any active job booking will remain unaffected.
+              </span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setChatToDelete(null)}
+                disabled={deleting}
+                className="py-3 bg-white border-3 border-black font-black uppercase text-xs sm:text-sm shadow-[3px_3px_0_0_#000] hover:bg-gray-100 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteChat}
+                disabled={deleting}
+                className="py-3 bg-[var(--color-brutal-red)] text-white border-3 border-black font-black uppercase text-xs sm:text-sm shadow-[3px_3px_0_0_#000] hover:opacity-90 active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                {deleting ? "Deleting..." : "Delete Chat"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

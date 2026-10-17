@@ -194,6 +194,7 @@ export interface JobRequest {
   };
   guaranteeClaimId?: string;
   guaranteeResolution?: "redo_arranged" | "refunded_clawback" | "rejected" | null;
+  hiddenFor?: Record<string, boolean>;
 }
 
 export interface Review {

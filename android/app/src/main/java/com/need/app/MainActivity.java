@@ -120,9 +120,9 @@ public class MainActivity extends BridgeActivity {
             if (manager != null) {
                 manager.createNotificationChannel(channel);
 
-                // Create the channel for incoming calls with the default system ringtone
+                // Create the channel for incoming calls with the user's actual device ringtone
                 NotificationChannel callChannel = new NotificationChannel(
-                    "incoming_calls_v3",
+                    "incoming_calls_v4",
                     "Incoming Calls",
                     NotificationManager.IMPORTANCE_HIGH
                 );
@@ -130,7 +130,10 @@ public class MainActivity extends BridgeActivity {
                 callChannel.enableVibration(true);
                 callChannel.setShowBadge(true);
                 
-                Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                Uri ringtoneUri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_RINGTONE);
+                if (ringtoneUri == null) {
+                    ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                }
                 AudioAttributes audioAttributes = new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)

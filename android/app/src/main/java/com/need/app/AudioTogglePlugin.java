@@ -23,6 +23,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import android.os.PowerManager;
 import java.util.List;
 
 @CapacitorPlugin(name = "AudioToggle")
@@ -31,6 +32,35 @@ public class AudioTogglePlugin extends Plugin {
     private static final String ONGOING_CALL_CHANNEL_ID = "ongoing_call_channel_v1";
     private static final int ONGOING_CALL_NOTIFICATION_ID = 1005;
     private AudioFocusRequest audioFocusRequest;
+    private PowerManager.WakeLock proximityWakeLock;
+
+    private void acquireProximityWakeLock(Context context) {
+        try {
+            if (proximityWakeLock == null) {
+                PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+                if (powerManager != null && powerManager.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+                    proximityWakeLock = powerManager.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "NeedApp:ProximityScreenLock");
+                }
+            }
+            if (proximityWakeLock != null && !proximityWakeLock.isHeld()) {
+                proximityWakeLock.acquire();
+                Log.d(TAG, "Proximity wake lock acquired (screen dims near ear)");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to acquire proximity wake lock: " + t.getMessage());
+        }
+    }
+
+    private void releaseProximityWakeLock() {
+        try {
+            if (proximityWakeLock != null && proximityWakeLock.isHeld()) {
+                proximityWakeLock.release();
+                Log.d(TAG, "Proximity wake lock released");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to release proximity wake lock: " + t.getMessage());
+        }
+    }
 
     private void ensureOngoingCallChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -178,6 +208,7 @@ public class AudioTogglePlugin extends Plugin {
         }
 
         try {
+            releaseProximityWakeLock();
             NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (notificationManager != null) {
                 notificationManager.cancel(ONGOING_CALL_NOTIFICATION_ID);
@@ -233,13 +264,19 @@ public class AudioTogglePlugin extends Plugin {
                         audioManager.clearCommunicationDevice();
                     }
                 }
-                Log.d(TAG, "Audio routed to EARPIECE");
+
+                // 4. Engage hardware proximity sensor to dim screen when phone is held to ear
+                acquireProximityWakeLock(context);
+                Log.d(TAG, "Audio routed to EARPIECE with proximity screen dimming enabled");
 
             } else if ("speaker".equalsIgnoreCase(mode)) {
-                // 1. Request Voice Communication Audio Focus
+                // 1. Release proximity wake lock so screen remains on for loudspeaker
+                releaseProximityWakeLock();
+
+                // 2. Request Voice Communication Audio Focus
                 requestCallAudioFocus(audioManager);
 
-                // 2. Set telephony communication mode and speakerphone
+                // 3. Set telephony communication mode and speakerphone
                 audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
                 audioManager.setSpeakerphoneOn(true);
 
@@ -261,6 +298,7 @@ public class AudioTogglePlugin extends Plugin {
 
             } else {
                 // Reset to normal mode (call ended)
+                releaseProximityWakeLock();
                 abandonCallAudioFocus(audioManager);
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
