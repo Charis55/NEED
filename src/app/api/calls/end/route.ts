@@ -53,27 +53,27 @@ export async function POST(req: NextRequest) {
 
     const isVideo = activeCall.type === "video";
     const syncConnectedAt = activeCall.bothConnectedAt || activeCall.connectedAt;
-    const wasConnected = !!syncConnectedAt;
+    const wasConnected = !!syncConnectedAt || reason === "ended" || (typeof durationMs === "number" && durationMs > 0);
 
     // Compute duration text based on synchronized time
     let durationText = "Missed Call";
-    if (wasConnected && ((typeof durationMs === "number" && durationMs > 0) || activeCall.bothConnectedAt)) {
-      const finalDurationMs = typeof durationMs === "number" && durationMs > 0
-        ? durationMs
-        : (activeCall.bothConnectedAt ? Math.max(0, Date.now() - activeCall.bothConnectedAt) : 0);
-
-      if (finalDurationMs > 0) {
-        const totalSeconds = Math.floor(finalDurationMs / 1000);
-        const m = Math.floor(totalSeconds / 60);
-        const s = totalSeconds % 60;
-        durationText = `${m}:${s.toString().padStart(2, "0")} mins`;
-      }
-    } else if (reason === "declined") {
+    if (reason === "declined") {
       durationText = "Declined Call";
     } else if (reason === "cancelled") {
       durationText = "Cancelled";
     } else if (reason === "timeout") {
       durationText = "Missed Call";
+    } else if (wasConnected || reason === "ended") {
+      let finalDurationMs = 0;
+      if (typeof durationMs === "number" && durationMs > 0) {
+        finalDurationMs = durationMs;
+      } else if (syncConnectedAt) {
+        finalDurationMs = Math.max(0, Date.now() - syncConnectedAt);
+      }
+      const totalSeconds = Math.floor(finalDurationMs / 1000);
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      durationText = `${m}:${s.toString().padStart(2, "0")} mins`;
     }
 
     const messageText = `[CALL_LOG]:${isVideo ? "video" : "voice"}:${durationText}`;

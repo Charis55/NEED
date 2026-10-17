@@ -28,9 +28,10 @@ interface AgoraCallModalProps {
   isVideo: boolean;
   partnerName: string;
   partnerPhoto?: string;
+  connectedAt?: number | null;
   bothConnectedAt?: number | null;
   onBothConnected?: (timestamp: number) => void;
-  onEndCall: () => void;
+  onEndCall: (durationSec?: number) => void;
 }
 
 export default function AgoraCallModal({ 
@@ -39,6 +40,7 @@ export default function AgoraCallModal({
   isVideo, 
   partnerName, 
   partnerPhoto, 
+  connectedAt,
   bothConnectedAt,
   onBothConnected,
   onEndCall 
@@ -61,7 +63,9 @@ export default function AgoraCallModal({
   speakerOnRef.current = speakerOn;
   const [error, setError] = useState("");
   const [callDuration, setCallDuration] = useState(0);
-  const syncStartTimeRef = useRef<number | null>(bothConnectedAt || null);
+  const callDurationRef = useRef(0);
+  callDurationRef.current = callDuration;
+  const syncStartTimeRef = useRef<number | null>(bothConnectedAt || connectedAt || null);
 
   // Both participants are connected in the channel
   const bothConnected = joined && remoteUsers.length > 0;
@@ -93,28 +97,32 @@ export default function AgoraCallModal({
     }
   }, [joined]);
 
-  // Sync incoming bothConnectedAt from Firestore
+  // Synchronize incoming timestamps without wiping active duration
   useEffect(() => {
-    syncStartTimeRef.current = bothConnectedAt || null;
-    if (!bothConnectedAt) {
-      setCallDuration(0);
+    if (bothConnectedAt) {
+      syncStartTimeRef.current = bothConnectedAt;
+    } else if (connectedAt && !syncStartTimeRef.current) {
+      syncStartTimeRef.current = connectedAt;
     }
-  }, [bothConnectedAt]);
+  }, [bothConnectedAt, connectedAt]);
 
-  // Synchronized Timer: only starts ticking when BOTH parties have connected
+  // Call is active once the local user joins and the call is answered / connected
+  const isCallActive = joined && (bothConnected || !!bothConnectedAt || !!connectedAt);
+
+  // Synchronized Timer: starts ticking as soon as call is active on either side
   useEffect(() => {
-    if (!bothConnected) {
-      setCallDuration(0);
+    if (!isCallActive) {
       return;
     }
 
-    let startTime = bothConnectedAt || syncStartTimeRef.current;
+    let startTime = bothConnectedAt || syncStartTimeRef.current || connectedAt;
     if (!startTime) {
       startTime = Date.now();
       syncStartTimeRef.current = startTime;
-      if (onBothConnected) {
-        onBothConnected(startTime);
-      }
+    }
+
+    if (onBothConnected && !bothConnectedAt) {
+      onBothConnected(startTime);
     }
 
     // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
@@ -129,7 +137,7 @@ export default function AgoraCallModal({
     }
 
     const calcElapsed = () => {
-      const activeStart = bothConnectedAt || syncStartTimeRef.current || startTime;
+      const activeStart = bothConnectedAt || syncStartTimeRef.current || startTime || connectedAt;
       if (!activeStart) return;
       const elapsed = Math.max(0, Math.floor((Date.now() - activeStart) / 1000));
       setCallDuration(elapsed);
@@ -138,7 +146,7 @@ export default function AgoraCallModal({
     calcElapsed();
     const interval = setInterval(calcElapsed, 1000);
     return () => clearInterval(interval);
-  }, [bothConnected, bothConnectedAt, onBothConnected, isVideo, micMuted, speakerOn, partnerName]);
+  }, [isCallActive, bothConnectedAt, connectedAt, onBothConnected, isVideo, micMuted, speakerOn, partnerName]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -201,18 +209,25 @@ export default function AgoraCallModal({
       isJoiningRef.current = true;
       try {
         // Listeners for remote users
+        client.on("user-joined", (user) => {
+          setRemoteUsers(prev => {
+            if (prev.find(u => u.uid === user.uid)) return prev;
+            return [...prev, user];
+          });
+        });
+
         client.on("user-published", async (user, mediaType) => {
+          setRemoteUsers(prev => {
+            if (prev.find(u => u.uid === user.uid)) return prev;
+            return [...prev, user];
+          });
+
           try {
             await client.subscribe(user, mediaType);
           } catch (err) {
             console.error("Agora subscribe error:", err);
             return;
           }
-          
-          setRemoteUsers(prev => {
-            if (prev.find(u => u.uid === user.uid)) return prev;
-            return [...prev, user];
-          });
 
           if (mediaType === "video") {
             // Delay slightly to ensure DOM element exists before playing
@@ -308,6 +323,19 @@ export default function AgoraCallModal({
           return;
         }
 
+        // Sync existing remote users who joined before local client
+        if (client.remoteUsers && client.remoteUsers.length > 0) {
+          setRemoteUsers(prev => {
+            const combined = [...prev];
+            for (const ru of client.remoteUsers) {
+              if (!combined.find(u => u.uid === ru.uid)) {
+                combined.push(ru);
+              }
+            }
+            return combined;
+          });
+        }
+
         // 3. Publish tracks
         if (isVideo) {
           await client.publish([localA, localV]);
@@ -332,8 +360,8 @@ export default function AgoraCallModal({
         
         if (isMounted) {
           setLocalAudioTrack(localA);
-          if (!syncStartTimeRef.current && bothConnectedAt) {
-            syncStartTimeRef.current = bothConnectedAt;
+          if (!syncStartTimeRef.current) {
+            syncStartTimeRef.current = bothConnectedAt || connectedAt || Date.now();
           }
           hasJoinedRef.current = true;
           setJoined(true);
@@ -412,7 +440,7 @@ export default function AgoraCallModal({
     }
     clientRef.current?.removeAllListeners();
     await clientRef.current?.leave();
-    onEndCall();
+    onEndCall(callDurationRef.current);
   };
 
   // Wire deep link handlers for background ongoing call notification actions (End, Mute, Speaker)
@@ -451,7 +479,7 @@ export default function AgoraCallModal({
           <h2 className="text-xl font-black uppercase text-red-600 mb-4">Call Error</h2>
           <p className="font-bold mb-6">{error}</p>
           <button 
-            onClick={onEndCall} 
+            onClick={() => onEndCall()} 
             className="w-full py-3 bg-white border-4 border-black font-black uppercase hover:bg-gray-200 shadow-[4px_4px_0_0_#000] active:translate-y-1 active:shadow-none transition-all"
           >
             Close

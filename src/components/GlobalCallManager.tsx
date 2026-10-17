@@ -348,7 +348,10 @@ export default function GlobalCallManager() {
     }
   }, [activeJob]);
 
-  const endCallWithLog = async (reason?: "cancelled" | "declined" | "timeout" | "ended") => {
+  const endCallWithLog = async (
+    reason?: "cancelled" | "declined" | "timeout" | "ended",
+    explicitDurationSec?: number
+  ) => {
     if (!activeJob || !activeJob.activeCall || !userUid) return;
     
     // Play end sound immediately and clear any ringing notification
@@ -358,11 +361,15 @@ export default function GlobalCallManager() {
     const targetJobId = activeJob.requestId;
     const finalReason = reason || "ended";
 
-    // Compute synchronized duration: prioritize bothConnectedAt (when both parties joined)
+    // Compute synchronized duration: prioritize explicitDurationSec from modal, then bothConnectedAt/connectedAt
     let durationMs: number | null = null;
-    const syncStartTime = activeJob.activeCall.bothConnectedAt || activeJob.activeCall.connectedAt;
-    if (syncStartTime && finalReason === "ended") {
-      durationMs = Math.max(0, Date.now() - syncStartTime);
+    if (typeof explicitDurationSec === "number" && explicitDurationSec > 0) {
+      durationMs = explicitDurationSec * 1000;
+    } else {
+      const syncStartTime = activeJob.activeCall.bothConnectedAt || activeJob.activeCall.connectedAt;
+      if (syncStartTime && finalReason === "ended") {
+        durationMs = Math.max(0, Date.now() - syncStartTime);
+      }
     }
 
     // Direct client Firestore update for instant (<50ms) reaction on both caller & receiver devices
@@ -371,8 +378,6 @@ export default function GlobalCallManager() {
         "activeCall.status": "ended",
         "activeCall.endedAt": Date.now(),
         "activeCall.endedReason": finalReason,
-        "activeCall.bothConnectedAt": null,
-        "activeCall.connectedAt": null,
         lastMessageAt: Date.now(),
       });
     } catch (firestoreErr) {
@@ -484,9 +489,10 @@ export default function GlobalCallManager() {
           isVideo={activeCall.type === "video"}
           partnerName={partnerName}
           partnerPhoto={partnerPhoto}
+          connectedAt={activeCall.connectedAt || null}
           bothConnectedAt={validBothConnectedAt}
           onBothConnected={(timestamp) => handleBothConnected(activeJob.requestId, timestamp)}
-          onEndCall={() => endCallWithLog("ended")}
+          onEndCall={(sec) => endCallWithLog("ended", sec)}
         />
       )}
       </div>
