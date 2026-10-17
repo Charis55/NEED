@@ -22,7 +22,7 @@ export default function InboxPage() {
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortOption, setSortOption] = useState<"ongoing" | "completed" | "az" | "za">("ongoing");
+  const [sortOption, setSortOption] = useState<"recent" | "oldest" | "ongoing" | "completed" | "az" | "za">("recent");
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<ChatListItem | null>(null);
   const [hiddenChatIds, setHiddenChatIds] = useState<string[]>([]);
@@ -49,7 +49,11 @@ export default function InboxPage() {
         try {
           const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
           const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
-          activeJobs.sort((a, b) => b.createdAt - a.createdAt);
+          activeJobs.sort((a, b) => {
+            const timeA = a.lastMessageAt || a.updatedAt || a.createdAt || 0;
+            const timeB = b.lastMessageAt || b.updatedAt || b.createdAt || 0;
+            return timeB - timeA;
+          });
 
           const listItems: ChatListItem[] = await Promise.all(activeJobs.map(async (job) => {
             let customer: UserAccount | null = null;
@@ -161,19 +165,28 @@ export default function InboxPage() {
     const nameA = (a.customer?.displayName || a.customer?.firstName || "").toLowerCase();
     const nameB = (b.customer?.displayName || b.customer?.firstName || "").toLowerCase();
     
+    const timeA = a.job.lastMessageAt || a.job.updatedAt || a.job.createdAt || 0;
+    const timeB = b.job.lastMessageAt || b.job.updatedAt || b.job.createdAt || 0;
+
+    if (sortOption === "recent") {
+      return timeB - timeA;
+    }
+    if (sortOption === "oldest") {
+      return timeA - timeB;
+    }
     if (sortOption === "az") return nameA.localeCompare(nameB);
     if (sortOption === "za") return nameB.localeCompare(nameA);
     if (sortOption === "ongoing") {
       const aIsOngoing = a.job.status !== "completed" ? 1 : 0;
       const bIsOngoing = b.job.status !== "completed" ? 1 : 0;
-      return bIsOngoing - aIsOngoing || b.job.createdAt - a.job.createdAt;
+      return bIsOngoing - aIsOngoing || timeB - timeA;
     }
     if (sortOption === "completed") {
       const aIsCompleted = a.job.status === "completed" ? 1 : 0;
       const bIsCompleted = b.job.status === "completed" ? 1 : 0;
-      return bIsCompleted - aIsCompleted || b.job.createdAt - a.job.createdAt;
+      return bIsCompleted - aIsCompleted || timeB - timeA;
     }
-    return 0;
+    return timeB - timeA;
   });
 
   return (
@@ -197,6 +210,8 @@ export default function InboxPage() {
                 <div className="absolute top-14 md:top-16 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
                   <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
                   {[
+                    { label: "Most Recent", value: "recent" },
+                    { label: "Oldest", value: "oldest" },
                     { label: "Ongoing", value: "ongoing" },
                     { label: "Completed", value: "completed" },
                     { label: "A to Z", value: "az" },

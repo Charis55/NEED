@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     await jobRef.update({
       'activeCall.status': 'ongoing',
       'activeCall.connectedAt': Date.now(),
+      'activeCall.bothConnectedAt': null,
       'activeCall.acceptedBySession': sessionId,
     });
 

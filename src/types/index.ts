@@ -189,10 +189,12 @@ export interface JobRequest {
     type: "audio" | "video";
     status: "ringing" | "ongoing" | "ended";
     timestamp: number;
-    connectedAt?: number;
-    bothConnectedAt?: number;
+    connectedAt?: number | null;
+    bothConnectedAt?: number | null;
     acceptedBySession?: string;
   };
+  lastMessageAt?: number;
+  lastMessageSenderId?: string;
   guaranteeClaimId?: string;
   guaranteeResolution?: "redo_arranged" | "refunded_clawback" | "rejected" | null;
   hiddenFor?: Record<string, boolean>;

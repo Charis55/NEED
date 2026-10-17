@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
     // 1. Update Firestore
     await jobRef.update({
       "activeCall.status": "ended",
+      "activeCall.bothConnectedAt": null,
+      "activeCall.connectedAt": null,
       lastMessageText: messageText,
       lastMessageSenderId: messageSenderId || callerId,
       lastMessageAt: Date.now(),

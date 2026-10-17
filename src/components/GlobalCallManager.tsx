@@ -240,6 +240,7 @@ export default function GlobalCallManager() {
               await updateDoc(doc(db, "jobRequests", targetId), {
                 "activeCall.status": "ongoing",
                 "activeCall.connectedAt": Date.now(),
+                "activeCall.bothConnectedAt": null,
                 "activeCall.acceptedBySession": sessionId
               });
             } catch (e) {
@@ -370,6 +371,8 @@ export default function GlobalCallManager() {
         "activeCall.status": "ended",
         "activeCall.endedAt": Date.now(),
         "activeCall.endedReason": finalReason,
+        "activeCall.bothConnectedAt": null,
+        "activeCall.connectedAt": null,
         lastMessageAt: Date.now(),
       });
     } catch (firestoreErr) {
@@ -404,6 +407,7 @@ export default function GlobalCallManager() {
         ...activeJob.activeCall!,
         status: "ongoing",
         connectedAt: Date.now(),
+        bothConnectedAt: null,
         acceptedBySession: sessionId
       }
     };
@@ -415,6 +419,7 @@ export default function GlobalCallManager() {
       await updateDoc(doc(db, "jobRequests", activeJob.requestId), {
         "activeCall.status": "ongoing",
         "activeCall.connectedAt": Date.now(),
+        "activeCall.bothConnectedAt": null,
         "activeCall.acceptedBySession": sessionId
       });
     } catch (e) {
@@ -443,6 +448,12 @@ export default function GlobalCallManager() {
   const isRingingByMe = activeCall.status === "ringing" && isCaller;
   const isOngoingForMe = activeCall.status === "ongoing";
 
+  // Validate bothConnectedAt: only valid if it occurred on or after the current call's timestamp
+  const validBothConnectedAt = 
+    activeCall.bothConnectedAt && (!activeCall.timestamp || activeCall.bothConnectedAt >= activeCall.timestamp)
+      ? activeCall.bothConnectedAt
+      : null;
+
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
       <div className="pointer-events-auto">
@@ -468,12 +479,12 @@ export default function GlobalCallManager() {
 
       {isOngoingForMe && (
         <AgoraCallModal 
-          channelName={activeJob.requestId}
+          channelName={activeCall.channelName || activeJob.requestId}
           uid={userUid}
           isVideo={activeCall.type === "video"}
           partnerName={partnerName}
           partnerPhoto={partnerPhoto}
-          bothConnectedAt={activeCall.bothConnectedAt || null}
+          bothConnectedAt={validBothConnectedAt}
           onBothConnected={(timestamp) => handleBothConnected(activeJob.requestId, timestamp)}
           onEndCall={() => endCallWithLog("ended")}
         />

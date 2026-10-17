@@ -102,15 +102,16 @@ export async function POST(req: NextRequest) {
 
     const now = Date.now();
 
-    // 5. Write activeCall to Firestore atomically
+    // 5. Write activeCall to Firestore atomically with unique session channelName
     await jobRef.update({
       activeCall: {
-        channelName: jobId,
+        channelName: `${jobId}_${now}`,
         callerId,
         type: callType,
         status: "ringing",
         timestamp: now,
         connectedAt: null,
+        bothConnectedAt: null,
       },
     });
 

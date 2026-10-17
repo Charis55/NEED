@@ -95,8 +95,9 @@ export default function AgoraCallModal({
 
   // Sync incoming bothConnectedAt from Firestore
   useEffect(() => {
-    if (bothConnectedAt) {
-      syncStartTimeRef.current = bothConnectedAt;
+    syncStartTimeRef.current = bothConnectedAt || null;
+    if (!bothConnectedAt) {
+      setCallDuration(0);
     }
   }, [bothConnectedAt]);
 
@@ -107,7 +108,7 @@ export default function AgoraCallModal({
       return;
     }
 
-    let startTime = syncStartTimeRef.current || bothConnectedAt;
+    let startTime = bothConnectedAt || syncStartTimeRef.current;
     if (!startTime) {
       startTime = Date.now();
       syncStartTimeRef.current = startTime;
@@ -128,7 +129,8 @@ export default function AgoraCallModal({
     }
 
     const calcElapsed = () => {
-      const activeStart = syncStartTimeRef.current || startTime || Date.now();
+      const activeStart = bothConnectedAt || syncStartTimeRef.current || startTime;
+      if (!activeStart) return;
       const elapsed = Math.max(0, Math.floor((Date.now() - activeStart) / 1000));
       setCallDuration(elapsed);
     };
