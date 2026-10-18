@@ -7,8 +7,8 @@ import {
   persistentMultipleTabManager 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getMessaging, Messaging } from "firebase/messaging";
-import { getAnalytics, Analytics } from "firebase/analytics";
+import type { Messaging } from "firebase/messaging";
+import type { Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB_Hc8lgDxkW_lmTLctK3mvx72fBLIfPNY",
@@ -44,15 +44,27 @@ let messaging: Messaging | null = null;
 let analytics: Analytics | null = null;
 
 if (typeof window !== "undefined") {
-  messaging = getMessaging(app);
+  // FCM messaging check to safely avoid crashes in WKWebView / iOS webviews
+  import("firebase/messaging").then(({ getMessaging, isSupported }) => {
+    isSupported().then((supported) => {
+      if (supported) {
+        try {
+          messaging = getMessaging(app);
+        } catch (e) {
+          console.warn("FCM getMessaging initialization failed:", e);
+        }
+      }
+    }).catch(() => {});
+  }).catch(() => {});
+
   // Analytics only works in the browser
-  import("firebase/analytics").then(({ isSupported }) => {
+  import("firebase/analytics").then(({ getAnalytics, isSupported }) => {
     isSupported().then((supported) => {
       if (supported) {
         analytics = getAnalytics(app);
       }
     });
-  });
+  }).catch(() => {});
 }
 
 export { app, auth, db, storage, messaging, analytics };
