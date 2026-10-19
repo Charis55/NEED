@@ -307,7 +307,7 @@ export default function ArtisanDashboard() {
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Banner */}
-      <div className="bg-[var(--color-brutal-blue)] pt-16 pb-24 px-6 md:px-12 border-b-4 border-black brutal-shadow-sm">
+      <div className="bg-[var(--color-brutal-blue)] pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-24 px-6 md:px-12 border-b-4 border-black brutal-shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
             <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">DASHBOARD</h1>

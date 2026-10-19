@@ -72,8 +72,8 @@ export default function AgoraCallModal({
   
   const [micMuted, setMicMuted] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
-  // Default audio calls to discrete earpiece (false); video calls to loudspeaker (true)
-  const [speakerOn, setSpeakerOn] = useState(isVideo);
+  // Default in-app calls to loudspeaker so both parties hear each other clearly immediately
+  const [speakerOn, setSpeakerOn] = useState(true);
   const speakerOnRef = useRef(speakerOn);
   speakerOnRef.current = speakerOn;
   const [error, setError] = useState("");
@@ -241,14 +241,22 @@ export default function AgoraCallModal({
             }, 100);
           }
           if (mediaType === "audio") {
-            user.audioTrack?.play();
+            try {
+              user.audioTrack?.setVolume(100);
+              user.audioTrack?.play();
+            } catch (playErr) {
+              console.warn("Agora audioTrack play error:", playErr);
+            }
             // Re-assert audio routing immediately after remote audio begins playing in WebView
-            if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-              setTimeout(() => {
-                AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(e =>
-                  console.warn("AudioToggle re-route on audio play failed:", e)
-                );
-              }, 250);
+            if (typeof window !== "undefined") {
+              if (Capacitor.isNativePlatform()) {
+                setTimeout(() => {
+                  AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(e =>
+                    console.warn("AudioToggle re-route on audio play failed:", e)
+                  );
+                }, 250);
+              }
+              notifyNativeCall("setAudioMode", { mode: speakerOnRef.current ? "speaker" : "earpiece" });
             }
           }
         });

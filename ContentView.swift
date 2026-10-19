@@ -70,16 +70,17 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     func setAudioMode(mode: String) {
         let session = AVAudioSession.sharedInstance()
         do {
-            if mode == "speaker" {
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
-                try session.overrideOutputAudioPort(.speaker)
-                UIDevice.current.isProximityMonitoringEnabled = false
-            } else {
+            if mode == "earpiece" {
                 // Discrete earpiece
                 try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP])
                 try session.overrideOutputAudioPort(.none)
                 // Turn on proximity sensor so screen sleeps when close to ear
                 UIDevice.current.isProximityMonitoringEnabled = true
+            } else {
+                // Default: loudspeaker so call audio is loud and clear
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+                try session.overrideOutputAudioPort(.speaker)
+                UIDevice.current.isProximityMonitoringEnabled = false
             }
             try session.setActive(true)
         } catch {
@@ -91,6 +92,18 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     nonisolated func providerDidReset(_ provider: CXProvider) {
         Task { @MainActor in
             NativeCallKitManager.shared.resetCallState()
+        }
+    }
+
+    nonisolated func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        Task { @MainActor in
+            do {
+                try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+                try audioSession.overrideOutputAudioPort(.speaker)
+                try audioSession.setActive(true)
+            } catch {
+                print("Failed to activate audio session in CallKit didActivate:", error)
+            }
         }
     }
 
@@ -159,10 +172,9 @@ struct ContentView: View {
             Color.white
                 .ignoresSafeArea()
 
-            // Full-screen WebView respecting top safe area (pulled below Dynamic Island / status bar)
-            // while flowing completely edge-to-edge at the bottom
+            // Full-screen WebView flowing completely edge-to-edge behind Dynamic Island and status bar
             WebView(viewModel: webViewModel)
-                .ignoresSafeArea(.all, edges: .bottom)
+                .ignoresSafeArea()
 
             // Official Android-style load-up splash screen with the authentic NEED logo
             if webViewModel.isLoading && !webViewModel.hasLoadedOnce {
@@ -334,9 +346,9 @@ struct WebView: UIViewRepresentable {
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.bounces = true
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.isOpaque = true
-        webView.backgroundColor = UIColor.white
-        webView.scrollView.backgroundColor = UIColor.white
+        webView.isOpaque = false
+        webView.backgroundColor = UIColor.clear
+        webView.scrollView.backgroundColor = UIColor.clear
 
         // Native pull-to-refresh
         let refreshControl = UIRefreshControl()

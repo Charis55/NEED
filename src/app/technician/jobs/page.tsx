@@ -609,7 +609,7 @@ export default function ArtisanDashboard() {
   const filteredCompletedRequests = filterAndSortJobs(completedRequests);
 
   return (
-    <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-12 px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="min-h-screen bg-[var(--color-brutal-bg)] pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] px-4 md:px-12 pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-5xl md:text-7xl font-black text-black mb-2 tracking-tighter uppercase">Job Requests</h1>
         <div className="mb-8 w-full block">

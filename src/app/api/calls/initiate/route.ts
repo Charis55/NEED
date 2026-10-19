@@ -48,8 +48,10 @@ export async function POST(req: NextRequest) {
     const now = Date.now();
 
     // 4. Determine recipient
-    const receiverId =
-      job.customerId === callerId ? job.artisanId : job.customerId;
+    const currentCaller = (callerId || "").trim();
+    const jobCustomer = (job.customerId || "").trim();
+    const jobArtisan = (job.artisanId || "").trim();
+    const receiverId = currentCaller === jobCustomer ? jobArtisan : jobCustomer;
 
     if (!receiverId) {
       return NextResponse.json(

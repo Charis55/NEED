@@ -74,15 +74,9 @@ export default function GlobalCallManager() {
         if (!data.activeCall) return false;
         const status = data.activeCall.status;
         if (status === "ringing") {
+          // A ringing call is considered valid unless it is genuinely stale (> 3 minutes old)
           const ringingAge = now - (data.activeCall.timestamp || 0);
-          if (ringingAge > 60000 || ringingAge < -30000) {
-            if (data.activeCall.callerId === userUid) {
-              updateDoc(doc(db, "jobRequests", data.requestId), {
-                "activeCall.status": "ended",
-                "activeCall.endedAt": now,
-                "activeCall.endedReason": "missed"
-              }).catch(() => {});
-            }
+          if (ringingAge > 3 * 60 * 1000) {
             return false;
           }
           return true;

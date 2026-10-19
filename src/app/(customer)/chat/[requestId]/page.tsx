@@ -736,7 +736,7 @@ export default function ChatPage() {
       onClick={() => setDeletingMsgId(null)}
     >
       {/* Header */}
-      <div className="bg-[var(--color-brutal-blue)] border-b-4 md:border-b-8 border-black pt-[max(env(safe-area-inset-top),0.75rem)] md:pt-10 pb-3 md:pb-4 px-3 md:px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
+      <div className="bg-[var(--color-brutal-blue)] border-b-4 md:border-b-8 border-black pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] md:pt-10 pb-3 md:pb-4 px-3 md:px-4 flex items-center shrink-0 shadow-[0_4px_0_0_#000] z-10">
         <button 
           onClick={() => {
             if (isCustomerViewing) {

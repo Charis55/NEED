@@ -144,7 +144,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Section */}
-      <div className="bg-[var(--color-brutal-green)] border-b-8 border-black pt-12 pb-10 mb-8">
+      <div className="bg-[var(--color-brutal-green)] border-b-8 border-black pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-10 mb-8">
         <div className="w-full px-6 md:px-12 relative z-[60]">
           <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">

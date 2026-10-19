@@ -233,7 +233,7 @@ function JobsContent() {
   };
 
   return (
-    <div className="w-full pt-16 px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+    <div className="w-full pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)] mt-4">
         MY BOOKINGS
       </h1>
