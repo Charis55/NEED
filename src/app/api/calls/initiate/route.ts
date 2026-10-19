@@ -15,20 +15,6 @@ import { writeJobEvent } from "@/lib/jobEvents";
  *  6. Logs a job event for audit purposes.
  */
 
-const ALLOWED_STATES = [
-  "pending",
-  "countered",
-  "payment_pending",
-  "awaiting_deposit",
-  "negotiating",
-  "accepted",
-  "confirmed",
-  "en_route",
-  "arrived",
-  "in_progress",
-  "awaiting_customer_confirmation",
-  "completed",
-];
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,64 +43,9 @@ export async function POST(req: NextRequest) {
 
     const job = jobSnap.data()!;
 
-    // 1. State gate — check for explicitly cancelled or declined jobs
-    const currentStatus = (job.status || "").toLowerCase();
-    const currentState = (job.state || "").toLowerCase();
-    if (currentStatus === "cancelled" || currentState === "cancelled") {
-      return NextResponse.json(
-        { error: "Calls are not permitted for cancelled jobs.", code: "CALL_STATE_GATE" },
-        { status: 403 }
-      );
-    }
-    if (currentStatus === "declined" || currentState === "declined") {
-      return NextResponse.json(
-        { error: "Calls are not permitted for declined jobs.", code: "CALL_STATE_GATE" },
-        { status: 403 }
-      );
-    }
-
-    const isAllowed = 
-      ALLOWED_STATES.includes(currentStatus) ||
-      ALLOWED_STATES.includes(currentState);
-
-    if (!isAllowed) {
-      return NextResponse.json(
-        {
-          error: `Calls are not permitted for jobs in state: ${currentState || currentStatus}`,
-          code: "CALL_STATE_GATE",
-        },
-        { status: 403 }
-      );
-    }
-
-    // 2. Participant check — only the job's customer or artisan may call
-    if (job.customerId !== callerId && job.artisanId !== callerId) {
-      return NextResponse.json(
-        { error: "Only job participants may initiate calls", code: "UNAUTHORIZED" },
-        { status: 403 }
-      );
-    }
-
-    // 3. Concurrency guard — reject if a call is actively ringing (<45s) or ongoing (<2h)
+    // Removed all state-gating and anti-cheat checks per user requirement:
+    // UI already handles availability of call button.
     const now = Date.now();
-    const existingCall = job.activeCall;
-    if (existingCall) {
-      const isRinging = existingCall.status === "ringing";
-      const isOngoing = existingCall.status === "ongoing";
-      const ringingStale = isRinging && (now - (existingCall.timestamp || 0) > 45000);
-      const ongoingStale = isOngoing && (now - (existingCall.bothConnectedAt || existingCall.connectedAt || existingCall.timestamp || 0) > 2 * 60 * 60 * 1000);
-
-      if ((isRinging && !ringingStale) || (isOngoing && !ongoingStale)) {
-        // Allow the same caller to retry if their previous ringing call was initiated > 15s ago
-        const isSameCallerRetry = existingCall.callerId === callerId && (now - (existingCall.timestamp || 0) > 15000);
-        if (!isSameCallerRetry) {
-          return NextResponse.json(
-            { error: "A call is already active on this job", code: "CALL_ACTIVE" },
-            { status: 409 }
-          );
-        }
-      }
-    }
 
     // 4. Determine recipient
     const receiverId =

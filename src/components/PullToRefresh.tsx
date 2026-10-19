@@ -15,9 +15,9 @@ export default function PullToRefresh({ children }: { children: React.ReactNode 
   const THRESHOLD = 80;
 
   useEffect(() => {
-    // Disable artificial JS touch interception on iOS / NeedApp to preserve 120Hz native WebKit scrolling and avoid accidental reloads
-    const isIOSorNeedApp = typeof navigator !== "undefined" && (/iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.userAgent.includes("NeedApp"));
-    if (isIOSorNeedApp) {
+    // If inside the native iOS Swift app, let native UIRefreshControl handle pull-to-refresh with 120Hz ProMotion & haptics
+    const isNativeApp = typeof window !== "undefined" && Boolean((window as any).webkit?.messageHandlers?.needNative);
+    if (isNativeApp) {
       return;
     }
 

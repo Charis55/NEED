@@ -159,9 +159,10 @@ struct ContentView: View {
             Color.white
                 .ignoresSafeArea()
 
-            // Full-screen WebView flowing completely edge-to-edge
+            // Full-screen WebView respecting top safe area (pulled below Dynamic Island / status bar)
+            // while flowing completely edge-to-edge at the bottom
             WebView(viewModel: webViewModel)
-                .ignoresSafeArea()
+                .ignoresSafeArea(.all, edges: .bottom)
 
             // Official Android-style load-up splash screen with the authentic NEED logo
             if webViewModel.isLoading && !webViewModel.hasLoadedOnce {
@@ -182,6 +183,7 @@ struct ContentView: View {
                 .zIndex(2)
             }
         }
+        .preferredColorScheme(.light)
         .animation(.easeInOut(duration: 0.3), value: webViewModel.isLoading)
         .animation(.easeInOut(duration: 0.3), value: webViewModel.showError)
         .onAppear {
@@ -336,6 +338,11 @@ struct WebView: UIViewRepresentable {
         webView.backgroundColor = UIColor.white
         webView.scrollView.backgroundColor = UIColor.white
 
+        // Native pull-to-refresh
+        let refreshControl = UIRefreshControl()
+        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.handleRefreshControl(_:)), for: .valueChanged)
+        webView.scrollView.refreshControl = refreshControl
+
         // Canonical Mobile Safari User-Agent so Google OAuth and third-party auth providers allow sign-in without 403 disallowed_useragent
         let baseUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
         webView.customUserAgent = baseUA
@@ -360,6 +367,18 @@ struct WebView: UIViewRepresentable {
 
         init(viewModel: WebViewModel) {
             self.viewModel = viewModel
+        }
+
+        // MARK: - Native Pull to Refresh
+        @objc func handleRefreshControl(_ sender: UIRefreshControl) {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
+            generator.impactOccurred()
+            if let webView = viewModel.webView {
+                webView.reload()
+            } else {
+                sender.endRefreshing()
+            }
         }
 
         // MARK: - WKScriptMessageHandler (Bridge for CallKit, Earpiece & Dynamic Island)
@@ -421,12 +440,14 @@ struct WebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            webView.scrollView.refreshControl?.endRefreshing()
             viewModel.isLoading = false
             viewModel.hasLoadedOnce = true
             viewModel.showError = false
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            webView.scrollView.refreshControl?.endRefreshing()
             let nsError = error as NSError
             if nsError.code == NSURLErrorCancelled {
                 return
@@ -439,6 +460,7 @@ struct WebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            webView.scrollView.refreshControl?.endRefreshing()
             let nsError = error as NSError
             if nsError.code == NSURLErrorCancelled {
                 return

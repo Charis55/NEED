@@ -33,14 +33,6 @@ export async function POST(req: Request) {
       const jobSnap = await adminDb.collection("jobRequests").doc(channelName).get();
       if (jobSnap.exists) {
         const job = jobSnap.data();
-        const currentStatus = (job?.status || "").toLowerCase();
-        const currentState = (job?.state || "").toLowerCase();
-        if (currentStatus === "cancelled" || currentState === "cancelled" || currentStatus === "declined" || currentState === "declined") {
-          return NextResponse.json(
-            { error: "Calls are disabled for cancelled or declined jobs." },
-            { status: 403, headers: corsHeaders }
-          );
-        }
         // Log call start event
         await writeJobEvent(channelName, "call_started", uid, { channelName });
       }
