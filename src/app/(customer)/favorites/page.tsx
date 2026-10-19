@@ -12,23 +12,39 @@ import { Heart, Star, X, Eye } from "lucide-react";
 
 export default function FavoritesPage() {
   const router = useRouter();
-  const [favorites, setFavorites] = useState<ArtisanProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [favorites, setFavorites] = useState<ArtisanProfile[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem("need_favorites_cache");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const cached = localStorage.getItem("need_favorites_cache");
+      return !cached || JSON.parse(cached).length === 0;
+    } catch {
+      return true;
+    }
+  });
+  const [user, setUser] = useState<any>(() => auth.currentUser || null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
 
     const fetchFavorites = async () => {
-      const user = auth.currentUser;
-      if (!user) {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
         setLoading(false);
         return;
       }
 
       try {
-        const userDocRef = doc(db, "users", user.uid);
+        const userDocRef = doc(db, "users", currentUser.uid);
         const userDoc = await getDoc(userDocRef);
         
         let savedArtisans: string[] = [];
@@ -41,6 +57,9 @@ export default function FavoritesPage() {
           if (!isCancelled) {
             setFavorites([]);
             setLoading(false);
+            try {
+              localStorage.removeItem("need_favorites_cache");
+            } catch {}
           }
           return;
         }
@@ -83,6 +102,9 @@ export default function FavoritesPage() {
         if (!isCancelled) {
           setFavorites(artisans);
           setLoading(false);
+          try {
+            localStorage.setItem("need_favorites_cache", JSON.stringify(artisans));
+          } catch {}
         }
       } catch (error) {
         console.error("Error fetching favorites", error);
@@ -101,10 +123,10 @@ export default function FavoritesPage() {
       }
     });
 
-    // Safety timeout: never let favorites screen hang longer than 4 seconds
+    // Safety timeout: never let favorites screen hang longer than 2.5 seconds
     const safetyTimer = setTimeout(() => {
       if (!isCancelled) setLoading(false);
-    }, 4000);
+    }, 2500);
 
     return () => {
       isCancelled = true;
@@ -114,14 +136,20 @@ export default function FavoritesPage() {
   }, []);
 
   const handleRemoveFavorite = async (artisanId: string) => {
-    const user = auth.currentUser;
-    if (!user) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
     try {
-      const userDocRef = doc(db, "users", user.uid);
+      const userDocRef = doc(db, "users", currentUser.uid);
       await updateDoc(userDocRef, {
         savedArtisans: arrayRemove(artisanId)
       });
-      setFavorites(prev => prev.filter(a => a.artisanId !== artisanId));
+      setFavorites(prev => {
+        const updated = prev.filter(a => a.artisanId !== artisanId);
+        try {
+          localStorage.setItem("need_favorites_cache", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
     } catch (error) {
       console.error("Error removing favorite", error);
     }

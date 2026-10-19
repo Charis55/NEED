@@ -92,7 +92,25 @@ export default function GlobalCallManager() {
       const foundJob = candidateJobs.length > 0 ? candidateJobs[0] : null;
 
       setActiveJob((prev) => {
-        // If we found a new call, fetch partner info
+        // Immediately initialize partner info from activeCall if available (0ms delay, no "Someone")
+        if (foundJob && foundJob.activeCall) {
+          const isCallerJob = foundJob.activeCall.callerId === userUid;
+          const directPartnerName = isCallerJob
+            ? (foundJob.activeCall as any).receiverName
+            : (foundJob.activeCall as any).callerName;
+          const directPartnerPhoto = isCallerJob
+            ? (foundJob.activeCall as any).receiverPhoto
+            : (foundJob.activeCall as any).callerPhoto;
+
+          if (directPartnerName && directPartnerName !== "Someone" && directPartnerName !== "Caller") {
+            setPartnerName(directPartnerName);
+          }
+          if (directPartnerPhoto) {
+            setPartnerPhoto(directPartnerPhoto);
+          }
+        }
+
+        // If we found a new call or need to enrich profile, fetch partner info
         if (foundJob && (!prev || prev.requestId !== foundJob.requestId)) {
           fetchPartnerInfo(foundJob, userUid);
         }
@@ -127,16 +145,20 @@ export default function GlobalCallManager() {
     let artisanJobs: JobRequest[] = [];
     let customerJobs: JobRequest[] = [];
 
+    const handleSnapshot = () => {
+      updateCombined(artisanJobs, customerJobs);
+    };
+
     const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", userUid));
     const unsubArtisan = onSnapshot(qArtisan, (snap) => {
       artisanJobs = snap.docs.map(d => ({ requestId: d.id, ...d.data() }) as JobRequest);
-      updateCombined(artisanJobs, customerJobs);
+      handleSnapshot();
     }, handleError);
 
     const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", userUid));
     const unsubCustomer = onSnapshot(qCustomer, (snap) => {
       customerJobs = snap.docs.map(d => ({ requestId: d.id, ...d.data() }) as JobRequest);
-      updateCombined(artisanJobs, customerJobs);
+      handleSnapshot();
     }, handleError);
 
     return () => {
@@ -449,18 +471,18 @@ export default function GlobalCallManager() {
   const { activeCall } = activeJob;
   const isCaller = activeCall.callerId === userUid;
 
-  // Multi-session / same-account isolation:
-  // 1. Caller device: only the specific device/tab (matching callerSessionId) shows OutgoingCallModal and connects to Agora
-  const isThisDeviceCaller = isCaller && (!activeCall.callerSessionId || activeCall.callerSessionId === sessionId);
+  // Caller device: whoever initiated the call is the caller on their device.
+  // We do not gate on fragile callerSessionId checks which caused calls to flash and close.
+  const isThisDeviceCaller = isCaller;
 
-  // 2. Receiver device: rings on all devices of the recipient account; once answered, only the specific device that accepted (matching acceptedBySession) connects to Agora
+  // Receiver device: rings on all devices of the recipient account; once answered, only the specific device that accepted connects to Agora
   const isThisDeviceAcceptedReceiver = !isCaller && (!activeCall.acceptedBySession || activeCall.acceptedBySession === sessionId);
 
   const isRingingForMe = activeCall.status === "ringing" && !isCaller;
   const isRingingByMe = activeCall.status === "ringing" && isThisDeviceCaller;
   const isOngoingForMe = activeCall.status === "ongoing" && (isCaller ? isThisDeviceCaller : isThisDeviceAcceptedReceiver);
 
-  // If this device is the caller on another device, or receiver not accepted on this device, don't show overlay
+  // If this device is neither the active caller nor ringing/accepted receiver, don't show overlay
   if (!isRingingForMe && !isRingingByMe && !isOngoingForMe) return null;
 
   // Validate bothConnectedAt: only valid if it occurred on or after the current call's timestamp
@@ -469,13 +491,23 @@ export default function GlobalCallManager() {
       ? activeCall.bothConnectedAt
       : null;
 
+  // Determine guaranteed names and photos directly from activeCall (0ms delay)
+  const resolvedCalleeName = (activeCall as any).receiverName || (partnerName !== "Someone" ? partnerName : "Technician");
+  const resolvedCalleePhoto = (activeCall as any).receiverPhoto || partnerPhoto;
+
+  const resolvedCallerName = (activeCall as any).callerName || (partnerName !== "Someone" ? partnerName : "Customer");
+  const resolvedCallerPhoto = (activeCall as any).callerPhoto || partnerPhoto;
+
+  const inCallPartnerName = isCaller ? resolvedCalleeName : resolvedCallerName;
+  const inCallPartnerPhoto = isCaller ? resolvedCalleePhoto : resolvedCallerPhoto;
+
   return (
     <div className="fixed inset-0 z-[9999] pointer-events-none">
       <div className="pointer-events-auto">
       {isRingingForMe && (
         <IncomingCallModal 
-          callerName={partnerName}
-          callerPhoto={partnerPhoto}
+          callerName={resolvedCallerName}
+          callerPhoto={resolvedCallerPhoto}
           callType={activeCall.type}
           jobTitle={activeJob.subcategory || activeJob.trade}
           onAccept={acceptCall}
@@ -485,8 +517,8 @@ export default function GlobalCallManager() {
 
       {isRingingByMe && (
         <OutgoingCallModal 
-          calleeName={partnerName}
-          calleePhoto={partnerPhoto}
+          calleeName={resolvedCalleeName}
+          calleePhoto={resolvedCalleePhoto}
           callType={activeCall.type}
           onCancel={() => endCallWithLog("cancelled")}
         />
@@ -497,8 +529,8 @@ export default function GlobalCallManager() {
           channelName={activeCall.channelName || activeJob.requestId}
           uid={userUid}
           isVideo={activeCall.type === "video"}
-          partnerName={partnerName}
-          partnerPhoto={partnerPhoto}
+          partnerName={inCallPartnerName}
+          partnerPhoto={inCallPartnerPhoto}
           connectedAt={activeCall.connectedAt || null}
           bothConnectedAt={validBothConnectedAt}
           onBothConnected={(timestamp) => handleBothConnected(activeJob.requestId, timestamp)}

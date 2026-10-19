@@ -18,7 +18,7 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
 
   const [dragOffset, setDragOffset] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
-  const [slideDirection, setSlideDirection] = useState<"left" | "right" | null>(null);
+  const [isMorphEntering, setIsMorphEntering] = useState<boolean>(false);
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
@@ -27,6 +27,7 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
   const currentDragOffsetRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
   const prevPathnameRef = useRef<string>(pathname);
+  const activeRouteAtStartRef = useRef<string>(pathname);
 
   const triggerHaptic = (style: ImpactStyle = ImpactStyle.Medium) => {
     try {
@@ -50,7 +51,7 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     }
   };
 
-  // Prefetch all dock routes so page switching is instant
+  // Prefetch all dock routes so tab switching is instant
   useEffect(() => {
     routes.forEach((route) => {
       try {
@@ -61,31 +62,27 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     });
   }, [routes, router]);
 
-  // Handle incoming page entry animation when pathname changes
+  // Handle morph entry animation when switching between dock routes
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
       const prevIndex = routes.indexOf(prevPathnameRef.current);
       prevPathnameRef.current = pathname;
 
       if (prevIndex !== -1 && currentIndex !== -1) {
-        // Determine entry direction
-        // If moved forward or looped from end to 0
-        const isForward = (currentIndex > prevIndex && !(prevIndex === 0 && currentIndex === routes.length - 1)) ||
-                          (prevIndex === routes.length - 1 && currentIndex === 0);
-        
-        // Quick fluid slide-in from appropriate side
-        setDragOffset(isForward ? 45 : -45);
+        // Start from morph entry state (subtle scale + blur cross-fade)
+        setIsMorphEntering(true);
+        setDragOffset(0);
         setIsAnimating(true);
+
         const timer = setTimeout(() => {
-          setDragOffset(0);
+          setIsMorphEntering(false);
           setIsAnimating(false);
-          setSlideDirection(null);
-        }, 30);
+        }, 220);
         return () => clearTimeout(timer);
       } else {
         setDragOffset(0);
         setIsAnimating(false);
-        setSlideDirection(null);
+        setIsMorphEntering(false);
       }
     }
   }, [pathname, currentIndex, routes]);
@@ -99,8 +96,21 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || isAnimating) return;
 
+      const clientX = e.touches[0].clientX;
+      const windowWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+
+      // CRITICAL: 45px edge exclusion deadzone
+      // Never intercept iOS native edge swipe-to-go-back gesture (0-45px from left edge)
+      // or edge forward gestures (> windowWidth - 45px)
+      const edgeDeadzone = 45;
+      if (clientX < edgeDeadzone || clientX > windowWidth - edgeDeadzone) {
+        startXRef.current = null;
+        startYRef.current = null;
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
-      // Ignore inputs, sliders, textareas, selects, maps, horizontal carousels
+      // Ignore interactive elements, sliders, textareas, maps, horizontal carousels
       if (
         target?.closest(
           "input, textarea, select, button, .leaflet-container, [data-no-swipe], .overflow-x-auto, .overflow-x-scroll"
@@ -109,11 +119,12 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
         return;
       }
 
-      startXRef.current = e.touches[0].clientX;
+      startXRef.current = clientX;
       startYRef.current = e.touches[0].clientY;
       startTimeRef.current = Date.now();
       isHorizontalSwipeRef.current = null;
       currentDragOffsetRef.current = 0;
+      activeRouteAtStartRef.current = pathname;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -128,14 +139,14 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
         const absX = Math.abs(diffX);
         const absY = Math.abs(diffY);
         if (absX > 8 || absY > 8) {
-          isHorizontalSwipeRef.current = absX > absY * 1.25;
+          isHorizontalSwipeRef.current = absX > absY * 1.35;
         }
       }
 
       if (isHorizontalSwipeRef.current) {
         if (e.cancelable) e.preventDefault();
-        // Dynamic finger drag with subtle resistance
-        const dampenedOffset = diffX * 0.75;
+        // Dynamic finger drag with fluid resistance
+        const dampenedOffset = diffX * 0.65;
         currentDragOffsetRef.current = dampenedOffset;
 
         if (!rafIdRef.current) {
@@ -148,15 +159,18 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
+      // Discard if gesture was cancelled or if route changed during touch (e.g. native edge back popped)
       if (
         startXRef.current === null ||
         startYRef.current === null ||
         !isHorizontalSwipeRef.current ||
-        isAnimating
+        isAnimating ||
+        activeRouteAtStartRef.current !== pathname
       ) {
         startXRef.current = null;
         startYRef.current = null;
         isHorizontalSwipeRef.current = null;
+        setDragOffset(0);
         return;
       }
 
@@ -168,9 +182,9 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
       startYRef.current = null;
       isHorizontalSwipeRef.current = null;
 
-      // Swipe trigger criteria: > 45px distance or fast flick (< 350ms with > 25px)
-      const isFastFlick = elapsed < 350 && Math.abs(diffX) > 25;
-      const isFullSwipe = Math.abs(diffX) >= 45 && elapsed < 700;
+      // Swipe trigger criteria: > 50px distance or fast flick (< 350ms with > 30px)
+      const isFastFlick = elapsed < 350 && Math.abs(diffX) > 30;
+      const isFullSwipe = Math.abs(diffX) >= 50 && elapsed < 750;
 
       if (isFastFlick || isFullSwipe) {
         setIsAnimating(true);
@@ -180,29 +194,25 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
           // Swiped LEFT -> Next dock tab
           const nextIndex = (currentIndex + 1) % routes.length;
           const nextRoute = routes[nextIndex];
-          setSlideDirection("left");
-          setDragOffset(-window.innerWidth * 0.95);
 
           setTimeout(() => {
             if (nextRoute && nextRoute !== pathname) {
               router.push(nextRoute);
             }
-          }, 140);
+          }, 100);
         } else {
           // Swiped RIGHT -> Previous dock tab
           const prevIndex = (currentIndex - 1 + routes.length) % routes.length;
           const prevRoute = routes[prevIndex];
-          setSlideDirection("right");
-          setDragOffset(window.innerWidth * 0.95);
 
           setTimeout(() => {
             if (prevRoute && prevRoute !== pathname) {
               router.push(prevRoute);
             }
-          }, 140);
+          }, 100);
         }
       } else {
-        // Snap back to neutral position if swipe threshold was not met
+        // Snap back to neutral morph position
         setIsAnimating(true);
         setDragOffset(0);
         setTimeout(() => {
@@ -230,13 +240,26 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     return <>{children}</>;
   }
 
+  // Calculate fluid morph variables: scale morph, blur morph, and gentle parallax
+  const windowWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+  const dragFraction = Math.min(1, Math.abs(dragOffset) / windowWidth);
+
+  // When morph entering: starts slightly scaled down (0.975) and blurred (2.5px), smoothly expanding into full view
+  const currentScale = isMorphEntering ? 0.985 : Math.max(0.97, 1 - dragFraction * 0.05);
+  const currentBlur = isMorphEntering ? 2 : Math.min(3, dragFraction * 6);
+  const currentOpacity = isMorphEntering ? 0.8 : Math.max(0.7, 1 - dragFraction * 0.4);
+  const currentTranslateX = dragOffset * 0.35; // Gentle subtle parallax shift, not abrupt bounce
+
   return (
     <div 
       className="w-full relative will-change-transform"
       style={{
-        transform: `translate3d(${dragOffset}px, 0, 0)`,
-        transition: isAnimating ? "transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease" : "none",
-        opacity: Math.max(0.4, 1 - Math.abs(dragOffset) / (typeof window !== "undefined" ? window.innerWidth * 1.8 : 800)),
+        transform: `translate3d(${currentTranslateX}px, 0, 0) scale(${currentScale})`,
+        opacity: currentOpacity,
+        filter: currentBlur > 0.2 ? `blur(${currentBlur.toFixed(1)}px)` : "none",
+        transition: isAnimating 
+          ? "transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), filter 220ms ease" 
+          : "none",
       }}
     >
       {children}

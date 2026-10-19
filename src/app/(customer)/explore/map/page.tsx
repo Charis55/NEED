@@ -9,7 +9,10 @@ async function getTechnicians(): Promise<ArtisanProfile[]> {
   const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/artisans`;
   
   try {
-    const res = await fetch(url, { next: { revalidate: 30 } });
+    const res = await fetch(url, { 
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(3000)
+    });
     if (!res.ok) return [];
     
     const data = await res.json();

@@ -60,11 +60,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Write activeCall to Firestore atomically with unique session channelName and callerSessionId
+    // 5. Fetch caller & receiver profiles concurrently for immediate display (zero 'Someone' delays)
+    let fcmToken: string | undefined;
+    let callerName: string = "Caller";
+    let callerPhoto: string | null = null;
+    let receiverName: string = "Technician";
+    let receiverPhoto: string | null = null;
+
+    const [receiverUserDoc, callerUserDoc, receiverArtisanDoc, callerArtisanDoc] = await Promise.all([
+      adminDb.collection("users").doc(receiverId).get(),
+      adminDb.collection("users").doc(callerId).get(),
+      adminDb.collection("artisans").doc(receiverId).get(),
+      adminDb.collection("artisans").doc(callerId).get(),
+    ]);
+
+    // Parse caller info
+    if (callerUserDoc.exists) {
+      const d = callerUserDoc.data()!;
+      callerName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || callerName;
+      callerPhoto = d.photoURL || d.profilePictureUrl || null;
+    }
+    if (callerArtisanDoc.exists) {
+      const d = callerArtisanDoc.data()!;
+      callerName = d.businessName || d.name || callerName;
+      callerPhoto = d.profilePictureUrl || d.photoURL || callerPhoto;
+    }
+
+    // Parse receiver info
+    if (receiverUserDoc.exists) {
+      const d = receiverUserDoc.data()!;
+      fcmToken = d.fcmToken;
+      receiverName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || receiverName;
+      receiverPhoto = d.photoURL || d.profilePictureUrl || null;
+    }
+    if (receiverArtisanDoc.exists) {
+      const d = receiverArtisanDoc.data()!;
+      if (!fcmToken) fcmToken = d.fcmToken;
+      receiverName = d.businessName || d.name || receiverName;
+      receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
+    }
+
+    // 6. Write activeCall to Firestore atomically with full profile info
     await jobRef.update({
       activeCall: {
         channelName: `${jobId}_${now}`,
         callerId,
+        callerName,
+        callerPhoto,
+        receiverId,
+        receiverName,
+        receiverPhoto,
         callerSessionId: callerSessionId || null,
         type: callType,
         status: "ringing",
@@ -74,50 +119,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 6. Log audit event
+    // 7. Log audit event
     await writeJobEvent(jobId, "call_initiated", callerId, {
       type: callType,
       receiverId,
     });
-
-    // 7. Fetch recipient FCM token (users → artisans fallback)
-    let fcmToken: string | undefined;
-    let callerName: string | undefined;
-
-    const [receiverUserDoc, callerUserDoc] = await Promise.all([
-      adminDb.collection("users").doc(receiverId).get(),
-      adminDb.collection("users").doc(callerId).get(),
-    ]);
-
-    if (receiverUserDoc.exists) {
-      fcmToken = receiverUserDoc.data()?.fcmToken;
-    }
-    if (!fcmToken) {
-      const receiverArtisanDoc = await adminDb
-        .collection("artisans")
-        .doc(receiverId)
-        .get();
-      if (receiverArtisanDoc.exists) {
-        fcmToken = receiverArtisanDoc.data()?.fcmToken;
-      }
-    }
-
-    if (callerUserDoc.exists) {
-      const d = callerUserDoc.data()!;
-      callerName =
-        d.displayName ||
-        (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) ||
-        "Someone";
-    } else {
-      const callerArtisanDoc = await adminDb
-        .collection("artisans")
-        .doc(callerId)
-        .get();
-      if (callerArtisanDoc.exists) {
-        const d = callerArtisanDoc.data()!;
-        callerName = d.businessName || d.name || "Technician";
-      }
-    }
 
     // 8. Send high-priority FCM data-only push (so Java CustomMessagingService handles native ringing)
     if (fcmToken) {

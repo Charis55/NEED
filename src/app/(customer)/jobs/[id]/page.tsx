@@ -53,10 +53,41 @@ function JobsContent() {
   const jobId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const { showAlert } = useAlert();
 
-  const [job, setJob] = useState<JobRequest | null>(null);
-  const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
-  const [artisanUser, setArtisanUser] = useState<UserAccount | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [job, setJob] = useState<JobRequest | null>(() => {
+    if (typeof window === "undefined" || !jobId) return null;
+    try {
+      const cached = sessionStorage.getItem(`need_job_cache_${jobId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [artisan, setArtisan] = useState<ArtisanProfile | null>(() => {
+    if (typeof window === "undefined" || !jobId) return null;
+    try {
+      const cached = sessionStorage.getItem(`need_job_artisan_${jobId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [artisanUser, setArtisanUser] = useState<UserAccount | null>(() => {
+    if (typeof window === "undefined" || !jobId) return null;
+    try {
+      const cached = sessionStorage.getItem(`need_job_artisan_user_${jobId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined" || !jobId) return true;
+    try {
+      return !sessionStorage.getItem(`need_job_cache_${jobId}`);
+    } catch {
+      return true;
+    }
+  });
 
   // Actions state
   const [counterInput, setCounterInput] = useState("");
@@ -104,10 +135,16 @@ function JobsContent() {
   useEffect(() => {
     if (!jobId) return;
 
+    let isMounted = true;
     const unsubJob = onSnapshot(doc(db, "jobRequests", jobId), async (docSnap) => {
       if (docSnap.exists()) {
         const data = { ...docSnap.data(), requestId: docSnap.id } as JobRequest;
-        setJob(data);
+        if (isMounted) {
+          setJob(data);
+          try {
+            sessionStorage.setItem(`need_job_cache_${jobId}`, JSON.stringify(data));
+          } catch {}
+        }
 
         // Fetch artisan info
         if (data.artisanId) {
@@ -116,17 +153,33 @@ function JobsContent() {
               getDoc(doc(db, "artisans", data.artisanId)),
               getDoc(doc(db, "users", data.artisanId))
             ]);
-            if (artDoc.exists()) setArtisan(artDoc.data() as ArtisanProfile);
-            if (userDoc.exists()) setArtisanUser(userDoc.data() as UserAccount);
+            if (isMounted) {
+              if (artDoc.exists()) {
+                const artData = artDoc.data() as ArtisanProfile;
+                setArtisan(artData);
+                try {
+                  sessionStorage.setItem(`need_job_artisan_${jobId}`, JSON.stringify(artData));
+                } catch {}
+              }
+              if (userDoc.exists()) {
+                const userData = userDoc.data() as UserAccount;
+                setArtisanUser(userData);
+                try {
+                  sessionStorage.setItem(`need_job_artisan_user_${jobId}`, JSON.stringify(userData));
+                } catch {}
+              }
+            }
           } catch (e) {
             console.error("Failed to load artisan info", e);
           }
         }
       } else {
-        showAlert("Booking not found", "error");
-        router.push("/jobs");
+        if (isMounted) {
+          showAlert("Booking not found", "error");
+          router.push("/jobs");
+        }
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }, (error) => {
       console.error("Error fetching request:", error);
       setLoading(false);

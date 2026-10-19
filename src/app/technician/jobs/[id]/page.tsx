@@ -41,9 +41,32 @@ export default function TechnicianManageJobPage() {
   const jobId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const { showAlert } = useAlert();
 
-  const [job, setJob] = useState<JobRequest | null>(null);
-  const [customer, setCustomer] = useState<UserAccount | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [job, setJob] = useState<JobRequest | null>(() => {
+    if (typeof window === "undefined" || !jobId) return null;
+    try {
+      const cached = sessionStorage.getItem(`need_tech_job_cache_${jobId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [customer, setCustomer] = useState<UserAccount | null>(() => {
+    if (typeof window === "undefined" || !jobId) return null;
+    try {
+      const cached = sessionStorage.getItem(`need_tech_customer_${jobId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined" || !jobId) return true;
+    try {
+      return !sessionStorage.getItem(`need_tech_job_cache_${jobId}`);
+    } catch {
+      return true;
+    }
+  });
   const [promoDaysLeft, setPromoDaysLeft] = useState<number | null>(null);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -75,31 +98,43 @@ export default function TechnicianManageJobPage() {
   useEffect(() => {
     if (!jobId) return;
 
+    let isMounted = true;
     let unsubUser: (() => void) | undefined;
     const unsubJob = onSnapshot(doc(db, "jobRequests", jobId), async (docSnap) => {
       if (docSnap.exists()) {
         const data = { ...docSnap.data(), requestId: docSnap.id } as JobRequest;
-        setJob(data);
+        if (isMounted) {
+          setJob(data);
+          try {
+            sessionStorage.setItem(`need_tech_job_cache_${jobId}`, JSON.stringify(data));
+          } catch {}
+        }
 
         // Fetch customer profile
         if (data.customerId) {
           try {
             const userSnap = await getDoc(doc(db, "users", data.customerId));
-            if (userSnap.exists()) {
-              setCustomer(userSnap.data() as UserAccount);
+            if (userSnap.exists() && isMounted) {
+              const custData = userSnap.data() as UserAccount;
+              setCustomer(custData);
+              try {
+                sessionStorage.setItem(`need_tech_customer_${jobId}`, JSON.stringify(custData));
+              } catch {}
             }
           } catch (e) {
             console.error("Failed to fetch customer data", e);
           }
         }
       } else {
-        showAlert("Job request not found", "error");
-        router.push("/technician/jobs");
+        if (isMounted) {
+          showAlert("Job request not found", "error");
+          router.push("/technician/jobs");
+        }
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }, (err) => {
       console.error("Error loading job:", err);
-      setLoading(false);
+      if (isMounted) setLoading(false);
     });
 
     // Check technician verification & promo

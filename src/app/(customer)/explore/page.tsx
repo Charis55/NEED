@@ -47,7 +47,19 @@ export default function Dashboard() {
     }
   }, []);
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>({});
+  const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const cached = localStorage.getItem("need_explore_artisan_counts");
+      if (cached) {
+        const { counts, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < 15 * 60 * 1000) {
+          return counts;
+        }
+      }
+    } catch {}
+    return {};
+  });
 
   const handleSortChange = (type: SortType) => {
     setSortBy(type);
@@ -94,30 +106,45 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    let isCancelled = false;
     async function fetchCounts() {
       try {
         const q = query(collection(db, "artisans"), where("verified", "==", true));
-        const snapshot = await getDocs(q);
-        const counts: Record<string, number> = {};
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.services && Array.isArray(data.services)) {
-            data.services.forEach((svc: { trade?: string; [key: string]: unknown }) => {
-              if (svc.trade) {
-                counts[svc.trade] = (counts[svc.trade] || 0) + 1;
-              }
-            });
-          } else if (data.trade) {
-            // Fallback for older profiles
-            counts[data.trade] = (counts[data.trade] || 0) + 1;
-          }
-        });
-        setArtisanCounts(counts);
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+        const fetchPromise = getDocs(q);
+        const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (snapshot && !isCancelled) {
+          const counts: Record<string, number> = {};
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.services && Array.isArray(data.services)) {
+              data.services.forEach((svc: { trade?: string; [key: string]: unknown }) => {
+                if (svc.trade) {
+                  counts[svc.trade] = (counts[svc.trade] || 0) + 1;
+                }
+              });
+            } else if (data.trade) {
+              // Fallback for older profiles
+              counts[data.trade] = (counts[data.trade] || 0) + 1;
+            }
+          });
+          setArtisanCounts(counts);
+          try {
+            localStorage.setItem(
+              "need_explore_artisan_counts",
+              JSON.stringify({ counts, timestamp: Date.now() })
+            );
+          } catch {}
+        }
       } catch (err) {
         console.error("Failed to fetch artisan counts:", err);
       }
     }
     fetchCounts();
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const formattedDate = user?.metadata?.creationTime 

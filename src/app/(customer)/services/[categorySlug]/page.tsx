@@ -17,8 +17,29 @@ type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 export default function SubcategoryPage({ params }: { params: Promise<{ categorySlug: string }> }) {
   const unwrappedParams = use(params);
   const category = servicesData[unwrappedParams.categorySlug];
-  const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const [artisanCounts, setArtisanCounts] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined" || !category?.title) return {};
+    try {
+      const cached = localStorage.getItem(`need_artisan_counts_${category.title}`);
+      if (cached) {
+        const { counts, timestamp } = JSON.parse(cached);
+        // Valid for 15 minutes
+        if (Date.now() - timestamp < 15 * 60 * 1000) {
+          return counts;
+        }
+      }
+    } catch {}
+    return {};
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined" || !category?.title) return true;
+    try {
+      const cached = localStorage.getItem(`need_artisan_counts_${category.title}`);
+      return !cached;
+    } catch {
+      return true;
+    }
+  });
   const [selectedSubServices, setSelectedSubServices] = useState<string[]>([]);
   
   // Search and Sort state
@@ -40,6 +61,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
   }
 
   useEffect(() => {
+    let isCancelled = false;
     async function fetchAvailableSubcategories() {
       try {
         const q = query(
@@ -47,31 +69,44 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
           where("available", "==", true),
           where("verified", "==", true)
         );
-        const snapshot = await getDocs(q);
-        const counts: Record<string, number> = {};
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+        const fetchPromise = getDocs(q);
+        const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
         
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.services && Array.isArray(data.services)) {
-            data.services.forEach((svc: { trade?: string; subcategory?: string; [key: string]: unknown }) => {
-              if (svc.trade === category.title && svc.subcategory) {
-                counts[svc.subcategory] = (counts[svc.subcategory] || 0) + 1;
-              }
-            });
-          } else if (data.trade === category.title && data.subcategory) {
-            counts[data.subcategory] = (counts[data.subcategory] || 0) + 1;
-          }
-        });
-        
-        setArtisanCounts(counts);
+        if (snapshot && !isCancelled) {
+          const counts: Record<string, number> = {};
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.services && Array.isArray(data.services)) {
+              data.services.forEach((svc: { trade?: string; subcategory?: string; [key: string]: unknown }) => {
+                if (svc.trade === category.title && svc.subcategory) {
+                  counts[svc.subcategory] = (counts[svc.subcategory] || 0) + 1;
+                }
+              });
+            } else if (data.trade === category.title && data.subcategory) {
+              counts[data.subcategory] = (counts[data.subcategory] || 0) + 1;
+            }
+          });
+          
+          setArtisanCounts(counts);
+          try {
+            localStorage.setItem(
+              `need_artisan_counts_${category.title}`,
+              JSON.stringify({ counts, timestamp: Date.now() })
+            );
+          } catch {}
+        }
       } catch (error) {
         console.error("Error fetching available subcategories:", error);
       } finally {
-        setLoading(false);
+        if (!isCancelled) setLoading(false);
       }
     }
 
     fetchAvailableSubcategories();
+    return () => {
+      isCancelled = true;
+    };
   }, [category.title]);
 
   const title = category.title;
