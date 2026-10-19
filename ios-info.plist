@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>Need</string>
+    <key>CFBundleExecutable</key>
+    <string>Need</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.chiduga.need</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Need</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>MinimumOSVersion</key>
+    <string>17.0</string>
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>1</integer>
+        <integer>2</integer>
+    </array>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- App Icon Configuration -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon</string>
+            </array>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+        </dict>
+    </dict>
+    <key>CFBundleIcons~ipad</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon</string>
+            </array>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+        </dict>
+    </dict>
+
+    <!-- Comprehensive Permissions -->
+    <key>NSCameraUsageDescription</key>
+    <string>Need requires camera access to take job photos, scan documents, and verify completed tasks.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Need requires microphone access for crystal-clear in-app calling between customers and artisans.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Need requires photo library access to upload service images and documentation.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Need requires permission to save receipts, invoices, and job summaries to your photos.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Need requires your location to connect you with nearby verified artisans and service providers.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Need uses your location to track job progress and service arrivals in real time.</string>
+
+    <!-- Background Modes for In-App VoIP Calls & Notifications -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+        <string>voip</string>
+        <string>remote-notification</string>
+    </array>
+
+    <!-- Deep Linking & Google OAuth Redirect Scheme -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.48438248184-s8lro7cq49u9r3f1no68e412av09gdro</string>
+                <string>need</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- UI & Display Configuration -->
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+    <key>UIStatusBarHidden</key>
+    <false/>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+</dict>
+</plist>
