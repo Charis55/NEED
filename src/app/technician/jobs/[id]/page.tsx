@@ -322,6 +322,9 @@ export default function TechnicianManageJobPage() {
     }
     setCallingInProgress(true);
     showAlert("Connecting in-app voice call...", "success");
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("need_active_outgoing_call", job.requestId);
+    }
     try {
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",

@@ -35,14 +35,16 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
     try {
       const { auth } = await import("@/lib/firebase");
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("need_active_outgoing_call", job.requestId);
+      }
       
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: job.requestId,
-          callerId: currentUser.uid,
+          callerId: currentUser?.uid || job.customerId,
           callType: "audio",
           callerSessionId: getSessionId(),
         }),

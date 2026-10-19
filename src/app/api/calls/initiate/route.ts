@@ -46,24 +46,8 @@ export async function POST(req: NextRequest) {
     const job = jobSnap.data()!;
     const now = Date.now();
 
-    // 1. Concurrency guard
-    if (job.activeCall) {
-      const activeStatus = job.activeCall.status;
-      if (activeStatus === "ringing") {
-        const ringAge = now - (job.activeCall.timestamp || job.activeCall.createdAt || 0);
-        if (ringAge < 45000) {
-          return NextResponse.json(
-            { error: "A call is already ringing on this job", code: "CALL_ACTIVE" },
-            { status: 409 }
-          );
-        }
-      } else if (activeStatus === "ongoing" || activeStatus === "connected" || activeStatus === "accepted") {
-        return NextResponse.json(
-          { error: "A call is already ongoing on this job", code: "CALL_ACTIVE" },
-          { status: 409 }
-        );
-      }
-    }
+    // Removed all state-gating and anti-cheat checks per user requirement:
+    // UI already handles availability of call button and user wants calls to always initiate without 409 blockers.
 
     // 2. Determine recipient
     const currentCaller = (callerId || "").trim();

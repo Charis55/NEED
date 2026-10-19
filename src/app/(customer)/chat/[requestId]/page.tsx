@@ -281,7 +281,7 @@ export default function ChatPage() {
       });
 
       if (partnerId) {
-        fetch("/api/send-notification", {
+        apiFetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -417,7 +417,7 @@ export default function ChatPage() {
       setNewMessage("");
 
       if (partnerId) {
-        fetch("/api/send-notification", {
+        apiFetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -598,7 +598,7 @@ export default function ChatPage() {
       setPendingImagePreview(null);
 
       if (partnerId) {
-        fetch("/api/send-notification", {
+        apiFetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -703,6 +703,9 @@ export default function ChatPage() {
       return;
     }
     showAlert("Starting call...", "success");
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("need_active_outgoing_call", requestId);
+    }
     try {
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",

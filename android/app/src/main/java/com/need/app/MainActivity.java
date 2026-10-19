@@ -120,6 +120,16 @@ public class MainActivity extends BridgeActivity {
             if (manager != null) {
                 manager.createNotificationChannel(channel);
 
+                NotificationChannel alertChannel = new NotificationChannel(
+                    "high_priority_alerts",
+                    "High Priority Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                );
+                alertChannel.setDescription("Important updates and chat messages");
+                alertChannel.enableVibration(true);
+                alertChannel.setShowBadge(true);
+                manager.createNotificationChannel(alertChannel);
+
                 // Create the channel for incoming calls with the user's actual device ringtone
                 NotificationChannel callChannel = new NotificationChannel(
                     "incoming_calls_v4",

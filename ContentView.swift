@@ -15,6 +15,10 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     private let callController = CXCallController()
     private var activeCallUUID: UUID?
 
+    weak var webView: WKWebView?
+    var currentJobId: String?
+    var currentCallerId: String?
+
     override init() {
         let config = CXProviderConfiguration()
         config.supportsVideo = true
@@ -26,9 +30,29 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         self.provider = CXProvider(configuration: config)
         super.init()
         self.provider.setDelegate(self, queue: nil)
+
+        // Observe system audio route changes (speaker vs earpiece / bluetooth / headphones)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioRouteChange(notification:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
     }
 
-    func startCall(partnerName: String, isVideo: Bool) {
+    @objc private func handleAudioRouteChange(notification: Notification) {
+        Task { @MainActor in
+            let session = AVAudioSession.sharedInstance()
+            let isSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+            UIDevice.current.isProximityMonitoringEnabled = !isSpeaker && (self.activeCallUUID != nil)
+            print("[CallKit] Audio route changed: isSpeaker=\(isSpeaker)")
+            self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeRouteChanged', { detail: { isSpeaker: \(isSpeaker) } }))", completionHandler: nil)
+        }
+    }
+
+    func startCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
+        self.currentJobId = jobId
+        self.currentCallerId = uid
         let uuid = UUID()
         self.activeCallUUID = uuid
         let handle = CXHandle(type: .generic, value: partnerName)
@@ -50,6 +74,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
     func resetCallState() {
         self.activeCallUUID = nil
+        self.currentJobId = nil
+        self.currentCallerId = nil
         UIDevice.current.isProximityMonitoringEnabled = false
     }
 
@@ -62,6 +88,40 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         resetCallState()
 
         // Reset audio session
+        let session = AVAudioSession.sharedInstance()
+        try? session.overrideOutputAudioPort(.none)
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    func onNativeEndRequested() {
+        let savedJobId = self.currentJobId
+        let savedCallerId = self.currentCallerId
+
+        // 1. Reset local state
+        resetCallState()
+
+        // 2. Dispatch event to webview so AgoraRTC leaves channel and React unmounts call modal
+        self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeCallEnd'))") { _, error in
+            if let error = error {
+                print("[CallKit] Failed to dispatch needNativeCallEnd:", error)
+            }
+        }
+
+        // 3. Fallback direct HTTP POST to server in case webview is throttled/backgrounded
+        if let jobId = savedJobId, !jobId.isEmpty, let url = URL(string: "https://need-chi.vercel.app/api/calls/end") {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            let payload: [String: Any] = [
+                "jobId": jobId,
+                "callerId": savedCallerId ?? "",
+                "reason": "ended"
+            ]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+            URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
+        }
+
+        // 4. Reset audio session
         let session = AVAudioSession.sharedInstance()
         try? session.overrideOutputAudioPort(.none)
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
@@ -91,7 +151,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     // MARK: - CXProviderDelegate
     nonisolated func providerDidReset(_ provider: CXProvider) {
         Task { @MainActor in
-            NativeCallKitManager.shared.resetCallState()
+            NativeCallKitManager.shared.onNativeEndRequested()
         }
     }
 
@@ -110,12 +170,16 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     nonisolated func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         action.fulfill()
         Task { @MainActor in
-            NativeCallKitManager.shared.resetCallState()
+            NativeCallKitManager.shared.onNativeEndRequested()
         }
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         action.fulfill()
+        Task { @MainActor in
+            let isMuted = action.isMuted
+            NativeCallKitManager.shared.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeMuteToggle', { detail: { isMuted: \(isMuted) } }))", completionHandler: nil)
+        }
     }
 }
 
@@ -356,6 +420,7 @@ struct WebView: UIViewRepresentable {
         webView.customUserAgent = baseUA
 
         viewModel.webView = webView
+        NativeCallKitManager.shared.webView = webView
 
         if let url = URL(string: "https://need-chi.vercel.app") {
             var request = URLRequest(url: url)
@@ -396,7 +461,9 @@ struct WebView: UIViewRepresentable {
             } else if action == "startCall" {
                 let partnerName = dict["partnerName"] as? String ?? "Technician"
                 let isVideo = dict["isVideo"] as? Bool ?? false
-                NativeCallKitManager.shared.startCall(partnerName: partnerName, isVideo: isVideo)
+                let jobId = dict["jobId"] as? String
+                let uid = dict["uid"] as? String
+                NativeCallKitManager.shared.startCall(partnerName: partnerName, isVideo: isVideo, jobId: jobId, uid: uid)
             } else if action == "endCall" {
                 NativeCallKitManager.shared.endCall()
             } else if action == "setAudioMode" {

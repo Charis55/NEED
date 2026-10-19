@@ -9,9 +9,8 @@ import OutgoingCallModal from "./OutgoingCallModal";
 import dynamic from "next/dynamic";
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
-import { useSessionId, getSessionId } from "@/utils/sessionId";
+import { getSessionId } from "@/utils/sessionId";
 import { apiFetch } from "@/utils/apiBase";
-import { isTerminalCallStatus, CallStatus } from "@/lib/callStateMachine";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -29,7 +28,6 @@ const playCallSound = (type: "pickup" | "end") => {
 const AgoraCallModal = dynamic(() => import("./AgoraCallModal"), { ssr: false });
 
 export default function GlobalCallManager() {
-  const currentSessionId = useSessionId();
   const [userUid, setUserUid] = useState<string | null>(null);
   const [activeJob, setActiveJob] = useState<JobRequest | null>(null);
   const [partnerName, setPartnerName] = useState<string>("Someone");
@@ -46,8 +44,6 @@ export default function GlobalCallManager() {
   const activeJobRef = useRef<JobRequest | null>(null);
   activeJobRef.current = activeJob;
   const lastHandledUrlRef = useRef<{ url: string; time: number } | null>(null);
-  const lastRevRef = useRef<Record<string, number>>({});
-  const handledCallIdsRef = useRef<Set<string>>(new Set());
 
   const clearCallNotification = async () => {
     if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
@@ -70,86 +66,71 @@ export default function GlobalCallManager() {
   useEffect(() => {
     if (!userUid) return;
 
-    const updateCombined = (artisanJobs: JobRequest[], customerJobs: JobRequest[]) => {
-      const combined = [...artisanJobs, ...customerJobs];
+    let artisanJobs: JobRequest[] = [];
+    let customerJobs: JobRequest[] = [];
+
+    const updateCombined = (aJobs: JobRequest[], cJobs: JobRequest[]) => {
+      const combined = [...aJobs, ...cJobs];
       const now = Date.now();
 
       // Find the most recent active call
       const candidateJobs = combined.filter((data) => {
         if (!data.activeCall) return false;
-        const call = data.activeCall as any;
-        const callId = call.callId || call.channelName;
-
-        // Skip calls already marked terminal in our local handled set
-        if (callId && handledCallIdsRef.current.has(callId)) {
-          return false;
-        }
-
-        // Monotonic rev check: ignore stale snapshots with lower rev
-        if (call.rev && callId) {
-          const lastRev = lastRevRef.current[callId] || 0;
-          if (call.rev < lastRev) return false;
-          lastRevRef.current[callId] = call.rev;
-        }
-
-        const status = call.status;
+        const status = data.activeCall.status;
         if (status === "ringing") {
-          const ringingAge = now - (call.timestamp || call.createdAt || 0);
-          return ringingAge <= 45000; // 45s server-enforced window
+          const ringingAge = now - (data.activeCall.timestamp || (data.activeCall as any).createdAt || 0);
+          return ringingAge <= 2 * 60 * 60 * 1000;
         }
-        if (status === "ongoing" || status === "connected" || status === "accepted") {
+        if (status === "ongoing" || (status as string) === "connected" || (status as string) === "accepted") {
           const ongoingAge =
-            now - (call.bothConnectedAt || call.connectedAt || call.timestamp || 0);
+            now - (data.activeCall.bothConnectedAt || data.activeCall.connectedAt || data.activeCall.timestamp || 0);
           return ongoingAge <= 2 * 60 * 60 * 1000;
         }
-        if (isTerminalCallStatus(status)) {
-          // If the current active job was just terminated remotely, hold for 1.5s
-          if (activeJobRef.current?.requestId === data.requestId) {
-            return true;
-          }
-          return false;
+        // If current active call was just marked ended remotely while we were in it, allow for 1.5s terminal display
+        if (status === "ended" && activeJobRef.current?.requestId === data.requestId) {
+          return true;
         }
         return false;
       });
 
       candidateJobs.sort(
         (a, b) =>
-          (b.activeCall?.timestamp || (b.activeCall as any)?.createdAt || 0) -
-          (a.activeCall?.timestamp || (a.activeCall as any)?.createdAt || 0)
+          ((b.activeCall as any)?.timestamp || (b.activeCall as any)?.createdAt || 0) -
+          ((a.activeCall as any)?.timestamp || (a.activeCall as any)?.createdAt || 0)
       );
 
       const foundJob = candidateJobs.length > 0 ? candidateJobs[0] : null;
 
       if (foundJob && foundJob.activeCall) {
         const call = foundJob.activeCall as any;
-        const callId = call.callId || call.channelName;
         const status = call.status;
 
-        // Handle remote transition to terminal state (Claude rule: hold >= 1.5s)
-        if (isTerminalCallStatus(status)) {
-          if (callId) handledCallIdsRef.current.add(callId);
-          clearCallNotification();
-          playCallSound("end");
+        // Remote decline/cancellation detection: hold for 1.5s
+        if (status === "ended") {
+          if (activeJobRef.current?.requestId === foundJob.requestId) {
+            clearCallNotification();
+            playCallSound("end");
 
-          let text = "Call Ended";
-          if (status === "declined" || call.endedReason === "declined") {
-            text = "Declined";
-          } else if (status === "cancelled" || call.endedReason === "cancelled") {
-            text = "Cancelled";
-          } else if (status === "missed" || call.endedReason === "timeout") {
-            text = "No Answer";
+            let text = "Call Ended";
+            if (call.endedReason === "declined") {
+              text = "Call Declined";
+            } else if (call.endedReason === "cancelled") {
+              text = "Call Cancelled";
+            } else if (call.endedReason === "timeout") {
+              text = "No Answer";
+            }
+
+            setTerminalState({
+              status: call.endedReason || "ended",
+              text,
+              dismissAt: now + 1500,
+            });
+
+            setTimeout(() => {
+              setActiveJob(null);
+              setTerminalState(null);
+            }, 1500);
           }
-
-          setTerminalState({
-            status,
-            text,
-            dismissAt: now + 1500,
-          });
-
-          setTimeout(() => {
-            setActiveJob(null);
-            setTerminalState(null);
-          }, 1500);
           return;
         }
 
@@ -197,33 +178,17 @@ export default function GlobalCallManager() {
       console.warn("GlobalCallManager Firestore listener error:", err?.message || err);
     };
 
-    let artisanJobs: JobRequest[] = [];
-    let customerJobs: JobRequest[] = [];
-
     const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", userUid));
-    const unsubArtisan = onSnapshot(
-      qArtisan,
-      { includeMetadataChanges: true },
-      (snap) => {
-        // Claude Rule: Never ring on snapshots sourced from cache
-        if (snap.metadata.fromCache && !activeJobRef.current) return;
-        artisanJobs = snap.docs.map((d) => ({ requestId: d.id, ...d.data() } as JobRequest));
-        updateCombined(artisanJobs, customerJobs);
-      },
-      handleError
-    );
+    const unsubArtisan = onSnapshot(qArtisan, (snap) => {
+      artisanJobs = snap.docs.map((d) => ({ requestId: d.id, ...d.data() } as JobRequest));
+      updateCombined(artisanJobs, customerJobs);
+    }, handleError);
 
     const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", userUid));
-    const unsubCustomer = onSnapshot(
-      qCustomer,
-      { includeMetadataChanges: true },
-      (snap) => {
-        if (snap.metadata.fromCache && !activeJobRef.current) return;
-        customerJobs = snap.docs.map((d) => ({ requestId: d.id, ...d.data() } as JobRequest));
-        updateCombined(artisanJobs, customerJobs);
-      },
-      handleError
-    );
+    const unsubCustomer = onSnapshot(qCustomer, (snap) => {
+      customerJobs = snap.docs.map((d) => ({ requestId: d.id, ...d.data() } as JobRequest));
+      updateCombined(artisanJobs, customerJobs);
+    }, handleError);
 
     return () => {
       unsubArtisan();
@@ -264,6 +229,9 @@ export default function GlobalCallManager() {
           if (isAnswer && targetId) {
             clearCallNotification();
             playCallSound("pickup");
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("need_my_answered_call", targetId);
+            }
             apiFetch("/api/calls/accept", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -355,11 +323,13 @@ export default function GlobalCallManager() {
     playCallSound("end");
     clearCallNotification();
 
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("need_active_outgoing_call");
+      sessionStorage.removeItem("need_my_answered_call");
+    }
+
     const targetJobId = activeJob.requestId;
     const finalReason = reason || "ended";
-    const callId =
-      (activeJob.activeCall as any).callId || activeJob.activeCall.channelName;
-    if (callId) handledCallIdsRef.current.add(callId);
 
     let durationMs: number | null = null;
     if (typeof explicitDurationSec === "number" && explicitDurationSec > 0) {
@@ -372,43 +342,20 @@ export default function GlobalCallManager() {
       }
     }
 
-    // Server-authoritative transition call
-    apiFetch("/api/calls/transition", {
+    // Dismiss overlay immediately on initiator tap
+    setActiveJob(null);
+
+    // Call server to update Firestore, write chat log, and send cancel/missed FCM pushes
+    apiFetch("/api/calls/end", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jobId: targetJobId,
-        callId,
         callerId: userUid,
-        action:
-          finalReason === "cancelled"
-            ? "cancel"
-            : finalReason === "declined"
-            ? "decline"
-            : finalReason === "timeout"
-            ? "timeout"
-            : "end",
         reason: finalReason,
         durationMs,
       }),
-    }).catch((err) => console.error("Failed to end call via server transition:", err));
-
-    // Claude Rule: Present terminal states for at least 1.5 seconds before unmounting
-    let statusText = "Call Ended";
-    if (finalReason === "declined") statusText = "Declined";
-    else if (finalReason === "cancelled") statusText = "Cancelled";
-    else if (finalReason === "timeout") statusText = "No Answer";
-
-    setTerminalState({
-      status: finalReason,
-      text: statusText,
-      dismissAt: Date.now() + 1500,
-    });
-
-    setTimeout(() => {
-      setActiveJob(null);
-      setTerminalState(null);
-    }, 1500);
+    }).catch((err) => console.error("Failed to end call via server:", err));
   };
 
   const acceptCall = async () => {
@@ -418,53 +365,60 @@ export default function GlobalCallManager() {
     playCallSound("pickup");
 
     const targetJobId = activeJob.requestId;
-    const callId =
-      (activeJob.activeCall as any).callId || activeJob.activeCall.channelName;
     const effectiveSessionId = getSessionId();
 
-    apiFetch("/api/calls/transition", {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("need_my_answered_call", targetJobId);
+    }
+
+    apiFetch("/api/calls/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        requestId: targetJobId,
         jobId: targetJobId,
-        callId,
-        action: "accept",
-        callerId: userUid,
         sessionId: effectiveSessionId,
       }),
     }).catch((err) => console.warn("Failed to accept call via server:", err));
   };
 
   const handleBothConnected = async (jobId: string, timestamp: number) => {
-    apiFetch("/api/calls/transition", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jobId,
-        action: "joined",
-        callerId: userUid,
-      }),
-    }).catch((err) => console.warn("Failed to report joined transition:", err));
+    try {
+      const { updateDoc, doc: fsDoc } = await import("firebase/firestore");
+      await updateDoc(fsDoc(db, "jobRequests", jobId), {
+        "activeCall.bothConnectedAt": timestamp,
+      });
+    } catch (e) {
+      console.warn("handleBothConnected client update failed:", e);
+    }
   };
 
   if (!activeJob || !activeJob.activeCall || !userUid) return null;
 
   const { activeCall } = activeJob;
   const isCaller = activeCall.callerId === userUid;
-  const isThisDeviceCaller = isCaller;
-  const activeSessionId = currentSessionId || getSessionId();
 
-  // Callee device: rings on all devices; once answered, only the accepting device connects to Agora
-  const isThisDeviceAcceptedReceiver =
-    !isCaller &&
-    (!activeCall.acceptedBySession ||
-      !activeSessionId ||
-      activeCall.acceptedBySession === activeSessionId);
+  // Caller Device Isolation:
+  // Only the device that actually tapped "Call" (tagged in sessionStorage) or has matching sessionId
+  // is treated as the caller device. This prevents other devices (e.g. web browser) from taking over or flashing.
+  const isThisDeviceInitiator = typeof window !== "undefined" && (
+    sessionStorage.getItem("need_active_outgoing_call") === activeJob.requestId ||
+    sessionStorage.getItem("need_active_outgoing_call") === (activeCall as any).callId ||
+    (!activeCall.callerSessionId || activeCall.callerSessionId === getSessionId())
+  );
+  const isThisDeviceCaller = isCaller && isThisDeviceInitiator;
+
+  // Receiver Device Isolation:
+  // Once answered, only the device that tapped Answer connects to Agora.
+  const isThisDeviceAcceptedReceiver = !isCaller && (
+    (typeof window !== "undefined" && sessionStorage.getItem("need_my_answered_call") === activeJob.requestId) ||
+    (!activeCall.acceptedBySession || activeCall.acceptedBySession === getSessionId())
+  );
 
   const isRingingForMe = activeCall.status === "ringing" && !isCaller && !terminalState;
   const isRingingByMe = (activeCall.status === "ringing" || !!terminalState) && isThisDeviceCaller;
   const isOngoingForMe =
-    (activeCall.status === "ongoing" || (activeCall.status as string) === "connected") &&
+    (activeCall.status === "ongoing" || (activeCall.status as string) === "connected" || (activeCall.status as string) === "accepted") &&
     (isCaller ? isThisDeviceCaller : isThisDeviceAcceptedReceiver) &&
     !terminalState;
 
@@ -500,7 +454,7 @@ export default function GlobalCallManager() {
           <IncomingCallModal
             callerName={resolvedCallerName}
             callerPhoto={resolvedCallerPhoto}
-            callType={activeCall.type}
+            callType={activeCall.type || (activeCall as any).callType || "audio"}
             jobTitle={activeJob.subcategory || activeJob.trade}
             onAccept={acceptCall}
             onDecline={() => endCallWithLog("declined")}
@@ -511,7 +465,7 @@ export default function GlobalCallManager() {
           <OutgoingCallModal
             calleeName={resolvedCalleeName}
             calleePhoto={resolvedCalleePhoto}
-            callType={activeCall.type}
+            callType={activeCall.type || (activeCall as any).callType || "audio"}
             statusText={terminalState ? terminalState.text : "Calling..."}
             isTerminal={!!terminalState}
             onCancel={() => endCallWithLog("cancelled")}
@@ -520,9 +474,10 @@ export default function GlobalCallManager() {
 
         {isOngoingForMe && (
           <AgoraCallModal
+            jobId={activeJob.requestId}
             channelName={activeCall.channelName || activeJob.requestId}
             uid={userUid}
-            isVideo={activeCall.type === "video"}
+            isVideo={(activeCall.type || (activeCall as any).callType) === "video"}
             partnerName={inCallPartnerName}
             partnerPhoto={inCallPartnerPhoto}
             connectedAt={activeCall.connectedAt || null}

@@ -38,6 +38,7 @@ const notifyNativeCall = (action: string, payload?: Record<string, any>) => {
 };
 
 interface AgoraCallModalProps {
+  jobId?: string;
   channelName: string;
   uid: string;
   isVideo: boolean;
@@ -50,6 +51,7 @@ interface AgoraCallModalProps {
 }
 
 export default function AgoraCallModal({ 
+  jobId,
   channelName, 
   uid, 
   isVideo, 
@@ -106,18 +108,47 @@ export default function AgoraCallModal({
     };
   }, []);
 
-  // When call connects, set initial audio route and notify native CallKit / Dynamic Island
-  useEffect(() => {
-    if (joined && typeof window !== "undefined") {
-      if (Capacitor.isNativePlatform()) {
-        AudioToggle.setAudioMode({ mode: speakerOn ? "speaker" : "earpiece" }).catch(e =>
-          console.warn("AudioToggle initial route failed:", e)
-        );
+    // Listen for Native CallKit / Dynamic Island button actions
+    useEffect(() => {
+      const handleNativeEnd = () => {
+        console.log("[AgoraCallModal] Native CallKit end event received from Dynamic Island / CallKit");
+        leaveCallRef.current();
+      };
+      const handleNativeRoute = (e: any) => {
+        if (e.detail && typeof e.detail.isSpeaker === "boolean") {
+          setSpeakerOn(e.detail.isSpeaker);
+        }
+      };
+      const handleNativeMute = (e: any) => {
+        if (e.detail && typeof e.detail.isMuted === "boolean") {
+          if (localAudioTrack) {
+            localAudioTrack.setMuted(e.detail.isMuted);
+            setMicMuted(e.detail.isMuted);
+          }
+        }
+      };
+      window.addEventListener("needNativeCallEnd", handleNativeEnd);
+      window.addEventListener("needNativeRouteChanged", handleNativeRoute);
+      window.addEventListener("needNativeMuteToggle", handleNativeMute);
+      return () => {
+        window.removeEventListener("needNativeCallEnd", handleNativeEnd);
+        window.removeEventListener("needNativeRouteChanged", handleNativeRoute);
+        window.removeEventListener("needNativeMuteToggle", handleNativeMute);
+      };
+    }, [localAudioTrack]);
+
+    // When call connects, set initial audio route and notify native CallKit / Dynamic Island
+    useEffect(() => {
+      if (joined && typeof window !== "undefined") {
+        if (Capacitor.isNativePlatform()) {
+          AudioToggle.setAudioMode({ mode: speakerOn ? "speaker" : "earpiece" }).catch(e =>
+            console.warn("AudioToggle initial route failed:", e)
+          );
+        }
+        notifyNativeCall("startCall", { partnerName, isVideo, jobId: jobId || channelName, uid });
+        notifyNativeCall("setAudioMode", { mode: speakerOn ? "speaker" : "earpiece" });
       }
-      notifyNativeCall("startCall", { partnerName, isVideo });
-      notifyNativeCall("setAudioMode", { mode: speakerOn ? "speaker" : "earpiece" });
-    }
-  }, [joined, partnerName, isVideo]);
+    }, [joined, partnerName, isVideo, jobId, channelName, uid]);
 
   // Clean, monotonic in-call timer: counts smoothly from 0 for the duration of the call on this device
   useEffect(() => {
