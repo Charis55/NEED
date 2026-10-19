@@ -12,7 +12,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { ChevronLeft, ChevronRight, Send, Image as ImageIcon, X, Mic, AlertTriangle, Star, ShieldAlert, Check, Phone, Video } from "lucide-react";
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
-import { sessionId } from "@/utils/sessionId";
+import { getSessionId } from "@/utils/sessionId";
 import { apiFetch } from "@/utils/apiBase";
 import AdUnit from "@/components/AdUnit";
 import { Capacitor } from "@capacitor/core";
@@ -711,7 +711,7 @@ export default function ChatPage() {
           jobId: requestId,
           callerId: currentUser.uid,
           callType: type,
-          callerSessionId: sessionId,
+          callerSessionId: getSessionId(),
         }),
       });
       const data = await res.json();

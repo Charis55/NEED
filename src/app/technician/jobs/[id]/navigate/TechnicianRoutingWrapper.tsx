@@ -8,7 +8,7 @@ import { Phone, MessageSquare, MapPin, CheckCircle, Play, ShieldCheck } from "lu
 import GlobalSpinner from "@/components/GlobalSpinner";
 import dynamicImport from "next/dynamic";
 import { geocode } from "@/utils/location";
-import { sessionId } from "@/utils/sessionId";
+import { getSessionId } from "@/utils/sessionId";
 import { apiFetch } from "@/utils/apiBase";
 
 const TechnicianRoutingMap = dynamicImport(() => import("./TechnicianRoutingMap"), { ssr: false, loading: () => <GlobalSpinner text="LOADING MAP" /> });
@@ -48,7 +48,7 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
           jobId: job.requestId,
           callerId: currentUser.uid,
           callType: "audio",
-          callerSessionId: sessionId,
+          callerSessionId: getSessionId(),
         }),
       });
       if (!res.ok) {

@@ -33,7 +33,7 @@ import {
 import { formatDateTime12Hour, to12HourFormat } from "@/utils/formatTime";
 import BrutalCelebrationIcon from "@/components/BrutalCelebrationIcon";
 import { apiFetch } from "@/utils/apiBase";
-import { sessionId } from "@/utils/sessionId";
+import { getSessionId } from "@/utils/sessionId";
 
 export default function TechnicianManageJobPage() {
   const params = useParams();
@@ -330,7 +330,7 @@ export default function TechnicianManageJobPage() {
           jobId: job.requestId,
           callerId: user.uid,
           callType,
-          callerSessionId: sessionId,
+          callerSessionId: getSessionId(),
         }),
       });
       const data = await res.json();

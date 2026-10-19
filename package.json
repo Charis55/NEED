@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test tests/feeEngine.test.ts tests/jobStateMachine.test.ts tests/money.test.ts tests/contactFilter.test.ts tests/leakage.test.ts tests/strikeAppeals.test.ts tests/customerCredits.test.ts tests/pairsAndRecurring.test.ts tests/inAppCalling.test.ts tests/guarantee.test.ts tests/ledgerReconciliation.test.ts tests/firestoreRules.test.ts"
+    "test": "npx tsx --test tests/feeEngine.test.ts tests/jobStateMachine.test.ts tests/money.test.ts tests/contactFilter.test.ts tests/leakage.test.ts tests/strikeAppeals.test.ts tests/customerCredits.test.ts tests/pairsAndRecurring.test.ts tests/inAppCalling.test.ts tests/callStateMachine.test.ts tests/guarantee.test.ts tests/ledgerReconciliation.test.ts tests/firestoreRules.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",

@@ -6,19 +6,21 @@ import { writeJobEvent } from "@/lib/jobEvents";
 /**
  * POST /api/calls/initiate
  *
- * Server-authoritative call initiation:
- *  1. Verifies the job is in an active state (prevents pre-booking or post-completion calls).
- *  2. Verifies the caller is a participant (customer or artisan) of the job.
- *  3. Verifies no call is already ringing / ongoing on this job (prevents double-rings).
- *  4. Writes activeCall to Firestore.
- *  5. Sends a high-priority FCM push to the recipient so their device wakes and rings.
- *  6. Logs a job event for audit purposes.
+ * Server-authoritative call initiation (Claude Section 2.2 & 2.4):
+ *  1. Verifies the caller is a participant of the job.
+ *  2. Concurrency guard: rejects if another call is currently ringing (< 45s) or ongoing.
+ *  3. Generates unique callId, monotonic rev: 1, ringExpiresAt (now + 45s).
+ *  4. Server-assigns non-colliding Agora UIDs for caller and callee.
+ *  5. Denormalizes caller and callee profile info into activeCall (zero 'Someone' delay).
+ *  6. Writes activeCall atomically to jobRequests/{jobId}.
+ *  7. Writes users/{calleeId}/callInbox/{callId} for efficient incoming call indexing.
+ *  8. Sends high-priority FCM data push with callId deduplication key.
+ *  9. Logs audit job event.
  */
-
 
 export async function POST(req: NextRequest) {
   try {
-    const { jobId, callerId, callType, callerSessionId } = await req.json();
+    const { jobId, callerId, callType, callerSessionId, attemptId } = await req.json();
 
     if (!jobId || !callerId || !callType) {
       return NextResponse.json(
@@ -42,12 +44,28 @@ export async function POST(req: NextRequest) {
     }
 
     const job = jobSnap.data()!;
-
-    // Removed all state-gating and anti-cheat checks per user requirement:
-    // UI already handles availability of call button.
     const now = Date.now();
 
-    // 4. Determine recipient
+    // 1. Concurrency guard
+    if (job.activeCall) {
+      const activeStatus = job.activeCall.status;
+      if (activeStatus === "ringing") {
+        const ringAge = now - (job.activeCall.timestamp || job.activeCall.createdAt || 0);
+        if (ringAge < 45000) {
+          return NextResponse.json(
+            { error: "A call is already ringing on this job", code: "CALL_ACTIVE" },
+            { status: 409 }
+          );
+        }
+      } else if (activeStatus === "ongoing" || activeStatus === "connected" || activeStatus === "accepted") {
+        return NextResponse.json(
+          { error: "A call is already ongoing on this job", code: "CALL_ACTIVE" },
+          { status: 409 }
+        );
+      }
+    }
+
+    // 2. Determine recipient
     const currentCaller = (callerId || "").trim();
     const jobCustomer = (job.customerId || "").trim();
     const jobArtisan = (job.artisanId || "").trim();
@@ -60,7 +78,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Fetch caller & receiver profiles concurrently for immediate display (zero 'Someone' delays)
+    // 3. Fetch caller & receiver profiles concurrently for immediate display (zero 'Someone' delays)
     let fcmToken: string | undefined;
     let callerName: string = "Caller";
     let callerPhoto: string | null = null;
@@ -100,49 +118,107 @@ export async function POST(req: NextRequest) {
       receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
     }
 
-    // 6. Write activeCall to Firestore atomically with full profile info
+    // 4. Generate unique identifiers and server-assigned Agora UIDs
+    const callId = attemptId || `call_${jobId}_${now}_${Math.random().toString(36).substring(2, 7)}`;
+    const callerAgoraUid = 1000 + Math.floor(Math.random() * 8000);
+    const calleeAgoraUid = 10000 + Math.floor(Math.random() * 8000);
+    const ringExpiresAt = now + 45000;
+    const channelName = `${jobId}_${now}`;
+
+    const activeCallPayload = {
+      callId,
+      jobId,
+      channelName,
+      rev: 1,
+      status: "ringing",
+      type: callType,
+      callType,
+      callerId,
+      callerName,
+      callerPhoto,
+      receiverId,
+      receiverName,
+      receiverPhoto,
+      callerSessionId: callerSessionId || null,
+      acceptedBySession: null,
+      caller: {
+        uid: callerId,
+        displayName: callerName,
+        photoUrl: callerPhoto,
+        role: currentCaller === jobCustomer ? "customer" : "artisan",
+        agoraUid: callerAgoraUid,
+      },
+      callee: {
+        uid: receiverId,
+        displayName: receiverName,
+        photoUrl: receiverPhoto,
+        role: receiverId === jobCustomer ? "customer" : "artisan",
+        agoraUid: calleeAgoraUid,
+      },
+      timestamp: now,
+      createdAt: now,
+      ringExpiresAt,
+      connectedAt: null,
+      bothConnectedAt: null,
+      endedAt: null,
+      endedBy: null,
+      endedReason: null,
+    };
+
+    // 5. Write activeCall to Firestore
     await jobRef.update({
-      activeCall: {
-        channelName: `${jobId}_${now}`,
+      activeCall: activeCallPayload,
+    });
+
+    // 6. Write users/{receiverId}/callInbox/{callId} for indexed global listening
+    adminDb
+      .collection("users")
+      .doc(receiverId)
+      .collection("callInbox")
+      .doc(callId)
+      .set({
+        callId,
+        jobId,
+        channelName,
+        callType,
         callerId,
         callerName,
         callerPhoto,
-        receiverId,
-        receiverName,
-        receiverPhoto,
-        callerSessionId: callerSessionId || null,
-        type: callType,
         status: "ringing",
-        timestamp: now,
-        connectedAt: null,
-        bothConnectedAt: null,
-      },
-    });
+        createdAt: now,
+        ringExpiresAt,
+      })
+      .catch((err) => console.warn("Failed to write callInbox document:", err));
 
     // 7. Log audit event
     await writeJobEvent(jobId, "call_initiated", callerId, {
+      callId,
       type: callType,
       receiverId,
     });
 
-    // 8. Send high-priority FCM data-only push (so Java CustomMessagingService handles native ringing)
+    // 8. Send high-priority FCM data-only push
     if (fcmToken) {
       try {
         await getMessaging(adminApp_).send({
           token: fcmToken,
-          // Data-only: CustomMessagingService shows the native call notification + ringtone
           data: {
             type: "call",
+            callId,
             requestId: jobId,
+            jobId,
             callType,
             callerName: callerName || "Someone",
             title: callerName || "Incoming Call",
             body: `Incoming ${callType} call`,
-            channelName: `${jobId}_${now}`,
+            channelName,
           },
           android: { priority: "high" },
           apns: {
-            headers: { "apns-priority": "10" },
+            headers: {
+              "apns-priority": "10",
+              "apns-expiration": Math.floor(ringExpiresAt / 1000).toString(),
+            },
             payload: {
               aps: {
                 alert: {
@@ -156,12 +232,17 @@ export async function POST(req: NextRequest) {
           },
         });
       } catch (fcmErr: any) {
-        // Non-fatal — Firestore update is the source of truth; client will see it via listener
         console.warn("FCM push for call initiation failed:", fcmErr?.message);
       }
     }
 
-    return NextResponse.json({ success: true, receiverId });
+    return NextResponse.json({
+      success: true,
+      callId,
+      channelName,
+      receiverId,
+      activeCall: activeCallPayload,
+    });
   } catch (error: any) {
     console.error("Error initiating call:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

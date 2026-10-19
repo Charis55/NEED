@@ -7,7 +7,8 @@ import { JobRequest, ArtisanProfile } from "@/types";
 import { Phone, MessageSquare, Bike, Star } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
 import dynamicImport from "next/dynamic";
-import { sessionId } from "@/utils/sessionId";
+import { getSessionId } from "@/utils/sessionId";
+import { apiFetch } from "@/utils/apiBase";
 
 const TrackingMap = dynamicImport(() => import("@/components/TrackingMap"), { ssr: false, loading: () => <GlobalSpinner text="LOADING TRACKING MAP" /> });
 
@@ -33,30 +34,23 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
     if (!job || !technician) return;
     try {
       const { auth } = await import("@/lib/firebase");
-      const { updateDoc, doc } = await import("firebase/firestore");
       const currentUser = auth.currentUser;
       if (!currentUser) return;
       
-      await updateDoc(doc(db, "jobRequests", job.requestId), {
-        activeCall: {
-          channelName: job.requestId,
-          callerId: currentUser.uid,
-          callerSessionId: sessionId,
-          type: "audio",
-          status: "ringing",
-          timestamp: Date.now()
-        }
-      });
-      fetch("/api/send-notification", {
+      const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: technician.userId,
-          title: `Incoming audio call`,
-          body: `${currentUser.displayName || 'Customer'} is calling you`,
-          data: { requestId: job.requestId, type: "call" }
-        })
-      }).catch(err => console.error("Push failed:", err));
+          jobId: job.requestId,
+          callerId: currentUser.uid,
+          callType: "audio",
+          callerSessionId: getSessionId(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        console.warn("Call initiation rejected:", data.error);
+      }
     } catch (err) {
       console.error(err);
     }

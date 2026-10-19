@@ -1,42 +1,32 @@
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { NextRequest, NextResponse } from "next/server";
+import { POST as transitionPOST } from "../transition/route";
 
-export async function POST(req: Request) {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const requestId = body.requestId || body.jobId;
-    const sessionId = body.sessionId || 'native-answer';
-
-    if (!requestId) {
-      return NextResponse.json({ error: 'Missing requestId' }, { status: 400 });
-    }
-
-    const jobRef = adminDb.collection('jobRequests').doc(requestId);
-    const jobSnap = await jobRef.get();
-
-    if (!jobSnap.exists) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-    }
-
-    const jobData = jobSnap.data()!;
-    const activeCall = jobData.activeCall;
-
-    // Guard: only transition to ongoing if the call is ringing
-    if (!activeCall || activeCall.status !== 'ringing') {
-      return NextResponse.json({ success: true, status: activeCall?.status || 'none' });
-    }
-
-    // Update Firestore so both caller and callee real-time listeners trigger
-    await jobRef.update({
-      'activeCall.status': 'ongoing',
-      'activeCall.connectedAt': Date.now(),
-      'activeCall.bothConnectedAt': null,
-      'activeCall.acceptedBySession': sessionId,
+    const proxyReq = new NextRequest(new URL("/api/calls/transition", req.url), {
+      method: "POST",
+      headers: req.headers,
+      body: JSON.stringify({
+        jobId: body.requestId || body.jobId,
+        action: "accept",
+        sessionId: body.sessionId || "native-answer",
+        callerId: body.userId || body.callerId,
+      }),
     });
-
-    return NextResponse.json({ success: true, status: 'ongoing' });
+    return transitionPOST(proxyReq);
   } catch (error: any) {
-    console.error('Error accepting call:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error in /api/calls/accept:", error);
+    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 }
