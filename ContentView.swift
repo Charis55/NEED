@@ -175,9 +175,9 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     nonisolated func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
+        let isMuted = action.isMuted
         action.fulfill()
         Task { @MainActor in
-            let isMuted = action.isMuted
             NativeCallKitManager.shared.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeMuteToggle', { detail: { isMuted: \(isMuted) } }))", completionHandler: nil)
         }
     }
