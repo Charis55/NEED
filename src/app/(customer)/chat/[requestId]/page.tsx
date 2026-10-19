@@ -13,6 +13,7 @@ import { ChevronLeft, ChevronRight, Send, Image as ImageIcon, X, Mic, AlertTrian
 import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import { sessionId } from "@/utils/sessionId";
+import { apiFetch } from "@/utils/apiBase";
 import AdUnit from "@/components/AdUnit";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
@@ -703,19 +704,20 @@ export default function ChatPage() {
     }
     showAlert("Starting call...", "success");
     try {
-      const res = await fetch("/api/calls/initiate", {
+      const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: requestId,
           callerId: currentUser.uid,
           callType: type,
+          callerSessionId: sessionId,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (data.code === "CALL_STATE_GATE") {
-          showAlert("Calls are only available once a job is confirmed.", "error");
+          showAlert(data.error || "Calls are not permitted for this job.", "error");
         } else if (data.code === "CALL_ACTIVE") {
           showAlert("A call is already active on this job.", "error");
         } else {

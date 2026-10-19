@@ -36,6 +36,8 @@ import { Geolocation } from "@capacitor/geolocation";
 import { formatDateTime12Hour, to12HourFormat } from "@/utils/formatTime";
 import { reverseGeocode, geocode } from "@/utils/location";
 import BrutalCelebrationIcon from "@/components/BrutalCelebrationIcon";
+import { apiFetch } from "@/utils/apiBase";
+import { sessionId } from "@/utils/sessionId";
 
 export default function CustomerManageJobPage() {
   return (
@@ -353,19 +355,20 @@ function JobsContent() {
     setCallingInProgress(true);
     showAlert("Connecting in-app voice call...", "success");
     try {
-      const res = await fetch("/api/calls/initiate", {
+      const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: job.requestId,
           callerId: user.uid,
           callType,
+          callerSessionId: sessionId,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (data.code === "CALL_STATE_GATE") {
-          showAlert("Calls are only permitted once a job is confirmed.", "error");
+          showAlert(data.error || "Calls are not permitted for this job.", "error");
         } else if (data.code === "CALL_ACTIVE") {
           showAlert("A call is already active on this job.", "error");
         } else {

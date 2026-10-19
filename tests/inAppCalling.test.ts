@@ -39,6 +39,11 @@ interface Job {
 // ─── Logic under test (pure functions extracted from the route) ────────────────
 
 const ALLOWED_STATES = [
+  "pending",
+  "countered",
+  "payment_pending",
+  "awaiting_deposit",
+  "negotiating",
   "accepted",
   "confirmed",
   "en_route",
@@ -127,21 +132,26 @@ const makeJob = (overrides: Partial<Job> = {}): Job => ({
 });
 
 describe("call state gate", () => {
-  it("blocks calls when job is in pending state", () => {
+  it("allows calls when job is in pending state", () => {
     const result = initiateCall(makeJob({ state: "pending" }), "cust_1", "audio");
-    assert.ok("code" in result);
-    assert.equal((result as any).code, "CALL_STATE_GATE");
-    assert.equal((result as any).status, 403);
+    assert.ok("success" in result);
+    assert.equal((result as any).success, true);
   });
 
-  it("blocks calls when job is in negotiating state", () => {
+  it("allows calls when job is in negotiating state", () => {
     const result = initiateCall(makeJob({ state: "negotiating" }), "cust_1", "audio");
-    assert.ok("code" in result);
-    assert.equal((result as any).code, "CALL_STATE_GATE");
+    assert.ok("success" in result);
+    assert.equal((result as any).success, true);
   });
 
   it("blocks calls when job is cancelled", () => {
     const result = initiateCall(makeJob({ state: "cancelled" }), "cust_1", "audio");
+    assert.ok("code" in result);
+    assert.equal((result as any).code, "CALL_STATE_GATE");
+  });
+
+  it("blocks calls when job is declined", () => {
+    const result = initiateCall(makeJob({ state: "declined" }), "cust_1", "audio");
     assert.ok("code" in result);
     assert.equal((result as any).code, "CALL_STATE_GATE");
   });

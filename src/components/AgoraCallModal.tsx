@@ -181,6 +181,7 @@ export default function AgoraCallModal({
     
     apiFetch('/api/agora/token', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channelName, uid })
     })
       .then(res => res.json())

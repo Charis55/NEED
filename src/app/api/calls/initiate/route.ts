@@ -16,6 +16,11 @@ import { writeJobEvent } from "@/lib/jobEvents";
  */
 
 const ALLOWED_STATES = [
+  "pending",
+  "countered",
+  "payment_pending",
+  "awaiting_deposit",
+  "negotiating",
   "accepted",
   "confirmed",
   "en_route",
@@ -27,7 +32,7 @@ const ALLOWED_STATES = [
 
 export async function POST(req: NextRequest) {
   try {
-    const { jobId, callerId, callType } = await req.json();
+    const { jobId, callerId, callType, callerSessionId } = await req.json();
 
     if (!jobId || !callerId || !callType) {
       return NextResponse.json(
@@ -52,17 +57,30 @@ export async function POST(req: NextRequest) {
 
     const job = jobSnap.data()!;
 
-    // 1. State gate — calls only allowed once job is active/confirmed/accepted
-    const jobState = job.state || job.status || "";
+    // 1. State gate — check for explicitly cancelled or declined jobs
+    const currentStatus = (job.status || "").toLowerCase();
+    const currentState = (job.state || "").toLowerCase();
+    if (currentStatus === "cancelled" || currentState === "cancelled") {
+      return NextResponse.json(
+        { error: "Calls are not permitted for cancelled jobs.", code: "CALL_STATE_GATE" },
+        { status: 403 }
+      );
+    }
+    if (currentStatus === "declined" || currentState === "declined") {
+      return NextResponse.json(
+        { error: "Calls are not permitted for declined jobs.", code: "CALL_STATE_GATE" },
+        { status: 403 }
+      );
+    }
+
     const isAllowed = 
-      ALLOWED_STATES.includes(jobState) ||
-      ALLOWED_STATES.includes(job.status || "") ||
-      ALLOWED_STATES.includes(job.state || "");
+      ALLOWED_STATES.includes(currentStatus) ||
+      ALLOWED_STATES.includes(currentState);
 
     if (!isAllowed) {
       return NextResponse.json(
         {
-          error: `Calls are only available once a job is confirmed. Current state: ${jobState}`,
+          error: `Calls are not permitted for jobs in state: ${currentState || currentStatus}`,
           code: "CALL_STATE_GATE",
         },
         { status: 403 }
@@ -77,16 +95,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Concurrency guard — reject if a call is already ringing or ongoing
+    // 3. Concurrency guard — reject if a call is actively ringing (<45s) or ongoing (<2h)
+    const now = Date.now();
     const existingCall = job.activeCall;
-    if (
-      existingCall &&
-      (existingCall.status === "ringing" || existingCall.status === "ongoing")
-    ) {
-      return NextResponse.json(
-        { error: "A call is already active on this job", code: "CALL_ACTIVE" },
-        { status: 409 }
-      );
+    if (existingCall) {
+      const isRinging = existingCall.status === "ringing";
+      const isOngoing = existingCall.status === "ongoing";
+      const ringingStale = isRinging && (now - (existingCall.timestamp || 0) > 45000);
+      const ongoingStale = isOngoing && (now - (existingCall.bothConnectedAt || existingCall.connectedAt || existingCall.timestamp || 0) > 2 * 60 * 60 * 1000);
+
+      if ((isRinging && !ringingStale) || (isOngoing && !ongoingStale)) {
+        // Allow the same caller to retry if their previous ringing call was initiated > 15s ago
+        const isSameCallerRetry = existingCall.callerId === callerId && (now - (existingCall.timestamp || 0) > 15000);
+        if (!isSameCallerRetry) {
+          return NextResponse.json(
+            { error: "A call is already active on this job", code: "CALL_ACTIVE" },
+            { status: 409 }
+          );
+        }
+      }
     }
 
     // 4. Determine recipient
@@ -95,18 +122,17 @@ export async function POST(req: NextRequest) {
 
     if (!receiverId) {
       return NextResponse.json(
-        { error: "Could not determine call recipient" },
+        { error: "Could not determine call recipient. Please ensure a technician is assigned to this request." },
         { status: 400 }
       );
     }
 
-    const now = Date.now();
-
-    // 5. Write activeCall to Firestore atomically with unique session channelName
+    // 5. Write activeCall to Firestore atomically with unique session channelName and callerSessionId
     await jobRef.update({
       activeCall: {
         channelName: `${jobId}_${now}`,
         callerId,
+        callerSessionId: callerSessionId || null,
         type: callType,
         status: "ringing",
         timestamp: now,

@@ -9,6 +9,7 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import dynamicImport from "next/dynamic";
 import { geocode } from "@/utils/location";
 import { sessionId } from "@/utils/sessionId";
+import { apiFetch } from "@/utils/apiBase";
 
 const TechnicianRoutingMap = dynamicImport(() => import("./TechnicianRoutingMap"), { ssr: false, loading: () => <GlobalSpinner text="LOADING MAP" /> });
 
@@ -40,13 +41,14 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
       
-      const res = await fetch("/api/calls/initiate", {
+      const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: job.requestId,
           callerId: currentUser.uid,
           callType: "audio",
+          callerSessionId: sessionId,
         }),
       });
       if (!res.ok) {

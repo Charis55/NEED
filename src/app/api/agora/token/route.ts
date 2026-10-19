@@ -33,16 +33,11 @@ export async function POST(req: Request) {
       const jobSnap = await adminDb.collection("jobRequests").doc(channelName).get();
       if (jobSnap.exists) {
         const job = jobSnap.data();
-        const allowedStates = ["accepted", "confirmed", "en_route", "arrived", "in_progress", "awaiting_customer_confirmation", "completed"];
-        const jobState = job?.state || job?.status || "";
-        const isAllowed = 
-          allowedStates.includes(jobState) ||
-          allowedStates.includes(job?.status || "") ||
-          allowedStates.includes(job?.state || "");
-
-        if (job && !isAllowed) {
+        const currentStatus = (job?.status || "").toLowerCase();
+        const currentState = (job?.state || "").toLowerCase();
+        if (currentStatus === "cancelled" || currentState === "cancelled" || currentStatus === "declined" || currentState === "declined") {
           return NextResponse.json(
-            { error: "Calls are only available after the booking is confirmed." },
+            { error: "Calls are disabled for cancelled or declined jobs." },
             { status: 403, headers: corsHeaders }
           );
         }

@@ -75,7 +75,7 @@ export default function GlobalCallManager() {
         const status = data.activeCall.status;
         if (status === "ringing") {
           const ringingAge = now - (data.activeCall.timestamp || 0);
-          if (ringingAge > 45000) {
+          if (ringingAge > 60000 || ringingAge < -30000) {
             if (data.activeCall.callerId === userUid) {
               updateDoc(doc(db, "jobRequests", data.requestId), {
                 "activeCall.status": "ended",
@@ -135,13 +135,13 @@ export default function GlobalCallManager() {
 
     const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", userUid));
     const unsubArtisan = onSnapshot(qArtisan, (snap) => {
-      artisanJobs = snap.docs.map(d => d.data() as JobRequest);
+      artisanJobs = snap.docs.map(d => ({ requestId: d.id, ...d.data() }) as JobRequest);
       updateCombined(artisanJobs, customerJobs);
     }, handleError);
 
     const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", userUid));
     const unsubCustomer = onSnapshot(qCustomer, (snap) => {
-      customerJobs = snap.docs.map(d => d.data() as JobRequest);
+      customerJobs = snap.docs.map(d => ({ requestId: d.id, ...d.data() }) as JobRequest);
       updateCombined(artisanJobs, customerJobs);
     }, handleError);
 
@@ -455,11 +455,20 @@ export default function GlobalCallManager() {
 
   const { activeCall } = activeJob;
   const isCaller = activeCall.callerId === userUid;
-  const isThisDeviceCaller = isCaller;
-  const isThisDeviceReceiver = !isCaller;
+
+  // Multi-session / same-account isolation:
+  // 1. Caller device: only the specific device/tab (matching callerSessionId) shows OutgoingCallModal and connects to Agora
+  const isThisDeviceCaller = isCaller && (!activeCall.callerSessionId || activeCall.callerSessionId === sessionId);
+
+  // 2. Receiver device: rings on all devices of the recipient account; once answered, only the specific device that accepted (matching acceptedBySession) connects to Agora
+  const isThisDeviceAcceptedReceiver = !isCaller && (!activeCall.acceptedBySession || activeCall.acceptedBySession === sessionId);
+
   const isRingingForMe = activeCall.status === "ringing" && !isCaller;
-  const isRingingByMe = activeCall.status === "ringing" && isCaller;
-  const isOngoingForMe = activeCall.status === "ongoing";
+  const isRingingByMe = activeCall.status === "ringing" && isThisDeviceCaller;
+  const isOngoingForMe = activeCall.status === "ongoing" && (isCaller ? isThisDeviceCaller : isThisDeviceAcceptedReceiver);
+
+  // If this device is the caller on another device, or receiver not accepted on this device, don't show overlay
+  if (!isRingingForMe && !isRingingByMe && !isOngoingForMe) return null;
 
   // Validate bothConnectedAt: only valid if it occurred on or after the current call's timestamp
   const validBothConnectedAt = 

@@ -20,8 +20,21 @@ export default function IncomingCallModal({
   onDecline
 }: IncomingCallModalProps) {
   useEffect(() => {
-    // We now handle ringing and vibrating natively via SocialNotificationPlugin
-    // This allows it to obey the device's ringer mode correctly.
+    let audio: HTMLAudioElement | null = null;
+    if (typeof window !== "undefined") {
+      // Audible looping ringtone for incoming calls (web & mobile)
+      audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
+      audio.loop = true;
+      audio.volume = 0.85;
+      audio.play().catch(e => console.warn("Incoming ring auto-play prevented:", e));
+    }
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = "";
+      }
+    };
   }, []);
 
 

@@ -49,4 +49,6 @@ next-env.d.ts
 serviceAccountKey.json
 *.serviceAccountKey.json
 service-account*.json
+GoogleService-Info.plist
+*.ipa
 scratch/
