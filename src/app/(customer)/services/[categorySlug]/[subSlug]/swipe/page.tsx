@@ -215,20 +215,21 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
         });
 
         const populateNames = async (list: (ArtisanProfile & { distance?: number; firstName?: string; lastName?: string })[]) => {
-          for (let i = 0; i < list.length; i++) {
-            if (!list[i].name && !list[i].firstName) {
+          const promises = list.map(async (item) => {
+            if (!item.name && !item.firstName) {
               try {
-                const userDoc = await getDoc(doc(db, "users", list[i].artisanId || list[i].userId));
+                const userDoc = await getDoc(doc(db, "users", item.artisanId || item.userId));
                 if (userDoc.exists()) {
                   const ud = userDoc.data();
-                  list[i].firstName = ud.firstName;
-                  list[i].lastName = ud.lastName;
-                  list[i].name = ud.firstName ? `${ud.firstName} ${ud.lastName}`.trim() : ud.displayName;
+                  item.firstName = ud.firstName;
+                  item.lastName = ud.lastName;
+                  item.name = ud.firstName ? `${ud.firstName} ${ud.lastName}`.trim() : ud.displayName;
                 }
               } catch (e) {}
             }
-          }
-          return list;
+            return item;
+          });
+          return await Promise.all(promises);
         };
 
         const result = await populateNames(data);

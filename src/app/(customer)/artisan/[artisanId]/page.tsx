@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { ArtisanProfile, Review } from "@/types";
 import { ChevronLeft, Star, MapPin, BadgeCheck, Clock, Calendar, X } from "lucide-react";
 import BackButton from "@/components/BackButton";
@@ -21,39 +21,109 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchProfile = async () => {
       try {
-        const docRef = doc(db, "artisans", unwrappedParams.artisanId);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          setArtisan(docSnap.data() as ArtisanProfile);
-          
-          const userDocSnap = await getDoc(doc(db, "users", unwrappedParams.artisanId));
-          if (userDocSnap.exists()) {
-            setArtisanUser(userDocSnap.data());
+        const id = unwrappedParams.artisanId;
+        if (!id) {
+          setLoading(false);
+          return;
+        }
+
+        let foundArtisan: ArtisanProfile | null = null;
+
+        // 1. Direct document lookup
+        try {
+          const docRef = doc(db, "artisans", id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            foundArtisan = { ...data, artisanId: data.artisanId || docSnap.id } as ArtisanProfile;
           }
-          
-          // Fetch Reviews
-          const q = query(
+        } catch (e) {
+          console.warn("Direct artisan lookup failed, trying queries:", e);
+        }
+
+        // 2. Query fallback by artisanId field
+        if (!foundArtisan) {
+          try {
+            const q = query(collection(db, "artisans"), where("artisanId", "==", id), limit(1));
+            const qSnap = await getDocs(q);
+            if (!qSnap.empty) {
+              const d = qSnap.docs[0];
+              foundArtisan = { ...d.data(), artisanId: d.data().artisanId || d.id } as ArtisanProfile;
+            }
+          } catch (e) {
+            console.warn("Artisan query by artisanId failed:", e);
+          }
+        }
+
+        // 3. Query fallback by userId field
+        if (!foundArtisan) {
+          try {
+            const qUser = query(collection(db, "artisans"), where("userId", "==", id), limit(1));
+            const qUserSnap = await getDocs(qUser);
+            if (!qUserSnap.empty) {
+              const d = qUserSnap.docs[0];
+              foundArtisan = { ...d.data(), artisanId: d.data().artisanId || d.id } as ArtisanProfile;
+            }
+          } catch (e) {
+            console.warn("Artisan query by userId failed:", e);
+          }
+        }
+
+        if (isCancelled) return;
+
+        if (foundArtisan) {
+          setArtisan(foundArtisan);
+          setLoading(false);
+
+          // Non-blocking parallel background fetches for user info and reviews
+          const userIdToFetch = foundArtisan.userId || foundArtisan.artisanId || id;
+          getDoc(doc(db, "users", userIdToFetch))
+            .then(userSnap => {
+              if (!isCancelled && userSnap.exists()) {
+                setArtisanUser(userSnap.data());
+              }
+            })
+            .catch(e => console.warn("Could not fetch user profile:", e));
+
+          const reviewsQuery = query(
             collection(db, "reviews"),
-            where("artisanId", "==", unwrappedParams.artisanId),
+            where("artisanId", "==", foundArtisan.artisanId || id)
           );
-          const reviewSnap = await getDocs(q);
-          const reviewData = reviewSnap.docs.map(d => d.data() as Review).sort((a, b) => b.createdAt - a.createdAt);
-          setReviews(reviewData);
+          getDocs(reviewsQuery)
+            .then(reviewSnap => {
+              if (!isCancelled) {
+                const reviewData = reviewSnap.docs
+                  .map(d => d.data() as Review)
+                  .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                setReviews(reviewData);
+              }
+            })
+            .catch(e => console.warn("Could not fetch reviews:", e));
         } else {
-          router.push("/explore");
+          setLoading(false);
         }
       } catch (err) {
         console.error("Failed to fetch artisan profile", err);
-      } finally {
-        setLoading(false);
+        if (!isCancelled) setLoading(false);
       }
     };
-    
+
     fetchProfile();
-  }, [unwrappedParams.artisanId, router]);
+
+    // Safety timeout: never let loading spinner lock the UI longer than 4.5 seconds
+    const safetyTimer = setTimeout(() => {
+      if (!isCancelled) setLoading(false);
+    }, 4500);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(safetyTimer);
+    };
+  }, [unwrappedParams.artisanId]);
 
   if (loading) {
     return (
@@ -63,7 +133,30 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
     );
   }
 
-  if (!artisan) return null;
+  if (!artisan) {
+    return (
+      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white border-4 border-black p-8 brutal-shadow max-w-md w-full">
+          <div className="w-16 h-16 bg-[var(--color-brutal-pink)] border-4 border-black flex items-center justify-center mx-auto mb-4 brutal-shadow-sm">
+            <X className="w-8 h-8 stroke-[3]" />
+          </div>
+          <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Technician Not Found</h2>
+          <p className="font-bold text-gray-600 mb-6 text-sm uppercase">
+            This profile may be inactive or unavailable. Explore other verified technicians.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => router.push("/explore")}
+              className="w-full py-3 bg-[var(--color-brutal-yellow)] border-4 border-black font-black uppercase brutal-shadow-sm hover:-translate-y-1 transition-transform"
+            >
+              EXPLORE TECHNICIANS
+            </button>
+            <BackButton className="w-full py-3 bg-white border-4 border-black font-black uppercase brutal-shadow-sm rounded-none hover:bg-gray-100" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[var(--color-brutal-bg)] min-h-screen flex flex-col font-sans pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
@@ -96,7 +189,7 @@ export default function ArtisanProfilePage({ params }: { params: Promise<{ artis
             />
           </div>
           
-          <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-tight">{artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName}` : "Technician")}</h1>
+          <h1 className="text-4xl font-black text-black uppercase tracking-tighter leading-tight">{artisan.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName}`.trim() : "Technician")}</h1>
           {artisan.services && artisan.services.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-2 mt-2 max-w-sm">
               {artisan.services.map((svc, i) => (

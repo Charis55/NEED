@@ -22,6 +22,21 @@ interface AudioTogglePlugin {
 
 const AudioToggle = registerPlugin<AudioTogglePlugin>("AudioToggle");
 
+const notifyNativeCall = (action: string, payload?: Record<string, any>) => {
+  if (typeof window === "undefined") return;
+  try {
+    const webkit = (window as any).webkit;
+    if (webkit?.messageHandlers?.needNative) {
+      webkit.messageHandlers.needNative.postMessage({
+        action,
+        ...payload
+      });
+    }
+  } catch (e) {
+    console.warn("notifyNativeCall failed:", e);
+  }
+};
+
 interface AgoraCallModalProps {
   channelName: string;
   uid: string;
@@ -78,24 +93,31 @@ export default function AgoraCallModal({
     }
 
     return () => {
-      // Ensure audio routing is reset to normal and notification is dismissed when exiting call
-      if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-        AudioToggle.stopOngoingCall().catch(e => console.warn("AudioToggle stopOngoingCall failed on unmount:", e));
-        AudioToggle.setAudioMode({ mode: "normal" }).catch(e =>
-          console.warn("AudioToggle reset failed on unmount:", e)
-        );
+      // Ensure audio routing is reset to normal and native call is ended
+      if (typeof window !== "undefined") {
+        if (Capacitor.isNativePlatform()) {
+          AudioToggle.stopOngoingCall().catch(e => console.warn("AudioToggle stopOngoingCall failed on unmount:", e));
+          AudioToggle.setAudioMode({ mode: "normal" }).catch(e =>
+            console.warn("AudioToggle reset failed on unmount:", e)
+          );
+        }
+        notifyNativeCall("endCall");
       }
     };
   }, []);
 
-  // When call connects, set initial audio route
+  // When call connects, set initial audio route and notify native CallKit / Dynamic Island
   useEffect(() => {
-    if (joined && typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-      AudioToggle.setAudioMode({ mode: speakerOn ? "speaker" : "earpiece" }).catch(e =>
-        console.warn("AudioToggle initial route failed:", e)
-      );
+    if (joined && typeof window !== "undefined") {
+      if (Capacitor.isNativePlatform()) {
+        AudioToggle.setAudioMode({ mode: speakerOn ? "speaker" : "earpiece" }).catch(e =>
+          console.warn("AudioToggle initial route failed:", e)
+        );
+      }
+      notifyNativeCall("startCall", { partnerName, isVideo });
+      notifyNativeCall("setAudioMode", { mode: speakerOn ? "speaker" : "earpiece" });
     }
-  }, [joined]);
+  }, [joined, partnerName, isVideo]);
 
   // Clean, monotonic in-call timer: counts smoothly from 0 for the duration of the call on this device
   useEffect(() => {
@@ -135,14 +157,17 @@ export default function AgoraCallModal({
 
   const toggleSpeaker = async () => {
     const nextSpeakerState = !speakerOn;
-    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-      try {
-        await AudioToggle.setAudioMode({ mode: nextSpeakerState ? "speaker" : "earpiece" });
-      } catch (err) {
-        console.warn("AudioToggle setAudioMode failed:", err);
-      }
-    }
     setSpeakerOn(nextSpeakerState);
+    if (typeof window !== 'undefined') {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await AudioToggle.setAudioMode({ mode: nextSpeakerState ? "speaker" : "earpiece" });
+        } catch (err) {
+          console.warn("AudioToggle setAudioMode failed:", err);
+        }
+      }
+      notifyNativeCall("setAudioMode", { mode: nextSpeakerState ? "speaker" : "earpiece" });
+    }
   };
 
   const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID;
@@ -234,8 +259,12 @@ export default function AgoraCallModal({
           }
         });
 
-        client.on("user-left", (user) => {
+        client.on("user-left", (user, reason) => {
+          console.log(`[Agora] Remote user ${user.uid} left with reason: ${reason}`);
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+          if (reason === "Quit") {
+            leaveCallRef.current();
+          }
         });
 
         // 1. Create local tracks with discrete voice filtering (AEC, ANS, AGC)
@@ -396,12 +425,16 @@ export default function AgoraCallModal({
     }
   };
 
+
   const leaveCall = async () => {
-    if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-      AudioToggle.stopOngoingCall().catch(e => console.warn("AudioToggle stopOngoingCall failed in leaveCall:", e));
-      AudioToggle.setAudioMode({ mode: "normal" }).catch(e =>
-        console.warn("AudioToggle reset failed in leaveCall:", e)
-      );
+    if (typeof window !== "undefined") {
+      notifyNativeCall("endCall");
+      if (Capacitor.isNativePlatform()) {
+        AudioToggle.stopOngoingCall().catch(e => console.warn("AudioToggle stopOngoingCall failed in leaveCall:", e));
+        AudioToggle.setAudioMode({ mode: "normal" }).catch(e =>
+          console.warn("AudioToggle reset failed in leaveCall:", e)
+        );
+      }
     }
     if (typeof window !== "undefined") {
       const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3");
@@ -595,9 +628,10 @@ export default function AgoraCallModal({
             </button>
           )}
 
-          {typeof window !== "undefined" && Capacitor.getPlatform() !== "web" && (
+          {typeof window !== "undefined" && (
             <button 
               onClick={toggleSpeaker}
+              title={speakerOn ? "Loudspeaker On - Click to switch to discrete earpiece" : "Earpiece On - Click to switch to loudspeaker"}
               className={`flex-1 max-w-[4rem] aspect-square flex items-center justify-center border-4 border-black brutal-shadow-hover ${!speakerOn ? 'bg-[var(--color-brutal-yellow)] text-black' : 'bg-[var(--color-brutal-bg)] text-black'}`}
             >
               {speakerOn ? <Volume2 size={24} className="sm:w-8 sm:h-8" /> : <Ear size={24} className="sm:w-8 sm:h-8" />}

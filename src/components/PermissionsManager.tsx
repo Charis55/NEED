@@ -5,8 +5,9 @@ import { Capacitor } from "@capacitor/core";
 import { Camera } from "@capacitor/camera";
 import { Geolocation } from "@capacitor/geolocation";
 import { auth } from "@/lib/firebase";
-import { ShieldCheck, MapPin, Camera as CameraIcon, Bell, Mic, AlertTriangle } from "lucide-react";
+import { ShieldCheck, MapPin, Camera as CameraIcon, Bell, Mic, PhoneCall, AlertTriangle } from "lucide-react";
 import { useAlert } from "./AlertProvider";
+import { isNativeApp } from "@/utils/platform";
 
 export default function PermissionsManager() {
   const [show, setShow] = useState(false);
@@ -14,9 +15,11 @@ export default function PermissionsManager() {
   const { showAlert } = useAlert();
 
   useEffect(() => {
+    const isMobileApp = isNativeApp();
+
     // We wait for auth state to ensure we only bother logged in users
     const unsub = auth.onAuthStateChanged((user) => {
-      if (user && !localStorage.getItem("need_permissions_handled") && Capacitor.isNativePlatform()) {
+      if (user && !localStorage.getItem("need_permissions_handled") && isMobileApp) {
         // Adding a slight delay so it doesn't flash immediately over login transition
         setTimeout(() => setShow(true), 1500);
       } else {
@@ -55,6 +58,19 @@ export default function PermissionsManager() {
       } catch (e) {
         console.warn("Media devices permission issue:", e);
       }
+
+      // Request Geolocation
+      try {
+        if ("geolocation" in navigator) {
+          await new Promise<void>((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              () => resolve(),
+              () => resolve(),
+              { timeout: 4000 }
+            );
+          });
+        }
+      } catch (e) {}
       
       // Request Notifications
       try {
@@ -126,12 +142,12 @@ export default function PermissionsManager() {
               </div>
             </div>
 
-            {/* Mic */}
+            {/* Phone Calls & Mic */}
             <div className="flex items-start gap-4 border-4 border-black p-4 bg-white">
-              <Mic className="w-8 h-8 shrink-0 mt-1 stroke-[3]" />
+              <PhoneCall className="w-8 h-8 shrink-0 mt-1 stroke-[3] text-black" />
               <div>
-                <h3 className="font-black uppercase text-xl">Microphone</h3>
-                <p className="font-bold text-sm">To send voice notes and conduct in-app live calls.</p>
+                <h3 className="font-black uppercase text-xl">Phone Calls & Microphone</h3>
+                <p className="font-bold text-sm">To make and receive crystal-clear in-app calls and voice notes with technicians.</p>
               </div>
             </div>
 

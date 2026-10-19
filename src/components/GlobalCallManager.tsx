@@ -67,39 +67,35 @@ export default function GlobalCallManager() {
 
     const updateCombined = (artisanJobs: JobRequest[], customerJobs: JobRequest[]) => {
       const combined = [...artisanJobs, ...customerJobs];
-      
-      // Find if there's any active call (filter out stale / expired calls)
       const now = Date.now();
-      let foundJob: JobRequest | null = null;
-      for (const data of combined) {
-        if (data.activeCall) {
-          if (data.activeCall.status === "ringing") {
-            const ringingAge = now - (data.activeCall.timestamp || 0);
-            if (ringingAge > 45000) {
-              // Stale ringing call: auto-end in background if user is caller
-              if (data.activeCall.callerId === userUid) {
-                updateDoc(doc(db, "jobRequests", data.requestId), {
-                  "activeCall.status": "ended",
-                  "activeCall.endedAt": now,
-                  "activeCall.endedReason": "missed"
-                }).catch(() => {});
-              }
-              continue;
+      
+      // Filter out invalid/stale calls, prioritize by most recent activeCall timestamp
+      const candidateJobs = combined.filter((data) => {
+        if (!data.activeCall) return false;
+        const status = data.activeCall.status;
+        if (status === "ringing") {
+          const ringingAge = now - (data.activeCall.timestamp || 0);
+          if (ringingAge > 45000) {
+            if (data.activeCall.callerId === userUid) {
+              updateDoc(doc(db, "jobRequests", data.requestId), {
+                "activeCall.status": "ended",
+                "activeCall.endedAt": now,
+                "activeCall.endedReason": "missed"
+              }).catch(() => {});
             }
-            foundJob = data;
-            break;
+            return false;
           }
-          if (data.activeCall.status === "ongoing") {
-            const ongoingAge = now - (data.activeCall.bothConnectedAt || data.activeCall.connectedAt || data.activeCall.timestamp || 0);
-            if (ongoingAge > 2 * 60 * 60 * 1000) {
-              // Ignore stale ongoing call older than 2 hours
-              continue;
-            }
-            foundJob = data;
-            break;
-          }
+          return true;
         }
-      }
+        if (status === "ongoing") {
+          const ongoingAge = now - (data.activeCall.bothConnectedAt || data.activeCall.connectedAt || data.activeCall.timestamp || 0);
+          return ongoingAge <= 2 * 60 * 60 * 1000;
+        }
+        return false;
+      });
+
+      candidateJobs.sort((a, b) => (b.activeCall?.timestamp || 0) - (a.activeCall?.timestamp || 0));
+      const foundJob = candidateJobs.length > 0 ? candidateJobs[0] : null;
 
       setActiveJob((prev) => {
         // If we found a new call, fetch partner info
@@ -412,6 +408,7 @@ export default function GlobalCallManager() {
     clearCallNotification();
     playCallSound("pickup");
 
+    const targetJobId = activeJob.requestId;
     const updatedJob: JobRequest = {
       ...activeJob,
       activeCall: {
@@ -424,17 +421,22 @@ export default function GlobalCallManager() {
     };
     setActiveJob(updatedJob);
 
+    // Optimistically and authoritatively accept via server API using adminDb
+    apiFetch("/api/calls/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: targetJobId, sessionId }),
+    }).catch(err => console.warn("Failed to accept call via server:", err));
+
     try {
-      // Accept: directly update Firestore (no server logic needed — state gate
-      // is already enforced on initiation; accept just flips status to "ongoing")
-      await updateDoc(doc(db, "jobRequests", activeJob.requestId), {
+      await updateDoc(doc(db, "jobRequests", targetJobId), {
         "activeCall.status": "ongoing",
         "activeCall.connectedAt": Date.now(),
         "activeCall.bothConnectedAt": null,
         "activeCall.acceptedBySession": sessionId
       });
     } catch (e) {
-      console.error("Failed to accept call", e);
+      console.error("Failed to accept call via client updateDoc:", e);
     }
   };
 

@@ -4,7 +4,7 @@ import {
   initializeFirestore, 
   getFirestore, 
   persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentSingleTabManager 
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import type { Messaging } from "firebase/messaging";
@@ -26,11 +26,12 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
 // Enable persistent on-device IndexedDB cache so all queries, profiles, and chats load instantly on mobile
+// Using single tab manager avoids multi-tab lock contention that can hang queries in iOS WKWebView
 let db: ReturnType<typeof getFirestore>;
 try {
   if (typeof window !== "undefined") {
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      localCache: persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
     });
   } else {
     db = getFirestore(app);

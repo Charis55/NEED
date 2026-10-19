@@ -18,6 +18,8 @@ export default function FavoritesPage() {
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchFavorites = async () => {
       const user = auth.currentUser;
       if (!user) {
@@ -36,35 +38,79 @@ export default function FavoritesPage() {
         }
 
         if (savedArtisans.length === 0) {
-          setFavorites([]);
+          if (!isCancelled) {
+            setFavorites([]);
+            setLoading(false);
+          }
           return;
         }
         
-        const artisanPromises = savedArtisans.map(async (artisanId) => {
-          const artisanRef = doc(db, "artisans", artisanId);
-          const artisanSnap = await getDoc(artisanRef);
-          if (artisanSnap.exists()) {
-            return artisanSnap.data() as ArtisanProfile;
-          }
-          return null;
-        });
+        const fetchSingleArtisan = async (artisanId: string): Promise<ArtisanProfile | null> => {
+          try {
+            // Fast direct doc lookup with 2.5s timeout
+            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+            
+            const fetchPromise = (async () => {
+              const artisanRef = doc(db, "artisans", artisanId);
+              const artisanSnap = await getDoc(artisanRef);
+              if (artisanSnap.exists()) {
+                const data = artisanSnap.data();
+                return { ...data, artisanId: data.artisanId || artisanSnap.id } as ArtisanProfile;
+              }
 
-        const artisans = (await Promise.all(artisanPromises)).filter(Boolean) as ArtisanProfile[];
-        setFavorites(artisans);
+              // Fallback query by field
+              const { query, collection, where, limit, getDocs } = await import("firebase/firestore");
+              const q = query(collection(db, "artisans"), where("artisanId", "==", artisanId), limit(1));
+              const qSnap = await getDocs(q);
+              if (!qSnap.empty) {
+                const d = qSnap.docs[0];
+                return { ...d.data(), artisanId: d.data().artisanId || d.id } as ArtisanProfile;
+              }
+              return null;
+            })();
+
+            return await Promise.race([fetchPromise, timeoutPromise]);
+          } catch (e) {
+            console.warn(`Failed to fetch favorite artisan ${artisanId}:`, e);
+            return null;
+          }
+        };
+
+        const artisanPromises = savedArtisans.map(artisanId => fetchSingleArtisan(artisanId));
+        const results = await Promise.all(artisanPromises);
+        const artisans = results.filter(Boolean) as ArtisanProfile[];
+        
+        if (!isCancelled) {
+          setFavorites(artisans);
+          setLoading(false);
+        }
       } catch (error) {
         console.error("Error fetching favorites", error);
+        if (!isCancelled) setLoading(false);
       } finally {
-        setLoading(false);
+        if (!isCancelled) setLoading(false);
       }
     };
 
     const unsubscribe = auth.onAuthStateChanged(currentUser => {
       setUser(currentUser);
-      if (currentUser) fetchFavorites();
-      else setLoading(false);
+      if (currentUser) {
+        fetchFavorites();
+      } else {
+        setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    // Safety timeout: never let favorites screen hang longer than 4 seconds
+    const safetyTimer = setTimeout(() => {
+      if (!isCancelled) setLoading(false);
+    }, 4000);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   const handleRemoveFavorite = async (artisanId: string) => {
