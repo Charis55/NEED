@@ -204,24 +204,40 @@ export default function MultiServiceSwipePage({
         const snap = await getDocs(q);
         const allData = snap.docs.map(doc => doc.data() as ArtisanProfile);
 
+        const categoryDef = servicesData[unwrappedParams.categorySlug];
         const decodedCategory = decodeURIComponent(unwrappedParams.categorySlug).replace(/-/g, ' ');
-        const selectedServices = unwrappedSearchParams.services 
-          ? unwrappedSearchParams.services.split(',').map(s => decodeURIComponent(s).replace(/-/g, ' ').toLowerCase())
-          : [];
+        const expectedCategoryTitle = (categoryDef?.title || decodedCategory).trim().toLowerCase();
+
+        // Map any service IDs or slug names to canonical lower-cased subservice titles
+        const rawServices = unwrappedSearchParams.services ? unwrappedSearchParams.services.split(',') : [];
+        const selectedTitles = rawServices.map(raw => {
+          const clean = decodeURIComponent(raw).trim();
+          const found = categoryDef?.subServices?.find(
+            s => s.id === clean || s.title.toLowerCase() === clean.toLowerCase() || s.title.toLowerCase() === clean.replace(/-/g, ' ').toLowerCase()
+          );
+          return (found?.title || clean.replace(/-/g, ' ')).toLowerCase();
+        });
 
         const data = allData.filter(artisan => {
           // Do not show artisans who haven't completed setup
           if (artisan.onboardingStep !== undefined && artisan.onboardingStep < 6) return false;
 
           if (artisan.services && artisan.services.length > 0) {
-            return artisan.services.some(svc => 
-              svc.trade.toLowerCase() === decodedCategory.toLowerCase() && 
-              (selectedServices.length === 0 || selectedServices.includes(svc.subcategory.toLowerCase()))
-            );
+            return artisan.services.some(svc => {
+              const svcTrade = (svc.trade || "").trim().toLowerCase();
+              const svcSub = (svc.subcategory || "").trim().toLowerCase();
+              const tradeMatches = svcTrade === expectedCategoryTitle || svcTrade === decodedCategory.toLowerCase();
+              if (!tradeMatches) return false;
+              if (selectedTitles.length === 0) return true;
+              return selectedTitles.some(sel => sel === svcSub || sel === svcSub.replace(/-/g, ' '));
+            });
           }
-          return artisan.trade?.toLowerCase() === decodedCategory.toLowerCase() && 
-                 artisan.subcategory && 
-                 (selectedServices.length === 0 || selectedServices.includes(artisan.subcategory.toLowerCase()));
+          const artTrade = (artisan.trade || "").trim().toLowerCase();
+          const artSub = (artisan.subcategory || "").trim().toLowerCase();
+          const tradeMatches = artTrade === expectedCategoryTitle || artTrade === decodedCategory.toLowerCase();
+          if (!tradeMatches || !artSub) return false;
+          if (selectedTitles.length === 0) return true;
+          return selectedTitles.some(sel => sel === artSub || sel === artSub.replace(/-/g, ' '));
         });
 
         const populateNames = async (list: (ArtisanProfile & { distance?: number; firstName?: string; lastName?: string })[]) => {

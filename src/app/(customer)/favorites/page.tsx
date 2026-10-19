@@ -10,8 +10,13 @@ import GlobalSpinner from "@/components/GlobalSpinner";
 import { ArtisanProfile } from "@/types";
 import { Heart, Star, X, Eye } from "lucide-react";
 
+import { useOptionalAuth } from "@/hooks/useOptionalAuth";
+import { apiFetch } from "@/utils/apiBase";
+
 export default function FavoritesPage() {
   const router = useRouter();
+  const { user: authUser, loading: authLoading } = useOptionalAuth();
+
   const [favorites, setFavorites] = useState<ArtisanProfile[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -30,27 +35,45 @@ export default function FavoritesPage() {
       return true;
     }
   });
-  const [user, setUser] = useState<any>(() => auth.currentUser || null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
 
-    const fetchFavorites = async () => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        setLoading(false);
-        return;
+    const fetchFavorites = async (currentUid: string) => {
+      // 1. Primary: Fast server API route using adminDb (50ms response, zero auth latency)
+      try {
+        const res = await apiFetch(`/api/favorites?userId=${encodeURIComponent(currentUid)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.favorites) && !isCancelled) {
+            setFavorites(data.favorites);
+            setLoading(false);
+            try {
+              localStorage.setItem("need_favorites_cache", JSON.stringify(data.favorites));
+              localStorage.setItem(`need_favorites_cache_${currentUid}`, JSON.stringify(data.favorites));
+            } catch {}
+            return;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Favorites API error, trying direct Firestore fallback:", apiErr);
       }
 
+      // 2. Secondary: Direct Firestore query fallback
       try {
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
+        const userDocRef = doc(db, "users", currentUid);
+        let userDoc = await getDoc(userDocRef);
         
         let savedArtisans: string[] = [];
         if (userDoc.exists()) {
           const data = userDoc.data();
           savedArtisans = data.savedArtisans || [];
+        } else {
+          const artisanDoc = await getDoc(doc(db, "artisans", currentUid));
+          if (artisanDoc.exists()) {
+            savedArtisans = artisanDoc.data().savedArtisans || [];
+          }
         }
 
         if (savedArtisans.length === 0) {
@@ -66,29 +89,21 @@ export default function FavoritesPage() {
         
         const fetchSingleArtisan = async (artisanId: string): Promise<ArtisanProfile | null> => {
           try {
-            // Fast direct doc lookup with 2.5s timeout
-            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-            
-            const fetchPromise = (async () => {
-              const artisanRef = doc(db, "artisans", artisanId);
-              const artisanSnap = await getDoc(artisanRef);
-              if (artisanSnap.exists()) {
-                const data = artisanSnap.data();
-                return { ...data, artisanId: data.artisanId || artisanSnap.id } as ArtisanProfile;
-              }
+            const artisanRef = doc(db, "artisans", artisanId);
+            const artisanSnap = await getDoc(artisanRef);
+            if (artisanSnap.exists()) {
+              const data = artisanSnap.data();
+              return { ...data, artisanId: data.artisanId || artisanSnap.id } as ArtisanProfile;
+            }
 
-              // Fallback query by field
-              const { query, collection, where, limit, getDocs } = await import("firebase/firestore");
-              const q = query(collection(db, "artisans"), where("artisanId", "==", artisanId), limit(1));
-              const qSnap = await getDocs(q);
-              if (!qSnap.empty) {
-                const d = qSnap.docs[0];
-                return { ...d.data(), artisanId: d.data().artisanId || d.id } as ArtisanProfile;
-              }
-              return null;
-            })();
-
-            return await Promise.race([fetchPromise, timeoutPromise]);
+            const { query, collection, where, limit, getDocs } = await import("firebase/firestore");
+            const q = query(collection(db, "artisans"), where("artisanId", "==", artisanId), limit(1));
+            const qSnap = await getDocs(q);
+            if (!qSnap.empty) {
+              const d = qSnap.docs[0];
+              return { ...d.data(), artisanId: d.data().artisanId || d.id } as ArtisanProfile;
+            }
+            return null;
           } catch (e) {
             console.warn(`Failed to fetch favorite artisan ${artisanId}:`, e);
             return null;
@@ -100,58 +115,60 @@ export default function FavoritesPage() {
         const artisans = results.filter(Boolean) as ArtisanProfile[];
         
         if (!isCancelled) {
-          setFavorites(artisans);
+          // Only update if we found favorites or if savedArtisans was genuinely empty
+          if (artisans.length > 0 || savedArtisans.length === 0) {
+            setFavorites(artisans);
+            try {
+              localStorage.setItem("need_favorites_cache", JSON.stringify(artisans));
+            } catch {}
+          }
           setLoading(false);
-          try {
-            localStorage.setItem("need_favorites_cache", JSON.stringify(artisans));
-          } catch {}
         }
       } catch (error) {
-        console.error("Error fetching favorites", error);
-        if (!isCancelled) setLoading(false);
+        console.error("Error fetching favorites:", error);
       } finally {
         if (!isCancelled) setLoading(false);
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged(currentUser => {
-      setUser(currentUser);
-      if (currentUser) {
-        fetchFavorites();
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Safety timeout: never let favorites screen hang longer than 2.5 seconds
-    const safetyTimer = setTimeout(() => {
-      if (!isCancelled) setLoading(false);
-    }, 2500);
+    if (authUser?.uid) {
+      fetchFavorites(authUser.uid);
+    } else if (!authLoading && !authUser) {
+      setLoading(false);
+    }
 
     return () => {
       isCancelled = true;
-      clearTimeout(safetyTimer);
-      unsubscribe();
     };
-  }, []);
+  }, [authUser?.uid, authLoading]);
 
   const handleRemoveFavorite = async (artisanId: string) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    const currentUid = authUser?.uid || auth.currentUser?.uid;
+    if (!currentUid) return;
+
+    // Optimistically update local UI & cache immediately
+    setFavorites(prev => {
+      const updated = prev.filter(a => a.artisanId !== artisanId);
+      try {
+        localStorage.setItem("need_favorites_cache", JSON.stringify(updated));
+        localStorage.setItem(`need_favorites_cache_${currentUid}`, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     try {
-      const userDocRef = doc(db, "users", currentUser.uid);
+      apiFetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUid, artisanId, action: "remove" }),
+      }).catch(err => console.warn("API remove favorite failed:", err));
+
+      const userDocRef = doc(db, "users", currentUid);
       await updateDoc(userDocRef, {
         savedArtisans: arrayRemove(artisanId)
       });
-      setFavorites(prev => {
-        const updated = prev.filter(a => a.artisanId !== artisanId);
-        try {
-          localStorage.setItem("need_favorites_cache", JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
     } catch (error) {
-      console.error("Error removing favorite", error);
+      console.warn("Client remove favorite fallback:", error);
     }
   };
 

@@ -197,21 +197,32 @@ export default function FindTechnicianMapPage({ params }: { params: Promise<{ ca
         const snap = await getDocs(q);
         const allData = snap.docs.map(doc => doc.data() as ArtisanProfile);
 
+        const categoryDef = servicesData[unwrappedParams.categorySlug];
         const decodedCategory = decodeURIComponent(unwrappedParams.categorySlug).replace(/-/g, ' ');
         const decodedSub = decodeURIComponent(unwrappedParams.subSlug).replace(/-/g, ' ');
+
+        const subServiceDef = categoryDef?.subServices?.find(
+          s => s.id === unwrappedParams.subSlug || s.title.toLowerCase() === decodedSub.toLowerCase()
+        );
+        const expectedSubTitle = (subServiceDef?.title || decodedSub).trim().toLowerCase();
+        const expectedCategoryTitle = (categoryDef?.title || decodedCategory).trim().toLowerCase();
 
         const data = allData.filter(artisan => {
           // Do not show artisans who haven't completed setup
           if (artisan.onboardingStep !== undefined && artisan.onboardingStep < 6) return false;
 
           if (artisan.services && artisan.services.length > 0) {
-            return artisan.services.some(svc => 
-              svc.trade.toLowerCase() === decodedCategory.toLowerCase() && 
-              svc.subcategory.toLowerCase() === decodedSub.toLowerCase()
-            );
+            return artisan.services.some(svc => {
+              const svcTrade = (svc.trade || "").trim().toLowerCase();
+              const svcSub = (svc.subcategory || "").trim().toLowerCase();
+              return (svcTrade === expectedCategoryTitle || svcTrade === decodedCategory.toLowerCase()) &&
+                     (svcSub === expectedSubTitle || svcSub === decodedSub.toLowerCase() || svcSub.replace(/-/g, ' ') === decodedSub.toLowerCase());
+            });
           }
-          return artisan.trade?.toLowerCase() === decodedCategory.toLowerCase() && 
-                 artisan.subcategory?.toLowerCase() === decodedSub.toLowerCase();
+          const artTrade = (artisan.trade || "").trim().toLowerCase();
+          const artSub = (artisan.subcategory || "").trim().toLowerCase();
+          return (artTrade === expectedCategoryTitle || artTrade === decodedCategory.toLowerCase()) &&
+                 (artSub === expectedSubTitle || artSub === decodedSub.toLowerCase() || artSub.replace(/-/g, ' ') === decodedSub.toLowerCase());
         });
 
         const populateNames = async (list: (ArtisanProfile & { distance?: number; firstName?: string; lastName?: string })[]) => {

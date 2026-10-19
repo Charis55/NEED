@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import GuestCTA from "@/components/GuestCTA";
 
 import { use } from "react";
+import { apiFetch } from "@/utils/apiBase";
 
 type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 
@@ -23,8 +24,8 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
       const cached = localStorage.getItem(`need_artisan_counts_${category.title}`);
       if (cached) {
         const { counts, timestamp } = JSON.parse(cached);
-        // Valid for 15 minutes
-        if (Date.now() - timestamp < 15 * 60 * 1000) {
+        // Valid for 15 minutes if non-empty
+        if (counts && Object.keys(counts).length > 0 && Date.now() - timestamp < 15 * 60 * 1000) {
           return counts;
         }
       }
@@ -35,7 +36,11 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
     if (typeof window === "undefined" || !category?.title) return true;
     try {
       const cached = localStorage.getItem(`need_artisan_counts_${category.title}`);
-      return !cached;
+      if (cached) {
+        const { counts } = JSON.parse(cached);
+        if (counts && Object.keys(counts).length > 0) return false;
+      }
+      return true;
     } catch {
       return true;
     }
@@ -63,28 +68,56 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
   useEffect(() => {
     let isCancelled = false;
     async function fetchAvailableSubcategories() {
+      // 1. First priority: Fast server API route (bypasses client connection latency)
+      try {
+        const res = await apiFetch(`/api/services/counts?categorySlug=${encodeURIComponent(unwrappedParams.categorySlug)}&trade=${encodeURIComponent(category.title)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.counts && !isCancelled) {
+            setArtisanCounts(data.counts);
+            setLoading(false);
+            try {
+              localStorage.setItem(
+                `need_artisan_counts_${category.title}`,
+                JSON.stringify({ counts: data.counts, timestamp: Date.now() })
+              );
+            } catch {}
+            return;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Server counts API error, trying direct Firestore fallback:", apiErr);
+      }
+
+      // 2. Secondary fallback: direct Firestore query with robust case-insensitive matching
       try {
         const q = query(
           collection(db, "artisans"),
           where("available", "==", true),
           where("verified", "==", true)
         );
-        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-        const fetchPromise = getDocs(q);
-        const snapshot = await Promise.race([fetchPromise, timeoutPromise]);
+        const snapshot = await getDocs(q);
         
         if (snapshot && !isCancelled) {
           const counts: Record<string, number> = {};
+          const targetTradeLower = (category.title || "").trim().toLowerCase();
+
           snapshot.forEach((doc) => {
             const data = doc.data();
             if (data.services && Array.isArray(data.services)) {
               data.services.forEach((svc: { trade?: string; subcategory?: string; [key: string]: unknown }) => {
-                if (svc.trade === category.title && svc.subcategory) {
-                  counts[svc.subcategory] = (counts[svc.subcategory] || 0) + 1;
+                const svcTrade = (svc.trade || "").trim().toLowerCase();
+                const svcSub = (svc.subcategory || "").trim();
+                if (svcTrade === targetTradeLower && svcSub) {
+                  counts[svcSub] = (counts[svcSub] || 0) + 1;
                 }
               });
-            } else if (data.trade === category.title && data.subcategory) {
-              counts[data.subcategory] = (counts[data.subcategory] || 0) + 1;
+            } else if (data.trade && data.subcategory) {
+              const dTrade = (data.trade || "").trim().toLowerCase();
+              const dSub = (data.subcategory || "").trim();
+              if (dTrade === targetTradeLower && dSub) {
+                counts[dSub] = (counts[dSub] || 0) + 1;
+              }
             }
           });
           
@@ -97,7 +130,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
           } catch {}
         }
       } catch (error) {
-        console.error("Error fetching available subcategories:", error);
+        console.error("Error fetching available subcategories from Firestore:", error);
       } finally {
         if (!isCancelled) setLoading(false);
       }
@@ -107,7 +140,7 @@ export default function SubcategoryPage({ params }: { params: Promise<{ category
     return () => {
       isCancelled = true;
     };
-  }, [category.title]);
+  }, [category.title, unwrappedParams.categorySlug]);
 
   const title = category.title;
   let subServices = [...category.subServices];

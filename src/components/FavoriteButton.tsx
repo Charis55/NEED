@@ -27,6 +27,16 @@ export default function FavoriteButton({ artisanId }: { artisanId: string }) {
           const data = userDoc.data();
           if (data.savedArtisans && data.savedArtisans.includes(artisanId)) {
             setIsFavorite(true);
+            setLoading(false);
+            return;
+          }
+        }
+        // Fallback check in artisans collection
+        const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
+        if (artisanDoc.exists()) {
+          const aData = artisanDoc.data();
+          if (aData.savedArtisans && aData.savedArtisans.includes(artisanId)) {
+            setIsFavorite(true);
           }
         }
       } catch (err) {
@@ -46,18 +56,46 @@ export default function FavoriteButton({ artisanId }: { artisanId: string }) {
     }
 
     const previousState = isFavorite;
-    setIsFavorite(!isFavorite); // Optimistic UI update
+    const nextState = !previousState;
+    setIsFavorite(nextState); // Optimistic UI update
+
+    // Synchronize localStorage cache
+    try {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("need_favorites_cache");
+        if (cached && !nextState) {
+          const list = JSON.parse(cached);
+          const filtered = list.filter((a: any) => (a.artisanId || a.id) !== artisanId);
+          localStorage.setItem("need_favorites_cache", JSON.stringify(filtered));
+        }
+      }
+    } catch {}
 
     try {
+      const { setDoc } = await import("firebase/firestore");
       const userDocRef = doc(db, "users", user.uid);
+
+      // 1. Authoritative server update via API
+      const { apiFetch } = await import("@/utils/apiBase");
+      apiFetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          artisanId,
+          action: previousState ? "remove" : "add",
+        }),
+      }).catch(err => console.warn("API favorite toggle failed:", err));
+
+      // 2. Client fallback with safe merge
       if (previousState) {
-        await updateDoc(userDocRef, {
+        await setDoc(userDocRef, {
           savedArtisans: arrayRemove(artisanId)
-        });
+        }, { merge: true });
       } else {
-        await updateDoc(userDocRef, {
+        await setDoc(userDocRef, {
           savedArtisans: arrayUnion(artisanId)
-        });
+        }, { merge: true });
       }
     } catch (err) {
       console.error("Failed to update favorite", err);
