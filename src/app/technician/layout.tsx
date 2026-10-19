@@ -15,14 +15,15 @@ const ARTISAN_DOCK_ROUTES = [
 export default function ArtisanLayout({ children }: { children: ReactNode }) {
   return (
     <RoleGuard requiredRole="artisan">
-      <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 relative">
-        <DockSwipeNavigator routes={ARTISAN_DOCK_ROUTES} />
+      <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 relative overflow-x-hidden">
         {/* Branding Logo (Floating, hidden on subpages) */}
         <FloatingBrandingLogo href="/technician/dashboard" />
 
-        <main className="w-full">
-          {children}
-        </main>
+        <DockSwipeNavigator routes={ARTISAN_DOCK_ROUTES}>
+          <main className="w-full">
+            {children}
+          </main>
+        </DockSwipeNavigator>
         
         <ArtisanDock />
       </div>

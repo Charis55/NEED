@@ -55,12 +55,14 @@ export default function ArtisanDashboard() {
 
   useEffect(() => {
     let unsubs: (() => void)[] = [];
+    const safetyTimer = setTimeout(() => setLoading(false), 2500);
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       unsubs.forEach(unsub => unsub());
       unsubs = [];
 
       if (!user) {
+        clearTimeout(safetyTimer);
         setLoading(false);
         return;
       }
@@ -150,6 +152,7 @@ export default function ArtisanDashboard() {
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       unsubs.forEach(unsub => unsub());
       unsubscribeAuth();
     };

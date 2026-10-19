@@ -6,14 +6,50 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import GlobalSpinner from "@/components/GlobalSpinner";
 
+const verifiedRolesCache = new Map<string, "artisan" | "customer">();
+
 export default function RoleGuard({ children, requiredRole }: { children: React.ReactNode, requiredRole: "artisan" | "customer" }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [authorized, setAuthorized] = useState(false);
+
+  // Instant authorization if role is already verified in this session
+  const [authorized, setAuthorized] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const currentUid = auth.currentUser?.uid;
+    if (currentUid) {
+      const cached = verifiedRolesCache.get(currentUid) || sessionStorage.getItem("need_role_" + currentUid);
+      if (cached === requiredRole) return true;
+    }
+    // Allow guest browsing on non-protected customer pages immediately
+    if (requiredRole === "customer" && !currentUid) {
+      const isProtected = pathname.startsWith("/chat") || pathname.startsWith("/inbox") || pathname.startsWith("/profile") || pathname.startsWith("/payment");
+      if (!isProtected) return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
+    // If already authorized and user hasn't changed, avoid redundant blocking
+    const currentUid = auth.currentUser?.uid;
+    if (currentUid && verifiedRolesCache.get(currentUid) === requiredRole && authorized) {
+      return;
+    }
+
+    let isMounted = true;
+    // 2.5s safeguard timeout: Never leave user stuck on "VERIFYING ACCESS"
+    const timeoutTimer = setTimeout(() => {
+      if (isMounted && !authorized) {
+        if (auth.currentUser) {
+          setAuthorized(true);
+        }
+      }
+    }, 2500);
+
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!isMounted) return;
+
       if (!user) {
+        clearTimeout(timeoutTimer);
         if (requiredRole === "artisan") {
           router.push("/login?role=artisan");
         } else {
@@ -26,15 +62,31 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
         }
         return;
       }
+
+      // Check cache first
+      const cachedRole = verifiedRolesCache.get(user.uid) || sessionStorage.getItem("need_role_" + user.uid);
+      if (cachedRole === requiredRole) {
+        clearTimeout(timeoutTimer);
+        setAuthorized(true);
+        return;
+      }
       
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (!isMounted) return;
+        clearTimeout(timeoutTimer);
+
         if (userDoc.exists()) {
-          const role = userDoc.data().role;
+          const role = userDoc.data().role as "artisan" | "customer";
+          if (role) {
+            verifiedRolesCache.set(user.uid, role);
+            sessionStorage.setItem("need_role_" + user.uid, role);
+          }
           
           if (requiredRole === "artisan") {
             if (role === "artisan") {
               const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
+              if (!isMounted) return;
               if (!artisanDoc.exists() || artisanDoc.data()?.onboardingStep !== 6) {
                 router.push("/onboarding");
               } else {
@@ -45,26 +97,27 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
             }
           } else if (requiredRole === "customer") {
             if (role === "artisan" && pathname !== "/login" && !pathname.startsWith("/chat/")) {
-              // If an artisan tries to access customer routes (except shared chat), redirect them
               router.push("/technician/dashboard");
             } else {
               setAuthorized(true);
             }
           }
         } else {
-          // If a Firebase user exists but NO userDoc exists,
-          // they haven't completed the signup flow (missing name, phone, etc).
-          // Force them back to the auth page to finish it.
           router.push(`/login?role=${requiredRole}`);
         }
       } catch (err) {
         console.error("RoleGuard error:", err);
-        setAuthorized(true);
+        clearTimeout(timeoutTimer);
+        if (isMounted) setAuthorized(true);
       }
     });
 
-    return () => unsubscribe();
-  }, [router, requiredRole, pathname]);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutTimer);
+      unsubscribe();
+    };
+  }, [router, requiredRole, pathname, authorized]);
 
   if (!authorized) {
     return (

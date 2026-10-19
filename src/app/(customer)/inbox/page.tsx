@@ -27,6 +27,9 @@ export default function InboxPage() {
   );
 }
 
+const artisanCache = new Map<string, ArtisanProfile>();
+const userCache = new Map<string, UserAccount>();
+
 function InboxContent() {
   const router = useRouter();
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
@@ -43,9 +46,15 @@ function InboxContent() {
 
   useEffect(() => {
     let unsubscribe = () => {};
+    // Safety timeout: never let inbox spinner block for > 2.5s
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 2500);
+
     const setupListener = () => {
       const user = auth.currentUser;
       if (!user) {
+        clearTimeout(safetyTimer);
         setLoading(false);
         return;
       }
@@ -56,6 +65,7 @@ function InboxContent() {
       );
       
       unsubscribe = onSnapshot(q, async (snapshot) => {
+        clearTimeout(safetyTimer);
         try {
           const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
           const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
@@ -65,17 +75,33 @@ function InboxContent() {
             return timeB - timeA;
           });
 
+          // Fast cached enrichment with per-doc 1.5s timeout fallback
           const listItems: ChatListItem[] = await Promise.all(activeJobs.map(async (job) => {
-            let artisan: ArtisanProfile | null = null;
-            let artisanUser: UserAccount | null = null;
+            let artisan: ArtisanProfile | null = job.artisanId ? artisanCache.get(job.artisanId) || null : null;
+            let artisanUser: UserAccount | null = job.artisanId ? userCache.get(job.artisanId) || null : null;
             
-            if (job.artisanId) {
-              const [artDoc, userDoc] = await Promise.all([
-                getDoc(doc(db, "artisans", job.artisanId)),
-                getDoc(doc(db, "users", job.artisanId))
-              ]);
-              if (artDoc.exists()) artisan = artDoc.data() as ArtisanProfile;
-              if (userDoc.exists()) artisanUser = userDoc.data() as UserAccount;
+            if (job.artisanId && (!artisan || !artisanUser)) {
+              try {
+                const timeoutP = new Promise<null>((res) => setTimeout(() => res(null), 1500));
+                const fetchP = Promise.all([
+                  !artisan ? getDoc(doc(db, "artisans", job.artisanId)) : Promise.resolve(null),
+                  !artisanUser ? getDoc(doc(db, "users", job.artisanId)) : Promise.resolve(null)
+                ]);
+                const res = await Promise.race([fetchP, timeoutP]);
+                if (res) {
+                  const [artDoc, userDoc] = res;
+                  if (artDoc && artDoc.exists()) {
+                    artisan = artDoc.data() as ArtisanProfile;
+                    artisanCache.set(job.artisanId, artisan);
+                  }
+                  if (userDoc && userDoc.exists()) {
+                    artisanUser = userDoc.data() as UserAccount;
+                    userCache.set(job.artisanId, artisanUser);
+                  }
+                }
+              } catch (e) {
+                // progressive fallback
+              }
             }
             
             return {
@@ -93,6 +119,10 @@ function InboxContent() {
         } finally {
           setLoading(false);
         }
+      }, (err) => {
+        console.warn("Inbox listener error:", err);
+        clearTimeout(safetyTimer);
+        setLoading(false);
       });
     };
 
@@ -104,11 +134,13 @@ function InboxContent() {
         } catch (e) {}
         setupListener();
       } else {
+        clearTimeout(safetyTimer);
         setLoading(false);
       }
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       unsubscribeAuth();
       unsubscribe();
     };

@@ -14,10 +14,13 @@ interface AuthState {
 }
 
 export function useOptionalAuth(): AuthState {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    isGuest: true,
-    loading: true,
+  const [state, setState] = useState<AuthState>(() => {
+    const current = auth.currentUser;
+    return {
+      user: current,
+      isGuest: !current,
+      loading: current ? false : true,
+    };
   });
 
   useEffect(() => {

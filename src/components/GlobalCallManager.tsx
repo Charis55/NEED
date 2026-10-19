@@ -74,9 +74,9 @@ export default function GlobalCallManager() {
         if (!data.activeCall) return false;
         const status = data.activeCall.status;
         if (status === "ringing") {
-          // A ringing call is considered valid unless it is genuinely stale (> 3 minutes old)
+          // A ringing call is considered valid unless it is genuinely ancient (> 2 hours old from abandoned crash)
           const ringingAge = now - (data.activeCall.timestamp || 0);
-          if (ringingAge > 3 * 60 * 1000) {
+          if (data.activeCall.timestamp && ringingAge > 2 * 60 * 60 * 1000) {
             return false;
           }
           return true;
@@ -330,19 +330,18 @@ export default function GlobalCallManager() {
 
   useEffect(() => {
     if (activeJob && activeJob.activeCall && activeJob.activeCall.status === "ringing") {
-      // Tolerate clock drift: If it's wildly in the past (e.g. > 5 mins), treat as stale.
-      const elapsed = Date.now() - activeJob.activeCall.timestamp;
-      if (elapsed > 5 * 60000) {
-        endCallWithLog("timeout");
-      } else {
-        // Just ring for 60 seconds from when we observe it, to avoid clock drift ending it instantly
+      const isCaller = activeJob.activeCall.callerId === userUid;
+      if (isCaller) {
+        // Only the CALLER should auto-timeout their outgoing call if nobody picks up after 60 seconds
         const timer = setTimeout(() => {
           endCallWithLog("timeout");
         }, 60000);
         return () => clearTimeout(timer);
       }
+      // For the RECEIVER: Never auto-terminate or write 'ended' to Firestore!
+      // The receiver simply lets the modal ring until answered, declined, or cancelled by the caller.
     }
-  }, [activeJob]);
+  }, [activeJob?.requestId, activeJob?.activeCall?.status, userUid]);
 
   const endCallWithLog = async (
     reason?: "cancelled" | "declined" | "timeout" | "ended",

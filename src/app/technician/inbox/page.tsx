@@ -17,6 +17,8 @@ interface ChatListItem {
   unreadCount: number;
 }
 
+const customerCache = new Map<string, UserAccount>();
+
 export default function InboxPage() {
   const router = useRouter();
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
@@ -33,9 +35,15 @@ export default function InboxPage() {
 
   useEffect(() => {
     let unsubscribe = () => {};
+    // Safety timeout: never let inbox spinner block for > 2.5s
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 2500);
+
     const setupListener = () => {
       const user = auth.currentUser;
       if (!user) {
+        clearTimeout(safetyTimer);
         setLoading(false);
         return;
       }
@@ -46,6 +54,7 @@ export default function InboxPage() {
       );
       
       unsubscribe = onSnapshot(q, async (snapshot) => {
+        clearTimeout(safetyTimer);
         try {
           const allJobs = snapshot.docs.map(doc => doc.data() as JobRequest);
           const activeJobs = allJobs.filter(j => ["accepted", "en_route", "in_progress", "payment_pending", "completed"].includes(j.status));
@@ -56,11 +65,18 @@ export default function InboxPage() {
           });
 
           const listItems: ChatListItem[] = await Promise.all(activeJobs.map(async (job) => {
-            let customer: UserAccount | null = null;
-            if (job.customerId) {
-              const cusDoc = await getDoc(doc(db, "users", job.customerId));
-              if (cusDoc.exists()) {
-                customer = cusDoc.data() as UserAccount;
+            let customer: UserAccount | null = job.customerId ? customerCache.get(job.customerId) || null : null;
+            if (job.customerId && !customer) {
+              try {
+                const timeoutP = new Promise<null>((res) => setTimeout(() => res(null), 1500));
+                const fetchP = getDoc(doc(db, "users", job.customerId));
+                const cusDoc = await Promise.race([fetchP, timeoutP]);
+                if (cusDoc && cusDoc.exists()) {
+                  customer = cusDoc.data() as UserAccount;
+                  customerCache.set(job.customerId, customer);
+                }
+              } catch (e) {
+                // progressive fallback
               }
             }
             return {
@@ -76,6 +92,10 @@ export default function InboxPage() {
         } finally {
           setLoading(false);
         }
+      }, (err) => {
+        console.warn("Technician inbox listener error:", err);
+        clearTimeout(safetyTimer);
+        setLoading(false);
       });
     };
 
@@ -87,11 +107,13 @@ export default function InboxPage() {
         } catch (e) {}
         setupListener();
       } else {
+        clearTimeout(safetyTimer);
         setLoading(false);
       }
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       unsubscribeAuth();
       unsubscribe();
     };

@@ -33,6 +33,7 @@ function JobsContent() {
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    const safetyTimer = setTimeout(() => setLoading(false), 2500);
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (unsubscribe) {
@@ -40,6 +41,7 @@ function JobsContent() {
       }
 
       if (!user) {
+        clearTimeout(safetyTimer);
         setLoading(false);
         return;
       }
@@ -47,6 +49,7 @@ function JobsContent() {
       const q = query(collection(db, "jobRequests"), where("customerId", "==", user.uid));
       
       unsubscribe = onSnapshot(q, (snapshot) => {
+        clearTimeout(safetyTimer);
         const results = snapshot.docs.map(doc => doc.data() as JobRequest);
         results.sort((a, b) => b.createdAt - a.createdAt);
 
@@ -59,11 +62,13 @@ function JobsContent() {
         setLoading(false);
       }, (error) => {
         console.error("Error fetching requests:", error);
+        clearTimeout(safetyTimer);
         setLoading(false);
       });
     });
 
     return () => {
+      clearTimeout(safetyTimer);
       if (unsubscribe) unsubscribe();
       unsubscribeAuth();
     };

@@ -44,8 +44,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
             }
         }
 
-        // Configure audio routing: earpiece for voice, speaker for video
-        setAudioMode(mode: isVideo ? "speaker" : "earpiece")
+        // Configure audio routing: default to loudspeaker for crystal clear volume
+        setAudioMode(mode: "speaker")
     }
 
     func resetCallState() {
@@ -334,6 +334,7 @@ struct WebView: UIViewRepresentable {
 
         let contentController = WKUserContentController()
         contentController.add(context.coordinator, name: "needNative")
+        contentController.add(context.coordinator, name: "haptic")
         config.userContentController = contentController
 
         if #available(iOS 14.0, *) {
@@ -349,11 +350,6 @@ struct WebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = UIColor.clear
         webView.scrollView.backgroundColor = UIColor.clear
-
-        // Native pull-to-refresh
-        let refreshControl = UIRefreshControl()
-        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.handleRefreshControl(_:)), for: .valueChanged)
-        webView.scrollView.refreshControl = refreshControl
 
         // Canonical Mobile Safari User-Agent so Google OAuth and third-party auth providers allow sign-in without 403 disallowed_useragent
         let baseUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
@@ -381,31 +377,30 @@ struct WebView: UIViewRepresentable {
             self.viewModel = viewModel
         }
 
-        // MARK: - Native Pull to Refresh
-        @objc func handleRefreshControl(_ sender: UIRefreshControl) {
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.prepare()
-            generator.impactOccurred()
-            if let webView = viewModel.webView {
-                webView.reload()
-            } else {
-                sender.endRefreshing()
-            }
-        }
-
-        // MARK: - WKScriptMessageHandler (Bridge for CallKit, Earpiece & Dynamic Island)
+        // MARK: - WKScriptMessageHandler (Bridge for CallKit, Haptics & Dynamic Island)
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "haptic" {
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.prepare()
+                generator.impactOccurred()
+                return
+            }
+
             guard message.name == "needNative", let dict = message.body as? [String: Any] else { return }
             let action = dict["action"] as? String ?? ""
 
-            if action == "startCall" {
+            if action == "haptic" {
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.prepare()
+                generator.impactOccurred()
+            } else if action == "startCall" {
                 let partnerName = dict["partnerName"] as? String ?? "Technician"
                 let isVideo = dict["isVideo"] as? Bool ?? false
                 NativeCallKitManager.shared.startCall(partnerName: partnerName, isVideo: isVideo)
             } else if action == "endCall" {
                 NativeCallKitManager.shared.endCall()
             } else if action == "setAudioMode" {
-                let mode = dict["mode"] as? String ?? "earpiece"
+                let mode = dict["mode"] as? String ?? "speaker"
                 NativeCallKitManager.shared.setAudioMode(mode: mode)
             }
         }
