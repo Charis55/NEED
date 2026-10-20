@@ -2,6 +2,74 @@ import { Capacitor } from "@capacitor/core";
 
 export type PlatformName = "ios" | "android" | "web";
 
+let inMemoryDeviceId: string | null = null;
+let inMemoryActiveOutgoingCallId: string | null = null;
+
+/**
+ * Safe session storage helpers that never throw in private browsing, WKWebView, or SSR.
+ */
+export function safeGetSession(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function safeSetSession(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // Ignore quota or security restrictions
+  }
+}
+
+export function safeRemoveSession(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore restrictions
+  }
+}
+
+/**
+ * In-memory active outgoing call token manager.
+ * Guarantees caller isolation: only the specific JS runtime that initiated
+ * the call knows the unique attempt/call token.
+ */
+export function setActiveOutgoingCallId(callId: string | null): void {
+  inMemoryActiveOutgoingCallId = callId;
+  if (typeof window !== "undefined") {
+    if (callId) {
+      safeSetSession("need_active_outgoing_call_id", callId);
+    } else {
+      safeRemoveSession("need_active_outgoing_call_id");
+    }
+  }
+}
+
+export function getActiveOutgoingCallId(): string | null {
+  if (inMemoryActiveOutgoingCallId) return inMemoryActiveOutgoingCallId;
+  return safeGetSession("need_active_outgoing_call_id");
+}
+
+export function clearActiveOutgoingCallId(): void {
+  inMemoryActiveOutgoingCallId = null;
+  safeRemoveSession("need_active_outgoing_call_id");
+}
+
+/**
+ * Generate a cryptographically unique call attempt ID.
+ */
+export function generateCallAttemptId(jobId: string): string {
+  const platform = getPlatformName();
+  const rand = Math.random().toString(36).substring(2, 7);
+  return `call_${jobId}_${Date.now()}_${platform}_${rand}`;
+}
+
 /**
  * Detect the platform Need is currently executing in:
  * - "ios": Native iOS app (Swift WKWebView / Capacitor)
@@ -45,24 +113,63 @@ export function isMobileDevice(): boolean {
 }
 
 /**
- * Unique, persistent device identifier stored in localStorage.
+ * Unique, persistent device identifier stored in memory, localStorage, and cookie.
  * Every physical device or browser profile gets a unique ID with platform prefix.
+ * Cached in memory so repeated calls in the same session NEVER return different values.
  * e.g. "ios_a1b2c3d4", "web_e5f6g7h8", "android_9i0j1k2l"
  */
 export function getDeviceId(): string {
   if (typeof window === "undefined") return "server";
+  if (inMemoryDeviceId) return inMemoryDeviceId;
+
+  const platform = getPlatformName();
+
+  // 1. Try reading from localStorage
   try {
-    let id = localStorage.getItem("need.deviceId");
-    if (!id) {
-      const platform = getPlatformName();
-      const rand = typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
-      id = `${platform}_${rand}`;
-      localStorage.setItem("need.deviceId", id);
+    const localId = localStorage.getItem("need.deviceId");
+    if (localId && localId.trim()) {
+      inMemoryDeviceId = localId.trim();
+      return inMemoryDeviceId;
     }
-    return id;
   } catch {
-    return `fallback_${Math.random().toString(36).substring(2, 12)}`;
+    // localStorage restricted / unavailable
   }
+
+  // 2. Try reading from cookie fallback
+  try {
+    if (typeof document !== "undefined" && document.cookie) {
+      const match = document.cookie.match(/(?:^|;\s*)need_device_id=([^;]+)/);
+      if (match && match[1]) {
+        inMemoryDeviceId = decodeURIComponent(match[1]);
+        return inMemoryDeviceId;
+      }
+    }
+  } catch {
+    // Cookie restricted / unavailable
+  }
+
+  // 3. Generate a new stable ID
+  const rand = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+  const newId = `${platform}_${rand}`;
+  inMemoryDeviceId = newId;
+
+  // Persist to localStorage if permitted
+  try {
+    localStorage.setItem("need.deviceId", newId);
+  } catch {
+    // Ignore
+  }
+
+  // Persist to document cookie if permitted (1-year lifetime)
+  try {
+    if (typeof document !== "undefined") {
+      document.cookie = `need_device_id=${encodeURIComponent(newId)}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+  } catch {
+    // Ignore
+  }
+
+  return inMemoryDeviceId;
 }

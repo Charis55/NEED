@@ -11,7 +11,15 @@ import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { getSessionId } from "@/utils/sessionId";
 import { apiFetch } from "@/utils/apiBase";
-import { getDeviceId, getPlatformName } from "@/utils/device";
+import {
+  getDeviceId,
+  getPlatformName,
+  getActiveOutgoingCallId,
+  clearActiveOutgoingCallId,
+  safeGetSession,
+  safeSetSession,
+  safeRemoveSession,
+} from "@/utils/device";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -44,6 +52,8 @@ export default function GlobalCallManager() {
   userUidRef.current = userUid;
   const activeJobRef = useRef<JobRequest | null>(null);
   activeJobRef.current = activeJob;
+  const terminalStateRef = useRef<typeof terminalState>(null);
+  terminalStateRef.current = terminalState;
   const lastHandledUrlRef = useRef<{ url: string; time: number } | null>(null);
 
   const clearCallNotification = async () => {
@@ -111,6 +121,12 @@ export default function GlobalCallManager() {
           if (activeJobRef.current?.requestId === foundJob.requestId) {
             clearCallNotification();
             playCallSound("end");
+            clearActiveOutgoingCallId();
+            safeRemoveSession("need_active_outgoing_call_id");
+            safeRemoveSession("need_active_outgoing_call_job");
+            safeRemoveSession("need_active_outgoing_call");
+            safeRemoveSession("need_my_answered_call");
+            safeRemoveSession("need_my_answered_call_id");
 
             let text = "Call Ended";
             if (call.endedReason === "declined") {
@@ -138,16 +154,26 @@ export default function GlobalCallManager() {
         // Active live call
         const isCallerJob = call.callerId === userUid;
         const myDeviceId = getDeviceId();
+        const activeCallId = call.callId || (call as any).id;
+        const registeredOutgoingCallId = getActiveOutgoingCallId();
 
         // 1. Outgoing Caller Isolation:
-        // If an outgoing call was initiated on another device (e.g. initiated on iPhone while laptop is logged in):
+        // ONLY the exact physical device that initiated the call displays the outgoing modal & joins Agora.
+        // Other devices on the same account (e.g. laptop when calling from iPhone) stay completely idle.
         if (isCallerJob) {
           const initiatedHere =
-            (typeof window !== "undefined" && sessionStorage.getItem("need_active_outgoing_call") === foundJob.requestId) ||
-            (Boolean(call.callerDeviceId) && call.callerDeviceId === myDeviceId);
+            (Boolean(activeCallId) && (
+              registeredOutgoingCallId === activeCallId ||
+              safeGetSession("need_active_outgoing_call_id") === activeCallId
+            )) ||
+            (Boolean(call.callerDeviceId) && call.callerDeviceId === myDeviceId) ||
+            // Fallback keep-alive: if this device already mounted and is in this exact call, NEVER unmount!
+            (activeJobRef.current?.requestId === foundJob.requestId &&
+             Boolean(activeJobRef.current?.activeCall?.callId) &&
+             activeJobRef.current?.activeCall?.callId === activeCallId);
 
           if (!initiatedHere) {
-            // Outgoing call was initiated elsewhere — stay completely idle on this secondary device
+            // Outgoing call was initiated on another device — stay completely idle on this secondary device
             if (activeJobRef.current?.requestId === foundJob.requestId) {
               setActiveJob(null);
               setNotifiedCallId(null);
@@ -163,8 +189,10 @@ export default function GlobalCallManager() {
           (status === "ongoing" || (status as string) === "connected" || (status as string) === "accepted")
         ) {
           const answeredHere =
-            (typeof window !== "undefined" && sessionStorage.getItem("need_my_answered_call") === foundJob.requestId) ||
-            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId);
+            (safeGetSession("need_my_answered_call") === foundJob.requestId) ||
+            (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
+            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId) ||
+            (Boolean(call.acceptedByPlatform) && call.acceptedByPlatform === getPlatformName());
 
           if (!answeredHere) {
             // Call was answered on another device (e.g. answered on iPhone while laptop was ringing)
@@ -207,7 +235,7 @@ export default function GlobalCallManager() {
           });
         }
       } else {
-        if (!terminalState) {
+        if (!terminalStateRef.current) {
           setActiveJob(null);
           setNotifiedCallId(null);
         }
@@ -234,7 +262,7 @@ export default function GlobalCallManager() {
       unsubArtisan();
       unsubCustomer();
     };
-  }, [userUid, terminalState]);
+  }, [userUid]);
 
   // Handle deep links from notification action buttons (Answer / Decline)
   useEffect(() => {
@@ -364,11 +392,12 @@ export default function GlobalCallManager() {
 
     playCallSound("end");
     clearCallNotification();
-
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem("need_active_outgoing_call");
-      sessionStorage.removeItem("need_my_answered_call");
-    }
+    clearActiveOutgoingCallId();
+    safeRemoveSession("need_active_outgoing_call_id");
+    safeRemoveSession("need_active_outgoing_call_job");
+    safeRemoveSession("need_active_outgoing_call");
+    safeRemoveSession("need_my_answered_call");
+    safeRemoveSession("need_my_answered_call_id");
 
     const targetJobId = activeJob.requestId;
     const finalReason = reason || "ended";
@@ -411,8 +440,9 @@ export default function GlobalCallManager() {
     const effectiveDeviceId = getDeviceId();
     const effectivePlatform = getPlatformName();
 
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("need_my_answered_call", targetJobId);
+    safeSetSession("need_my_answered_call", targetJobId);
+    if ((activeJob.activeCall as any)?.callId) {
+      safeSetSession("need_my_answered_call_id", (activeJob.activeCall as any).callId);
     }
 
     apiFetch("/api/calls/accept", {
@@ -445,23 +475,32 @@ export default function GlobalCallManager() {
   const isCaller = activeCall.callerId === userUid;
 
   const myDeviceId = getDeviceId();
+  const activeCallId = (activeCall as any).callId;
+  const registeredOutgoingCallId = getActiveOutgoingCallId();
 
   // Outgoing Caller Device Isolation:
   // ONLY the exact physical device where the user tapped "Call" reflects the outgoing call
   // and connects to Agora. Other devices on the same account (e.g. laptop) stay completely idle.
-  const isThisDeviceInitiator = typeof window !== "undefined" && (
-    sessionStorage.getItem("need_active_outgoing_call") === activeJob.requestId ||
-    sessionStorage.getItem("need_active_outgoing_call") === (activeCall as any).callId ||
-    (Boolean((activeCall as any).callerDeviceId) && (activeCall as any).callerDeviceId === myDeviceId)
-  );
+  const isThisDeviceInitiator =
+    (Boolean(activeCallId) && (
+      registeredOutgoingCallId === activeCallId ||
+      safeGetSession("need_active_outgoing_call_id") === activeCallId
+    )) ||
+    (Boolean((activeCall as any).callerDeviceId) && (activeCall as any).callerDeviceId === myDeviceId) ||
+    (activeJobRef.current?.requestId === activeJob.requestId &&
+     Boolean(activeJobRef.current?.activeCall?.callId) &&
+     activeJobRef.current?.activeCall?.callId === activeCallId);
+
   const isThisDeviceCaller = isCaller && isThisDeviceInitiator;
 
   // Incoming Receiver Device Isolation:
   // Once answered, only the device that tapped Answer connects to Agora.
   // Other devices that were ringing immediately stop ringing and stay idle.
   const isThisDeviceAcceptedReceiver = !isCaller && (
-    (typeof window !== "undefined" && sessionStorage.getItem("need_my_answered_call") === activeJob.requestId) ||
-    (Boolean((activeCall as any).acceptedByDeviceId) && (activeCall as any).acceptedByDeviceId === myDeviceId)
+    (safeGetSession("need_my_answered_call") === activeJob.requestId) ||
+    (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
+    (Boolean((activeCall as any).acceptedByDeviceId) && (activeCall as any).acceptedByDeviceId === myDeviceId) ||
+    (Boolean((activeCall as any).acceptedByPlatform) && (activeCall as any).acceptedByPlatform === getPlatformName())
   );
 
   const isRingingForMe = activeCall.status === "ringing" && !isCaller && !terminalState;

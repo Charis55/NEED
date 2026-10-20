@@ -703,16 +703,25 @@ export default function ChatPage() {
       return;
     }
     showAlert("Starting call...", "success");
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("need_active_outgoing_call", requestId);
-    }
     try {
-      const { getDeviceId, getPlatformName } = await import("@/utils/device");
+      const {
+        getDeviceId,
+        getPlatformName,
+        generateCallAttemptId,
+        setActiveOutgoingCallId,
+        safeSetSession,
+      } = await import("@/utils/device");
+
+      const attemptId = generateCallAttemptId(requestId);
+      setActiveOutgoingCallId(attemptId);
+      safeSetSession("need_active_outgoing_call_job", requestId);
+
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: requestId,
+          attemptId,
           callerId: currentUser.uid,
           callType: type,
           callerDeviceId: getDeviceId(),

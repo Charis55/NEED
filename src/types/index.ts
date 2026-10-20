@@ -183,9 +183,14 @@ export interface JobRequest {
   completedAt: number | null;
   reviewed?: boolean;
   activeCall?: {
+    callId?: string;
     channelName: string;
     callerId: string;
+    callerDeviceId?: string;
+    callerPlatform?: string;
     callerSessionId?: string;
+    acceptedByDeviceId?: string;
+    acceptedByPlatform?: string;
     type: "audio" | "video";
     status: "ringing" | "ongoing" | "ended";
     timestamp: number;

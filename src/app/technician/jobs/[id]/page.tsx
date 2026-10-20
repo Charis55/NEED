@@ -322,16 +322,25 @@ export default function TechnicianManageJobPage() {
     }
     setCallingInProgress(true);
     showAlert("Connecting in-app voice call...", "success");
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("need_active_outgoing_call", job.requestId);
-    }
     try {
-      const { getDeviceId, getPlatformName } = await import("@/utils/device");
+      const {
+        getDeviceId,
+        getPlatformName,
+        generateCallAttemptId,
+        setActiveOutgoingCallId,
+        safeSetSession,
+      } = await import("@/utils/device");
+
+      const attemptId = generateCallAttemptId(job.requestId);
+      setActiveOutgoingCallId(attemptId);
+      safeSetSession("need_active_outgoing_call_job", job.requestId);
+
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobId: job.requestId,
+          attemptId,
           callerId: user.uid,
           callType,
           callerDeviceId: getDeviceId(),
