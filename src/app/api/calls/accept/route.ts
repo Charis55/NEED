@@ -16,6 +16,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const requestId = body.requestId || body.jobId;
     const sessionId = body.sessionId || 'native-answer';
+    const deviceId = body.deviceId || null;
+    const platform = body.platform || null;
 
     if (!requestId) {
       return NextResponse.json({ error: 'Missing requestId' }, { status: 400, headers: corsHeaders });
@@ -42,6 +44,8 @@ export async function POST(req: Request) {
       'activeCall.connectedAt': Date.now(),
       'activeCall.bothConnectedAt': null,
       'activeCall.acceptedBySession': sessionId,
+      'activeCall.acceptedByDeviceId': deviceId,
+      'activeCall.acceptedByPlatform': platform,
     });
 
     return NextResponse.json({ success: true, status: 'ongoing' }, { headers: corsHeaders });

@@ -94,6 +94,7 @@ public class MainActivity extends BridgeActivity {
                     db.collection("jobRequests").document(targetRequestId)
                         .update(
                             "activeCall.status", "ongoing",
+                            "activeCall.acceptedByPlatform", "android",
                             "activeCall.connectedAt", System.currentTimeMillis()
                         )
                         .addOnSuccessListener(aVoid -> Log.d("MainActivity", "Native answer Firestore update succeeded"))

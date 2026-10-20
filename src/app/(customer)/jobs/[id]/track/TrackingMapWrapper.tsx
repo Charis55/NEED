@@ -39,6 +39,7 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
         sessionStorage.setItem("need_active_outgoing_call", job.requestId);
       }
       
+      const { getDeviceId, getPlatformName } = await import("@/utils/device");
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -46,6 +47,8 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
           jobId: job.requestId,
           callerId: currentUser?.uid || job.customerId,
           callType: "audio",
+          callerDeviceId: getDeviceId(),
+          callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
         }),
       });

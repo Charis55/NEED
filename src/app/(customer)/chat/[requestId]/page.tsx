@@ -707,6 +707,7 @@ export default function ChatPage() {
       sessionStorage.setItem("need_active_outgoing_call", requestId);
     }
     try {
+      const { getDeviceId, getPlatformName } = await import("@/utils/device");
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -714,6 +715,8 @@ export default function ChatPage() {
           jobId: requestId,
           callerId: currentUser.uid,
           callType: type,
+          callerDeviceId: getDeviceId(),
+          callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
         }),
       });

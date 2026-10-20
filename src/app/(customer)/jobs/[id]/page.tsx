@@ -411,6 +411,7 @@ function JobsContent() {
       sessionStorage.setItem("need_active_outgoing_call", job.requestId);
     }
     try {
+      const { getDeviceId, getPlatformName } = await import("@/utils/device");
       const res = await apiFetch("/api/calls/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -418,6 +419,8 @@ function JobsContent() {
           jobId: job.requestId,
           callerId: user.uid,
           callType,
+          callerDeviceId: getDeviceId(),
+          callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
         }),
       });

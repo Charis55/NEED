@@ -11,6 +11,7 @@ import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { getSessionId } from "@/utils/sessionId";
 import { apiFetch } from "@/utils/apiBase";
+import { getDeviceId, getPlatformName } from "@/utils/device";
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
@@ -136,6 +137,45 @@ export default function GlobalCallManager() {
 
         // Active live call
         const isCallerJob = call.callerId === userUid;
+        const myDeviceId = getDeviceId();
+
+        // 1. Outgoing Caller Isolation:
+        // If an outgoing call was initiated on another device (e.g. initiated on iPhone while laptop is logged in):
+        if (isCallerJob) {
+          const initiatedHere =
+            (typeof window !== "undefined" && sessionStorage.getItem("need_active_outgoing_call") === foundJob.requestId) ||
+            (Boolean(call.callerDeviceId) && call.callerDeviceId === myDeviceId);
+
+          if (!initiatedHere) {
+            // Outgoing call was initiated elsewhere — stay completely idle on this secondary device
+            if (activeJobRef.current?.requestId === foundJob.requestId) {
+              setActiveJob(null);
+              setNotifiedCallId(null);
+            }
+            return;
+          }
+        }
+
+        // 2. Incoming Call Multi-Device Pick Isolation (WhatsApp style):
+        // If an incoming call was ringing and has now been answered on another device:
+        if (
+          !isCallerJob &&
+          (status === "ongoing" || (status as string) === "connected" || (status as string) === "accepted")
+        ) {
+          const answeredHere =
+            (typeof window !== "undefined" && sessionStorage.getItem("need_my_answered_call") === foundJob.requestId) ||
+            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId);
+
+          if (!answeredHere) {
+            // Call was answered on another device (e.g. answered on iPhone while laptop was ringing)
+            // Immediately stop ringing, dismiss incoming call modal, and stay idle.
+            clearCallNotification();
+            setActiveJob(null);
+            setNotifiedCallId(null);
+            return;
+          }
+        }
+
         const directPartnerName = isCallerJob
           ? call.receiverName || call.callee?.displayName
           : call.callerName || call.caller?.displayName;
@@ -239,6 +279,8 @@ export default function GlobalCallManager() {
                 requestId: targetId,
                 jobId: targetId,
                 sessionId: getSessionId(),
+                deviceId: getDeviceId(),
+                platform: getPlatformName(),
               }),
             }).catch((err) => console.warn("Failed to accept call via server:", err));
           } else if (isDecline && targetId) {
@@ -366,6 +408,8 @@ export default function GlobalCallManager() {
 
     const targetJobId = activeJob.requestId;
     const effectiveSessionId = getSessionId();
+    const effectiveDeviceId = getDeviceId();
+    const effectivePlatform = getPlatformName();
 
     if (typeof window !== "undefined") {
       sessionStorage.setItem("need_my_answered_call", targetJobId);
@@ -378,6 +422,8 @@ export default function GlobalCallManager() {
         requestId: targetJobId,
         jobId: targetJobId,
         sessionId: effectiveSessionId,
+        deviceId: effectiveDeviceId,
+        platform: effectivePlatform,
       }),
     }).catch((err) => console.warn("Failed to accept call via server:", err));
   };
@@ -398,21 +444,24 @@ export default function GlobalCallManager() {
   const { activeCall } = activeJob;
   const isCaller = activeCall.callerId === userUid;
 
-  // Caller Device Isolation:
-  // Only the device that actually tapped "Call" (tagged in sessionStorage) or has matching sessionId
-  // is treated as the caller device. This prevents other devices (e.g. web browser) from taking over or flashing.
+  const myDeviceId = getDeviceId();
+
+  // Outgoing Caller Device Isolation:
+  // ONLY the exact physical device where the user tapped "Call" reflects the outgoing call
+  // and connects to Agora. Other devices on the same account (e.g. laptop) stay completely idle.
   const isThisDeviceInitiator = typeof window !== "undefined" && (
     sessionStorage.getItem("need_active_outgoing_call") === activeJob.requestId ||
     sessionStorage.getItem("need_active_outgoing_call") === (activeCall as any).callId ||
-    (!activeCall.callerSessionId || activeCall.callerSessionId === getSessionId())
+    (Boolean((activeCall as any).callerDeviceId) && (activeCall as any).callerDeviceId === myDeviceId)
   );
   const isThisDeviceCaller = isCaller && isThisDeviceInitiator;
 
-  // Receiver Device Isolation:
+  // Incoming Receiver Device Isolation:
   // Once answered, only the device that tapped Answer connects to Agora.
+  // Other devices that were ringing immediately stop ringing and stay idle.
   const isThisDeviceAcceptedReceiver = !isCaller && (
     (typeof window !== "undefined" && sessionStorage.getItem("need_my_answered_call") === activeJob.requestId) ||
-    (!activeCall.acceptedBySession || activeCall.acceptedBySession === getSessionId())
+    (Boolean((activeCall as any).acceptedByDeviceId) && (activeCall as any).acceptedByDeviceId === myDeviceId)
   );
 
   const isRingingForMe = activeCall.status === "ringing" && !isCaller && !terminalState;

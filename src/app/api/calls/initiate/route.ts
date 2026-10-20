@@ -20,7 +20,15 @@ import { writeJobEvent } from "@/lib/jobEvents";
 
 export async function POST(req: NextRequest) {
   try {
-    const { jobId, callerId, callType, callerSessionId, attemptId } = await req.json();
+    const {
+      jobId,
+      callerId,
+      callType,
+      callerSessionId,
+      callerDeviceId,
+      callerPlatform,
+      attemptId,
+    } = await req.json();
 
     if (!jobId || !callerId || !callType) {
       return NextResponse.json(
@@ -124,7 +132,11 @@ export async function POST(req: NextRequest) {
       receiverName,
       receiverPhoto,
       callerSessionId: callerSessionId || null,
+      callerDeviceId: callerDeviceId || null,
+      callerPlatform: callerPlatform || null,
       acceptedBySession: null,
+      acceptedByDeviceId: null,
+      acceptedByPlatform: null,
       caller: {
         uid: callerId,
         displayName: callerName,

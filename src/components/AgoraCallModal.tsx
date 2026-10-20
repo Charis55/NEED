@@ -6,6 +6,7 @@ import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear } from "lucide-rea
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { apiFetch } from "@/utils/apiBase";
+import { isMobileDevice } from "@/utils/device";
 
 interface AudioTogglePlugin {
   setAudioMode(options: { mode: "speaker" | "earpiece" | "normal" }): Promise<{ success: boolean; mode?: string }>;
@@ -668,7 +669,7 @@ export default function AgoraCallModal({
             </button>
           )}
 
-          {typeof window !== "undefined" && (
+          {isMobileDevice() && (
             <button 
               onClick={toggleSpeaker}
               title={speakerOn ? "Loudspeaker On - Click to switch to discrete earpiece" : "Earpiece On - Click to switch to loudspeaker"}
