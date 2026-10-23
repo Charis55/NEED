@@ -173,3 +173,23 @@ export function getDeviceId(): string {
 
   return inMemoryDeviceId;
 }
+
+/**
+ * Sends a message across the WKScriptMessageHandler bridge to native iOS Swift.
+ * Supports actions: "startCall", "endCall", "reportIncomingCall", "setAudioMode", "haptic".
+ */
+export function notifyNativeCall(action: string, payload?: Record<string, any>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const webkit = (window as any).webkit;
+    if (webkit?.messageHandlers?.needNative) {
+      webkit.messageHandlers.needNative.postMessage({
+        action,
+        ...payload,
+      });
+    }
+  } catch (e) {
+    console.warn("notifyNativeCall failed:", e);
+  }
+}
+

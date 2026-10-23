@@ -117,15 +117,25 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
     };
 
     const setupWebPush = async (uid: string) => {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") return;
+      try {
+        if (typeof window === "undefined" || !("Notification" in window)) return;
+        
+        let permission = Notification.permission;
+        if (permission === "default") {
+          permission = await Notification.requestPermission();
+        }
+        if (permission !== "granted") return;
 
-      const token = await getToken(messaging as any, {
-        vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",
-      });
+        const token = await getToken(messaging as any, {
+          vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",
+        });
 
-      if (token) {
-        await persistToken(uid, token);
+        if (token) {
+          console.log("[useFCM] Retrieved Web FCM token:", token.substring(0, 10) + "...");
+          await persistToken(uid, token);
+        }
+      } catch (e) {
+        console.warn("[useFCM] setupWebPush error:", e);
       }
     };
 
@@ -143,26 +153,26 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
           vibration: true,
           visibility: 1,
         }).catch((e) => console.warn("Channel creation error:", e));
-
       });
     }
 
+    // Listen for native iOS token bridge events
+    const handleNativeToken = (e: any) => {
+      const token = e.detail?.token;
+      if (token && auth.currentUser) {
+        console.log("[useFCM] Native iOS push token received:", token.substring(0, 10) + "...");
+        persistToken(auth.currentUser.uid, token);
+      }
+    };
+    window.addEventListener("needNativePushToken", handleNativeToken);
+
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
-
-      const handled = localStorage.getItem("need_permissions_handled");
-      const shouldInit =
-        handled === "true" ||
-        (!Capacitor.isNativePlatform() && Notification.permission === "granted");
-
-      if (!shouldInit) return;
 
       try {
         if (Capacitor.isNativePlatform()) {
           await setupNativePush(user.uid);
 
-          // If the registration listener already fired before auth was ready,
-          // the token is sitting in the ref — persist it now.
           if (pendingNativeToken.current) {
             await persistToken(user.uid, pendingNativeToken.current);
           }
@@ -175,6 +185,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      window.removeEventListener("needNativePushToken", handleNativeToken);
       unsubscribeAuth();
     };
   }, []);

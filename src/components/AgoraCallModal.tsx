@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
+import AgoraRTC, { 
+  IAgoraRTCClient, 
+  ICameraVideoTrack, 
+  IMicrophoneAudioTrack,
+  IRemoteVideoTrack,
+  IRemoteAudioTrack,
+  IAgoraRTCRemoteUser
+} from "agora-rtc-sdk-ng";
 import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear } from "lucide-react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { apiFetch } from "@/utils/apiBase";
-import { isMobileDevice } from "@/utils/device";
+import { isMobileDevice, notifyNativeCall } from "@/utils/device";
 
 interface AudioTogglePlugin {
   setAudioMode(options: { mode: "speaker" | "earpiece" | "normal" }): Promise<{ success: boolean; mode?: string }>;
@@ -23,21 +30,6 @@ interface AudioTogglePlugin {
 
 const AudioToggle = registerPlugin<AudioTogglePlugin>("AudioToggle");
 
-const notifyNativeCall = (action: string, payload?: Record<string, any>) => {
-  if (typeof window === "undefined") return;
-  try {
-    const webkit = (window as any).webkit;
-    if (webkit?.messageHandlers?.needNative) {
-      webkit.messageHandlers.needNative.postMessage({
-        action,
-        ...payload
-      });
-    }
-  } catch (e) {
-    console.warn("notifyNativeCall failed:", e);
-  }
-};
-
 interface AgoraCallModalProps {
   jobId?: string;
   channelName: string;
@@ -49,6 +41,35 @@ interface AgoraCallModalProps {
   bothConnectedAt?: number | null;
   onBothConnected?: (timestamp: number) => void;
   onEndCall: (durationSec?: number) => void;
+}
+
+function VideoTrackPlayer({
+  track,
+  isLocal = false,
+  className = "w-full h-full object-cover",
+}: {
+  track: ICameraVideoTrack | IRemoteVideoTrack | null | undefined;
+  isLocal?: boolean;
+  className?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !track) return;
+    try {
+      track.play(el, { fit: "cover", mirror: isLocal });
+    } catch (err) {
+      console.warn("[Agora VideoTrackPlayer] Play error:", err);
+    }
+    return () => {
+      try {
+        track.stop();
+      } catch (e) {}
+    };
+  }, [track, isLocal]);
+
+  return <div ref={containerRef} className={className} />;
 }
 
 export default function AgoraCallModal({ 
@@ -246,19 +267,11 @@ export default function AgoraCallModal({
       isJoiningRef.current = true;
       try {
         // Listeners for remote users
-        client.on("user-joined", (user) => {
-          setRemoteUsers(prev => {
-            if (prev.find(u => u.uid === user.uid)) return prev;
-            return [...prev, user];
-          });
+        client.on("user-joined", () => {
+          setRemoteUsers([...client.remoteUsers]);
         });
 
         client.on("user-published", async (user, mediaType) => {
-          setRemoteUsers(prev => {
-            if (prev.find(u => u.uid === user.uid)) return prev;
-            return [...prev, user];
-          });
-
           try {
             await client.subscribe(user, mediaType);
           } catch (err) {
@@ -266,12 +279,8 @@ export default function AgoraCallModal({
             return;
           }
 
-          if (mediaType === "video") {
-            // Delay slightly to ensure DOM element exists before playing
-            setTimeout(() => {
-              user.videoTrack?.play(`remote-video-${user.uid}`, { fit: "contain" });
-            }, 100);
-          }
+          setRemoteUsers([...client.remoteUsers]);
+
           if (mediaType === "audio") {
             try {
               user.audioTrack?.setVolume(100);
@@ -279,54 +288,100 @@ export default function AgoraCallModal({
             } catch (playErr) {
               console.warn("Agora audioTrack play error:", playErr);
             }
-            // Re-assert audio routing immediately after remote audio begins playing in WebView
             if (typeof window !== "undefined") {
-              if (Capacitor.isNativePlatform()) {
-                setTimeout(() => {
-                  AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(e =>
-                    console.warn("AudioToggle re-route on audio play failed:", e)
-                  );
-                }, 250);
-              }
               notifyNativeCall("setAudioMode", { mode: speakerOnRef.current ? "speaker" : "earpiece" });
             }
           }
         });
 
-        client.on("user-unpublished", (user, mediaType) => {
-          if (mediaType === "video") {
-            user.videoTrack?.stop();
-            setRemoteUsers(prev => [...prev]);
-          }
+        client.on("user-unpublished", () => {
+          setRemoteUsers([...client.remoteUsers]);
         });
 
         client.on("user-left", (user, reason) => {
           console.log(`[Agora] Remote user ${user.uid} left with reason: ${reason}`);
-          setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+          setRemoteUsers([...client.remoteUsers]);
           if (reason === "Quit") {
             leaveCallRef.current();
           }
         });
 
-        // 1. Create local tracks with discrete voice filtering (AEC, ANS, AGC)
-        localA = await AgoraRTC.createMicrophoneAudioTrack({
-          AEC: true,
-          ANS: true,
-          AGC: true,
-        });
+        // Ensure browser Web Audio Context is active and not suspended
+        if (typeof window !== "undefined") {
+          const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            try {
+              const testCtx = new AudioCtx();
+              if (testCtx.state === "suspended") {
+                testCtx.resume().catch(() => {});
+              }
+            } catch (ctxErr) {}
+          }
+        }
+
+        // Handle browser/webview autoplay restrictions gracefully
+        AgoraRTC.onAudioAutoplayFailed = () => {
+          console.warn("[Agora] Audio autoplay failed, arming touch listener to unlock audio");
+          const unlock = () => {
+            if (clientRef.current) {
+              clientRef.current.remoteUsers.forEach(u => {
+                try {
+                  u.audioTrack?.play();
+                } catch (e) {
+                  console.warn("[Agora] Retry audio play error:", e);
+                }
+              });
+            }
+            window.removeEventListener("click", unlock);
+            window.removeEventListener("touchstart", unlock);
+          };
+          window.addEventListener("click", unlock, { once: true });
+          window.addEventListener("touchstart", unlock, { once: true });
+        };
+
+        // 1. Create local tracks with discrete voice filtering and fallback
+        try {
+          localA = await AgoraRTC.createMicrophoneAudioTrack({
+            AEC: true,
+            ANS: true,
+            AGC: true,
+            encoderConfig: "speech_standard",
+          });
+        } catch (audioConstraintErr) {
+          console.warn("[Agora] createMicrophoneAudioTrack with constraints failed, retrying default:", audioConstraintErr);
+          try {
+            localA = await AgoraRTC.createMicrophoneAudioTrack();
+          } catch (audioFallbackErr) {
+            console.error("[Agora] createMicrophoneAudioTrack fallback failed:", audioFallbackErr);
+            throw audioFallbackErr;
+          }
+        }
+
         if (!isMounted) {
           localA.stop();
           localA.close();
           return;
         }
 
+        try {
+          localA.setVolume(100);
+        } catch (volErr) {
+          console.warn("[Agora] Failed setting local track volume:", volErr);
+        }
+
         if (isVideo) {
-          localV = await AgoraRTC.createCameraVideoTrack();
+          try {
+            localV = await AgoraRTC.createCameraVideoTrack();
+          } catch (videoErr) {
+            console.warn("[Agora] createCameraVideoTrack failed:", videoErr);
+          }
           if (!isMounted) {
             localA.stop();
             localA.close();
-            localV.stop();
-            localV.close();
+            if (localV) {
+              localV.stop();
+              localV.close();
+            }
             return;
           }
         }
@@ -370,21 +425,35 @@ export default function AgoraCallModal({
           return;
         }
 
-        // Sync existing remote users who joined before local client
+        // Sync & SUBSCRIBE to existing remote users who joined before local client
         if (client.remoteUsers && client.remoteUsers.length > 0) {
-          setRemoteUsers(prev => {
-            const combined = [...prev];
-            for (const ru of client.remoteUsers) {
-              if (!combined.find(u => u.uid === ru.uid)) {
-                combined.push(ru);
+          for (const ru of client.remoteUsers) {
+            setRemoteUsers(prev => (prev.find(u => u.uid === ru.uid) ? prev : [...prev, ru]));
+            if (ru.hasAudio && !ru.audioTrack) {
+              try {
+                await client.subscribe(ru, "audio");
+                (ru as any).audioTrack?.setVolume(100);
+                (ru as any).audioTrack?.play();
+                console.log(`[Agora] Subscribed & playing existing remote user audio for UID: ${ru.uid}`);
+              } catch (subErr) {
+                console.warn(`[Agora] Failed subscribing to existing user ${ru.uid} audio:`, subErr);
               }
             }
-            return combined;
-          });
+            if (ru.hasVideo && !ru.videoTrack && isVideo) {
+              try {
+                await client.subscribe(ru, "video");
+                setTimeout(() => {
+                  (ru as any).videoTrack?.play(`remote-video-${ru.uid}`, { fit: "contain" });
+                }, 100);
+              } catch (subErr) {
+                console.warn(`[Agora] Failed subscribing to existing user ${ru.uid} video:`, subErr);
+              }
+            }
+          }
         }
 
         // 3. Publish tracks
-        if (isVideo) {
+        if (isVideo && localV) {
           await client.publish([localA, localV]);
           if (!isMounted) {
             if (localA) { localA.stop(); localA.close(); }
@@ -393,9 +462,6 @@ export default function AgoraCallModal({
           }
 
           setLocalVideoTrack(localV);
-          setTimeout(() => {
-            localV.play("local-video");
-          }, 100);
         } else {
           await client.publish([localA]);
           if (!isMounted) {
@@ -621,13 +687,19 @@ export default function AgoraCallModal({
             {remoteUsers.map(user => (
               <div 
                 key={user.uid} 
-                id={`remote-video-${user.uid}`} 
-                className={`absolute inset-0 w-full h-full object-cover ${!user.hasVideo ? 'flex items-center justify-center bg-[var(--color-brutal-bg)]' : 'bg-black'}`}
+                className="absolute inset-0 w-full h-full bg-black overflow-hidden"
               >
-                {!user.hasVideo && (
-                   <div className="text-black bg-[var(--color-brutal-yellow)] px-6 py-3 border-4 border-black shadow-[6px_6px_0_0_#000] font-black uppercase text-2xl">
-                     Camera Off
-                   </div>
+                {user.hasVideo && user.videoTrack ? (
+                  <VideoTrackPlayer track={user.videoTrack} isLocal={false} />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-[var(--color-brutal-bg)]">
+                    <div className="text-black bg-[var(--color-brutal-yellow)] px-6 py-3 border-4 border-black shadow-[6px_6px_0_0_#000] font-black uppercase text-xl sm:text-2xl mb-4">
+                      Camera Off
+                    </div>
+                    <div className="text-black font-black uppercase text-lg">
+                      {partnerName}
+                    </div>
+                  </div>
                 )}
                 <div className="absolute bottom-6 left-6 z-10 bg-[var(--color-brutal-yellow)] text-black border-4 border-black px-4 py-2 font-black text-lg uppercase shadow-[4px_4px_0_0_#000]">
                   {partnerName}
@@ -638,9 +710,9 @@ export default function AgoraCallModal({
             {/* Local Video Picture-in-Picture */}
             {localVideoTrack && (
               <div 
-                id="local-video" 
-                className={`absolute ${remoteUsers.length > 0 ? 'top-6 right-6 w-28 h-40 sm:w-40 sm:h-56 border-4 border-black shadow-[8px_8px_0_0_#000]' : 'inset-0 w-full h-full'} bg-black overflow-hidden transition-all duration-300 z-20`}
+                className={`absolute ${remoteUsers.some(u => u.hasVideo) ? 'top-6 right-6 w-28 h-40 sm:w-40 sm:h-56 border-4 border-black shadow-[8px_8px_0_0_#000]' : 'inset-0 w-full h-full'} bg-black overflow-hidden transition-all duration-300 z-20`}
               >
+                <VideoTrackPlayer track={localVideoTrack} isLocal={true} />
                 <div className="absolute bottom-2 left-2 z-10 bg-white text-black border-2 border-black px-2 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000]">
                   You
                 </div>

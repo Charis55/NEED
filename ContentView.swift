@@ -6,14 +6,60 @@ import Photos
 import UserNotifications
 import CallKit
 
+// MARK: - Native Notification Delegate (Foreground banners & action button handling)
+@MainActor
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationDelegate()
+
+    // Show banners even when app is open in foreground
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .sound, .badge])
+        } else {
+            completionHandler([.alert, .sound, .badge])
+        }
+    }
+
+    // Handle user tapping Answer or Decline buttons on persistent notifications
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let actionId = response.actionIdentifier
+        let userInfo = response.notification.request.content.userInfo
+        let reqId = (userInfo["requestId"] as? String) ?? (userInfo["jobId"] as? String)
+
+        Task { @MainActor in
+            if actionId == "ANSWER_ACTION" {
+                if let reqId = reqId, !reqId.isEmpty {
+                    NativeCallKitManager.shared.currentJobId = reqId
+                }
+                NativeCallKitManager.shared.onNativeAnswerRequested()
+            } else if actionId == "DECLINE_ACTION" {
+                if let reqId = reqId, !reqId.isEmpty {
+                    NativeCallKitManager.shared.currentJobId = reqId
+                }
+                NativeCallKitManager.shared.onNativeEndRequested()
+            }
+        }
+        completionHandler()
+    }
+}
+
 // MARK: - Native CallKit & Dynamic Island Manager
 @MainActor
 final class NativeCallKitManager: NSObject, CXProviderDelegate {
     static let shared = NativeCallKitManager()
 
-    private let provider: CXProvider
+    let provider: CXProvider
     private let callController = CXCallController()
-    private var activeCallUUID: UUID?
+    private(set) var activeCallUUID: UUID?
+    private var isCallConnected: Bool = false
 
     weak var webView: WKWebView?
     var currentJobId: String?
@@ -50,9 +96,60 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         }
     }
 
+    func configureAudioSession(isSpeaker: Bool = true) {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(
+                .playAndRecord,
+                mode: .voiceChat,
+                options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+            )
+            if isSpeaker {
+                try session.overrideOutputAudioPort(.speaker)
+                UIDevice.current.isProximityMonitoringEnabled = false
+            } else {
+                try session.overrideOutputAudioPort(.none)
+                UIDevice.current.isProximityMonitoringEnabled = true
+            }
+            try session.setActive(true, options: [])
+            print("[CallKit] Audio session successfully configured: isSpeaker=\(isSpeaker)")
+        } catch {
+            print("[CallKit] Error configuring audio session:", error)
+        }
+    }
+
+    func reportIncomingCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
+        self.currentJobId = jobId
+        self.currentCallerId = uid
+        self.isCallConnected = false
+
+        let uuid = UUID()
+        self.activeCallUUID = uuid
+
+        let update = CXCallUpdate()
+        update.remoteHandle = CXHandle(type: .generic, value: partnerName)
+        update.localizedCallerName = partnerName
+        update.hasVideo = isVideo
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
+        update.supportsHolding = false
+        update.supportsDTMF = false
+
+        print("[CallKit] Reporting incoming call for Dynamic Island / Banner: \(partnerName)")
+        provider.reportNewIncomingCall(with: uuid, update: update) { error in
+            if let error = error {
+                print("[CallKit] Failed to report incoming call:", error)
+            } else {
+                print("[CallKit] Incoming call successfully presented on Dynamic Island / Lock Screen")
+            }
+        }
+    }
+
     func startCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
         self.currentJobId = jobId
         self.currentCallerId = uid
+        self.isCallConnected = false
+
         let uuid = UUID()
         self.activeCallUUID = uuid
         let handle = CXHandle(type: .generic, value: partnerName)
@@ -60,22 +157,23 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         startAction.isVideo = isVideo
 
         let transaction = CXTransaction(action: startAction)
-        callController.request(transaction) { [weak self] error in
-            if error == nil {
-                Task { @MainActor in
-                    self?.provider.reportOutgoingCall(with: uuid, connectedAt: Date())
-                }
+        callController.request(transaction) { error in
+            if let error = error {
+                print("[CallKit] CXStartCallAction transaction error:", error)
+            } else {
+                print("[CallKit] CXStartCallAction transaction requested")
             }
         }
 
-        // Configure audio routing: default to loudspeaker for crystal clear volume
-        setAudioMode(mode: "speaker")
+        // Configure audio routing: default to loudspeaker
+        configureAudioSession(isSpeaker: true)
     }
 
     func resetCallState() {
         self.activeCallUUID = nil
         self.currentJobId = nil
         self.currentCallerId = nil
+        self.isCallConnected = false
         UIDevice.current.isProximityMonitoringEnabled = false
     }
 
@@ -93,29 +191,67 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    func onNativeEndRequested() {
+    func onNativeAnswerRequested() {
+        self.isCallConnected = true
+        configureAudioSession(isSpeaker: true)
+
         let savedJobId = self.currentJobId
-        let savedCallerId = self.currentCallerId
+        print("[CallKit] Dynamic Island / CallKit Answer tapped for jobId: \(savedJobId ?? "")")
 
-        // 1. Reset local state
-        resetCallState()
-
-        // 2. Dispatch event to webview so AgoraRTC leaves channel and React unmounts call modal
-        self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeCallEnd'))") { _, error in
+        // 1. Dispatch event to WKWebView so React updates state, dismisses incoming modal and mounts AgoraCallModal
+        self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeCallAnswer', { detail: { jobId: '\(savedJobId ?? "")' } }))") { _, error in
             if let error = error {
-                print("[CallKit] Failed to dispatch needNativeCallEnd:", error)
+                print("[CallKit] Failed to dispatch needNativeCallAnswer:", error)
             }
         }
 
-        // 3. Fallback direct HTTP POST to server in case webview is throttled/backgrounded
-        if let jobId = savedJobId, !jobId.isEmpty, let url = URL(string: "https://need-chi.vercel.app/api/calls/end") {
+        // 2. Direct background HTTP POST to /api/calls/accept as an infallible fallback
+        if let jobId = savedJobId, !jobId.isEmpty, let url = URL(string: "https://need-chi.vercel.app/api/calls/accept") {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let payload: [String: Any] = [
                 "jobId": jobId,
+                "requestId": jobId,
+                "platform": "ios"
+            ]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+            URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
+        }
+    }
+
+    func onNativeEndRequested() {
+        let savedJobId = self.currentJobId
+        let savedCallerId = self.currentCallerId
+        let wasConnected = self.isCallConnected
+
+        // 1. Reset local state
+        resetCallState()
+
+        // 2. Dispatch event to webview
+        let eventName = wasConnected ? "needNativeCallEnd" : "needNativeCallDecline"
+        print("[CallKit] Dynamic Island / CallKit End/Decline tapped: \(eventName)")
+        self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('\(eventName)', { detail: { jobId: '\(savedJobId ?? "")' } }))") { _, error in
+            if let error = error {
+                print("[CallKit] Failed to dispatch \(eventName):", error)
+            }
+        }
+
+        // 3. Fallback direct HTTP POST to server
+        let endpoint = wasConnected ? "https://need-chi.vercel.app/api/calls/end" : "https://need-chi.vercel.app/api/calls/decline"
+        if let jobId = savedJobId, !jobId.isEmpty, let url = URL(string: endpoint) {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            let payload: [String: Any] = wasConnected ? [
+                "jobId": jobId,
                 "callerId": savedCallerId ?? "",
                 "reason": "ended"
+            ] : [
+                "jobId": jobId,
+                "requestId": jobId,
+                "callerId": savedCallerId ?? "",
+                "reason": "declined"
             ]
             request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
             URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
@@ -128,24 +264,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     func setAudioMode(mode: String) {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            if mode == "earpiece" {
-                // Discrete earpiece
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP])
-                try session.overrideOutputAudioPort(.none)
-                // Turn on proximity sensor so screen sleeps when close to ear
-                UIDevice.current.isProximityMonitoringEnabled = true
-            } else {
-                // Default: loudspeaker so call audio is loud and clear
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
-                try session.overrideOutputAudioPort(.speaker)
-                UIDevice.current.isProximityMonitoringEnabled = false
-            }
-            try session.setActive(true)
-        } catch {
-            print("Failed to set audio session mode:", error)
-        }
+        configureAudioSession(isSpeaker: mode != "earpiece")
     }
 
     // MARK: - CXProviderDelegate
@@ -155,15 +274,22 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         }
     }
 
-    nonisolated func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+    nonisolated func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
+        let callUUID = action.callUUID
+        action.fulfill()
         Task { @MainActor in
-            do {
-                try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
-                try audioSession.overrideOutputAudioPort(.speaker)
-                try audioSession.setActive(true)
-            } catch {
-                print("Failed to activate audio session in CallKit didActivate:", error)
-            }
+            NativeCallKitManager.shared.isCallConnected = true
+            NativeCallKitManager.shared.configureAudioSession(isSpeaker: true)
+            NativeCallKitManager.shared.provider.reportOutgoingCall(with: callUUID, connectedAt: Date())
+            print("[CallKit] CXStartCallAction fulfilled successfully")
+        }
+    }
+
+    nonisolated func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
+        action.fulfill()
+        Task { @MainActor in
+            NativeCallKitManager.shared.onNativeAnswerRequested()
+            print("[CallKit] CXAnswerCallAction fulfilled successfully from Dynamic Island / CallKit")
         }
     }
 
@@ -171,6 +297,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         action.fulfill()
         Task { @MainActor in
             NativeCallKitManager.shared.onNativeEndRequested()
+            print("[CallKit] CXEndCallAction fulfilled successfully from Dynamic Island / CallKit")
         }
     }
 
@@ -179,6 +306,21 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         action.fulfill()
         Task { @MainActor in
             NativeCallKitManager.shared.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeMuteToggle', { detail: { isMuted: \(isMuted) } }))", completionHandler: nil)
+            print("[CallKit] CXSetMutedCallAction fulfilled from Dynamic Island: isMuted=\(isMuted)")
+        }
+    }
+
+    nonisolated func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        Task { @MainActor in
+            let session = AVAudioSession.sharedInstance()
+            try? session.overrideOutputAudioPort(.speaker)
+            print("[CallKit] Audio session activated by CallKit, speaker default applied")
+        }
+    }
+
+    nonisolated func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        Task { @MainActor in
+            print("[CallKit] Audio session deactivated by CallKit")
         }
     }
 }
@@ -200,9 +342,10 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
             try? AVAudioSession.sharedInstance().setCategory(
                 .playAndRecord,
                 mode: .voiceChat,
-                options: [.allowBluetoothHFP, .allowBluetoothA2DP]
+                options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
             )
         }
+        AVCaptureDevice.requestAccess(for: .audio) { _ in }
 
         // 2. Camera (For taking job photos and verification)
         AVCaptureDevice.requestAccess(for: .video) { _ in }
@@ -213,7 +356,26 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
         // 4. Location (For connecting to nearby artisans)
         locationManager.requestWhenInUseAuthorization()
 
-        // 5. Push Notifications (For job alerts and incoming call notifications)
+        // 5. Push Notifications & Action Categories (For job alerts and incoming call persistent notifications)
+        let answerAction = UNNotificationAction(
+            identifier: "ANSWER_ACTION",
+            title: "Answer",
+            options: [.foreground]
+        )
+        let declineAction = UNNotificationAction(
+            identifier: "DECLINE_ACTION",
+            title: "Decline",
+            options: [.destructive]
+        )
+        let callCategory = UNNotificationCategory(
+            identifier: "INCOMING_CALL",
+            actions: [answerAction, declineAction],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([callCategory])
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound, .badge]
         ) { granted, _ in
@@ -359,14 +521,43 @@ struct ErrorView: View {
     }
 }
 
+// MARK: - Native App Delegate (APNs Push Token Handling)
+@MainActor
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("[APNs] Registered native push device token: \(tokenString)")
+        WebViewModel.shared.apnsToken = tokenString
+        WebViewModel.shared.bridgeDeviceToken(token: tokenString)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("[APNs] Failed to register for remote notifications: \(error.localizedDescription)")
+    }
+}
+
 // MARK: - WebViewModel
 @MainActor
 final class WebViewModel: ObservableObject {
+    static let shared = WebViewModel()
     @Published var isLoading: Bool = true
     @Published var hasLoadedOnce: Bool = false
     @Published var showError: Bool = false
     @Published var errorMessage: String = ""
     weak var webView: WKWebView?
+    var apnsToken: String?
+
+    func bridgeDeviceToken(token: String) {
+        guard let webView = self.webView else { return }
+        let js = "window.dispatchEvent(new CustomEvent('needNativePushToken', { detail: { token: '\(token)' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
 
     func reload() {
         showError = false
@@ -458,6 +649,12 @@ struct WebView: UIViewRepresentable {
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.prepare()
                 generator.impactOccurred()
+            } else if action == "reportIncomingCall" {
+                let partnerName = dict["partnerName"] as? String ?? "Customer"
+                let isVideo = dict["isVideo"] as? Bool ?? false
+                let jobId = dict["jobId"] as? String
+                let uid = dict["uid"] as? String
+                NativeCallKitManager.shared.reportIncomingCall(partnerName: partnerName, isVideo: isVideo, jobId: jobId, uid: uid)
             } else if action == "startCall" {
                 let partnerName = dict["partnerName"] as? String ?? "Technician"
                 let isVideo = dict["isVideo"] as? Bool ?? false
@@ -518,6 +715,9 @@ struct WebView: UIViewRepresentable {
             viewModel.isLoading = false
             viewModel.hasLoadedOnce = true
             viewModel.showError = false
+            if let token = WebViewModel.shared.apnsToken {
+                WebViewModel.shared.bridgeDeviceToken(token: token)
+            }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

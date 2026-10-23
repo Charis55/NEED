@@ -50,8 +50,8 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        // Only incoming call notifications are data-only (so Java handles the ringing).
-        // All other types (chat, missed_call, etc.) use standard FCM notification payload.
+        // Only incoming call notifications are data-only on Android (so Java handles the ringing & action buttons).
+        // On iOS (APNs), all notifications need alert { title, body } to show banner, with category for calls.
         const isIncomingCall = data?.type === "call";
         await getMessaging(adminApp_).send({
           token: fcmToken,
@@ -72,11 +72,17 @@ export async function POST(req: NextRequest) {
             }),
           },
           apns: {
+            headers: {
+              "apns-priority": "10",
+              "apns-push-type": "alert",
+            },
             payload: {
               aps: {
-                alert: isIncomingCall ? { title, body } : undefined,
+                alert: { title, body },
                 sound: "default",
+                badge: 1,
                 contentAvailable: true,
+                category: isIncomingCall ? "INCOMING_CALL" : undefined,
               },
             },
           },

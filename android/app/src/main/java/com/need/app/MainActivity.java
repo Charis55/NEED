@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.GeolocationPermissions;
+import android.webkit.PermissionRequest;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -175,6 +176,17 @@ public class MainActivity extends BridgeActivity {
                     } else {
                         super.onGeolocationPermissionsShowPrompt(origin, callback);
                     }
+                }
+
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    MainActivity.this.runOnUiThread(() -> {
+                        try {
+                            request.grant(request.getResources());
+                        } catch (Exception e) {
+                            Log.w("MainActivity", "onPermissionRequest grant error: " + e.getMessage());
+                        }
+                    });
                 }
             });
         }

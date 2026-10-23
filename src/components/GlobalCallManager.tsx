@@ -19,6 +19,7 @@ import {
   safeGetSession,
   safeSetSession,
   safeRemoveSession,
+  notifyNativeCall,
 } from "@/utils/device";
 
 const playCallSound = (type: "pickup" | "end") => {
@@ -57,6 +58,7 @@ export default function GlobalCallManager() {
   const lastHandledUrlRef = useRef<{ url: string; time: number } | null>(null);
 
   const clearCallNotification = async () => {
+    notifyNativeCall("endCall");
     if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
       try {
         const { PushNotifications } = await import("@capacitor/push-notifications");
@@ -225,10 +227,16 @@ export default function GlobalCallManager() {
           return foundJob;
         });
 
-        // Trigger notifications for incoming ringing calls
+        // Trigger native CallKit / Dynamic Island & system notifications for incoming ringing calls
         if (status === "ringing" && !isCallerJob) {
           setNotifiedCallId((prevNotified) => {
             if (prevNotified !== foundJob.requestId) {
+              notifyNativeCall("reportIncomingCall", {
+                partnerName: directPartnerName || "Customer",
+                isVideo: (call.type || (call as any).callType) === "video",
+                jobId: foundJob.requestId,
+                uid: userUid,
+              });
               return foundJob.requestId;
             }
             return prevNotified;
@@ -236,6 +244,7 @@ export default function GlobalCallManager() {
         }
       } else {
         if (!terminalStateRef.current) {
+          clearCallNotification();
           setActiveJob(null);
           setNotifiedCallId(null);
         }
@@ -343,6 +352,29 @@ export default function GlobalCallManager() {
       };
     }
   }, []);
+
+  // Listen for Native CallKit & Dynamic Island answer/decline events
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleNativeAnswer = (e: any) => {
+      console.log("[GlobalCallManager] Native answer received from Dynamic Island / CallKit / Notification:", e?.detail);
+      acceptCall();
+    };
+
+    const handleNativeDecline = (e: any) => {
+      console.log("[GlobalCallManager] Native decline received from Dynamic Island / CallKit / Notification:", e?.detail);
+      endCallWithLog("declined");
+    };
+
+    window.addEventListener("needNativeCallAnswer", handleNativeAnswer);
+    window.addEventListener("needNativeCallDecline", handleNativeDecline);
+
+    return () => {
+      window.removeEventListener("needNativeCallAnswer", handleNativeAnswer);
+      window.removeEventListener("needNativeCallDecline", handleNativeDecline);
+    };
+  }, [activeJob?.requestId]);
 
   const fetchPartnerInfo = async (job: JobRequest, uid: string) => {
     try {

@@ -23,7 +23,7 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>MinimumOSVersion</key>
-    <string>17.0</string>
+    <string>16.0</string>
     <key>UIDeviceFamily</key>
     <array>
         <integer>1</integer>
@@ -103,6 +103,7 @@
             <array>
                 <string>com.googleusercontent.apps.48438248184-s8lro7cq49u9r3f1no68e412av09gdro</string>
                 <string>need</string>
+                <string>needapp</string>
             </array>
         </dict>
     </array>
