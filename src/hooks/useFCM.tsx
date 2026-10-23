@@ -17,13 +17,16 @@ async function persistToken(uid: string, token: string) {
     const userRef = doc(db, "users", uid);
     await updateDoc(userRef, { fcmToken: token });
   } catch (e) {
-    console.warn("Failed to save fcmToken to users/:", e);
+    console.warn("Failed to save fcmToken directly to users/:", e);
   }
   try {
-    const artisanRef = doc(db, "artisans", uid);
-    await updateDoc(artisanRef, { fcmToken: token });
+    await fetch("/api/notifications/register-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, token }),
+    });
   } catch (e) {
-    // Not an artisan — that's fine
+    console.warn("Failed calling /api/notifications/register-token:", e);
   }
 }
 
@@ -159,26 +162,37 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
     // Listen for native iOS token bridge events
     const handleNativeToken = (e: any) => {
       const token = e.detail?.token;
-      if (token && auth.currentUser) {
+      if (!token) return;
+      pendingNativeToken.current = token;
+      const currentUid = auth.currentUser?.uid;
+      if (currentUid) {
         console.log("[useFCM] Native iOS push token received:", token.substring(0, 10) + "...");
-        persistToken(auth.currentUser.uid, token);
+        persistToken(currentUid, token);
       }
     };
     window.addEventListener("needNativePushToken", handleNativeToken);
+
+    // Proactively ask native wrapper for cached token if already received
+    try {
+      (window as any).webkit?.messageHandlers?.needNative?.postMessage?.({ action: "getPushToken" });
+    } catch (e) {}
 
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
 
       try {
+        if (pendingNativeToken.current) {
+          await persistToken(user.uid, pendingNativeToken.current);
+        }
         if (Capacitor.isNativePlatform()) {
           await setupNativePush(user.uid);
-
-          if (pendingNativeToken.current) {
-            await persistToken(user.uid, pendingNativeToken.current);
-          }
         } else {
           await setupWebPush(user.uid);
         }
+        // Ask native wrapper again post-login
+        try {
+          (window as any).webkit?.messageHandlers?.needNative?.postMessage?.({ action: "getPushToken" });
+        } catch (e) {}
       } catch (error: any) {
         console.warn("FCM setup failed:", error);
       }

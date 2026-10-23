@@ -97,17 +97,32 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse receiver info
+    let rawApnsToken: string | undefined;
     if (receiverUserDoc.exists) {
       const d = receiverUserDoc.data()!;
       fcmToken = d.fcmToken;
+      rawApnsToken = d.apnsToken;
       receiverName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || receiverName;
       receiverPhoto = d.photoURL || d.profilePictureUrl || null;
     }
     if (receiverArtisanDoc.exists) {
       const d = receiverArtisanDoc.data()!;
       if (!fcmToken) fcmToken = d.fcmToken;
+      if (!rawApnsToken) rawApnsToken = d.apnsToken;
       receiverName = d.businessName || d.name || receiverName;
       receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
+    }
+
+    // Convert APNs hex token if necessary
+    const targetToken = fcmToken || rawApnsToken;
+    if (targetToken && /^[0-9a-fA-F]{64}$/.test(targetToken)) {
+      const { convertApnsToFcm } = await import("@/app/api/notifications/register-token/route");
+      const converted = await convertApnsToFcm(targetToken);
+      if (converted) {
+        fcmToken = converted;
+        // Cache converted FCM token in Firestore
+        adminDb.collection("users").doc(receiverId).set({ fcmToken: converted }, { merge: true }).catch(() => {});
+      }
     }
 
     // 4. Generate unique identifiers and server-assigned Agora UIDs

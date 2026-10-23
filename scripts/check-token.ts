@@ -4,7 +4,12 @@ async function run() {
   console.log("Found", users.docs.length, "users.");
   users.forEach(doc => {
     const data = doc.data();
-    console.log(doc.id, "=>", data.fcmToken ? "HAS_TOKEN: " + data.fcmToken.substring(0, 10) + "..." : "NO_TOKEN");
+    console.log(doc.id, "=>", data.displayName || data.firstName || data.email, "token:", data.fcmToken ? data.fcmToken.substring(0, 20) + "... (len: " + data.fcmToken.length + ")" : "NO_TOKEN");
+  });
+  const jobs = await adminDb.collection("jobRequests").orderBy("createdAt", "desc").limit(3).get();
+  jobs.forEach(doc => {
+    const d = doc.data();
+    console.log("Job:", doc.id, "customer:", d.customerId, "artisan:", d.artisanId, "activeCall:", d.activeCall?.callId, "status:", d.activeCall?.status);
   });
 }
-run().catch(console.error);
+run().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });

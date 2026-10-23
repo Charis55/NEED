@@ -46,7 +46,7 @@ interface AgoraCallModalProps {
 function VideoTrackPlayer({
   track,
   isLocal = false,
-  className = "w-full h-full object-cover",
+  className = "w-full h-full",
 }: {
   track: ICameraVideoTrack | IRemoteVideoTrack | null | undefined;
   isLocal?: boolean;
@@ -59,17 +59,38 @@ function VideoTrackPlayer({
     if (!el || !track) return;
     try {
       track.play(el, { fit: "cover", mirror: isLocal });
+      const enforceVideoAttributes = () => {
+        const video = el.querySelector("video");
+        if (video) {
+          video.setAttribute("playsinline", "true");
+          video.setAttribute("webkit-playsinline", "true");
+          if (isLocal) {
+            video.muted = true;
+            video.setAttribute("muted", "true");
+          }
+          video.play().catch(() => {});
+        }
+      };
+      enforceVideoAttributes();
+      const timer = setTimeout(enforceVideoAttributes, 150);
+      return () => {
+        clearTimeout(timer);
+        try {
+          track.stop();
+        } catch (e) {}
+      };
     } catch (err) {
       console.warn("[Agora VideoTrackPlayer] Play error:", err);
     }
-    return () => {
-      try {
-        track.stop();
-      } catch (e) {}
-    };
   }, [track, isLocal]);
 
-  return <div ref={containerRef} className={className} />;
+  return (
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}
+    />
+  );
 }
 
 export default function AgoraCallModal({ 
@@ -258,8 +279,8 @@ export default function AgoraCallModal({
     let localV: ICameraVideoTrack;
     let connectionPromise: Promise<void> | null = null;
     
-    // Create a fresh client for this effect execution
-    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    // Create a fresh client with h264 for universal iOS Safari / WebKit hardware support
+    const client = AgoraRTC.createClient({ mode: "rtc", codec: "h264" });
     clientRef.current = client;
 
     const initCall = async () => {
@@ -372,6 +393,9 @@ export default function AgoraCallModal({
         if (isVideo) {
           try {
             localV = await AgoraRTC.createCameraVideoTrack();
+            if (isMounted) {
+              setLocalVideoTrack(localV);
+            }
           } catch (videoErr) {
             console.warn("[Agora] createCameraVideoTrack failed:", videoErr);
           }
@@ -442,9 +466,8 @@ export default function AgoraCallModal({
             if (ru.hasVideo && !ru.videoTrack && isVideo) {
               try {
                 await client.subscribe(ru, "video");
-                setTimeout(() => {
-                  (ru as any).videoTrack?.play(`remote-video-${ru.uid}`, { fit: "contain" });
-                }, 100);
+                setRemoteUsers([...client.remoteUsers]);
+                console.log(`[Agora] Subscribed to existing user ${ru.uid} video`);
               } catch (subErr) {
                 console.warn(`[Agora] Failed subscribing to existing user ${ru.uid} video:`, subErr);
               }

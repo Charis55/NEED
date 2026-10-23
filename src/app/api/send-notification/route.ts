@@ -35,6 +35,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No FCM token registered for recipient" }, { status: 404 });
     }
 
+    if (fcmToken && /^[0-9a-fA-F]{64}$/.test(fcmToken)) {
+      const { convertApnsToFcm } = await import("@/app/api/notifications/register-token/route");
+      const converted = await convertApnsToFcm(fcmToken);
+      if (converted) {
+        fcmToken = converted;
+        adminDb.collection(collectionName).doc(userId).update({ fcmToken: converted }).catch(() => {});
+      }
+    }
+
     let pushSuccess = false;
 
     if (fcmToken && pushEnabled) {
