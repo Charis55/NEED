@@ -39,6 +39,12 @@ public class CustomMessagingService extends MessagingService {
             if (notificationManager != null) {
                 notificationManager.cancel(1001);
             }
+        } else {
+            // General notification: chat, job_update, new_request, etc.
+            // When the app is in the background or killed, ensure a system notification is posted!
+            if (!MainActivity.isAppInForeground) {
+                showGeneralNotification(remoteMessage);
+            }
         }
     }
 
@@ -144,5 +150,73 @@ public class CustomMessagingService extends MessagingService {
         notification.flags |= Notification.FLAG_INSISTENT;
 
         notificationManager.notify(1001, notification);
+    }
+
+    private void showGeneralNotification(RemoteMessage remoteMessage) {
+        Map<String, String> data = remoteMessage.getData();
+        String title = null;
+        String body = null;
+
+        if (remoteMessage.getNotification() != null) {
+            title = remoteMessage.getNotification().getTitle();
+            body = remoteMessage.getNotification().getBody();
+        }
+        if ((title == null || title.isEmpty()) && data != null) {
+            title = data.get("title");
+        }
+        if (title == null || title.isEmpty()) {
+            title = "Need";
+        }
+        if ((body == null || body.isEmpty()) && data != null) {
+            body = data.get("body");
+        }
+        if (body == null || body.isEmpty()) {
+            body = "You have a new update";
+        }
+
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) return;
+
+        String channelId = "high_priority_alerts";
+
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        String reqId = data != null ? data.get("requestId") : null;
+        if (reqId == null && data != null) reqId = data.get("jobId");
+        if (reqId != null && !reqId.isEmpty()) {
+            intent.setData(Uri.parse("needapp://chat/" + reqId));
+            intent.putExtra("requestId", reqId);
+            intent.putExtra("jobId", reqId);
+        }
+
+        if (data != null) {
+            for (Map.Entry<String, String> entry : data.entrySet()) {
+                intent.putExtra(entry.getKey(), entry.getValue());
+            }
+        }
+
+        int notifId = (int) (System.currentTimeMillis() % 100000);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, notifId, intent, flags);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent);
+
+        int resId = getResources().getIdentifier("ic_stat_icon", "drawable", getPackageName());
+        if (resId != 0) {
+            builder.setSmallIcon(resId);
+        }
+
+        notificationManager.notify(notifId, builder.build());
     }
 }

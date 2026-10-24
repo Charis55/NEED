@@ -57,31 +57,51 @@ function VideoTrackPlayer({
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !track) return;
-    try {
-      track.play(el, { fit: "cover", mirror: isLocal });
-      const enforceVideoAttributes = () => {
-        const video = el.querySelector("video");
-        if (video) {
-          video.setAttribute("playsinline", "true");
-          video.setAttribute("webkit-playsinline", "true");
-          if (isLocal) {
-            video.muted = true;
-            video.setAttribute("muted", "true");
-          }
-          video.play().catch(() => {});
+
+    let isCancelled = false;
+
+    const playVideo = () => {
+      if (isCancelled || !containerRef.current) return;
+      try {
+        while (containerRef.current.firstChild) {
+          containerRef.current.removeChild(containerRef.current.firstChild);
         }
-      };
-      enforceVideoAttributes();
-      const timer = setTimeout(enforceVideoAttributes, 150);
-      return () => {
-        clearTimeout(timer);
-        try {
-          track.stop();
-        } catch (e) {}
-      };
-    } catch (err) {
-      console.warn("[Agora VideoTrackPlayer] Play error:", err);
-    }
+        track.play(containerRef.current, { fit: "cover", mirror: isLocal });
+
+        const fixVideo = () => {
+          if (!containerRef.current) return;
+          const video = containerRef.current.querySelector("video");
+          if (video) {
+            video.setAttribute("playsinline", "true");
+            video.setAttribute("webkit-playsinline", "true");
+            video.setAttribute("autoplay", "true");
+            video.playsInline = true;
+            video.autoplay = true;
+            if (isLocal) {
+              video.muted = true;
+              video.setAttribute("muted", "true");
+            }
+            video.play().catch(() => {});
+          }
+        };
+
+        fixVideo();
+        setTimeout(fixVideo, 50);
+        setTimeout(fixVideo, 200);
+        setTimeout(fixVideo, 600);
+      } catch (err) {
+        console.warn("[Agora VideoTrackPlayer] Play error:", err);
+      }
+    };
+
+    playVideo();
+
+    return () => {
+      isCancelled = true;
+      try {
+        track.stop();
+      } catch (e) {}
+    };
   }, [track, isLocal]);
 
   return (
@@ -129,6 +149,38 @@ export default function AgoraCallModal({
 
   // Both participants are connected in the channel
   const bothConnected = joined && remoteUsers.length > 0;
+
+  // Proactively unlock Web Audio Context & Agora audio on ANY user touch or click
+  useEffect(() => {
+    const unlockAllAudio = () => {
+      try {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+          }
+        }
+        if (clientRef.current) {
+          clientRef.current.remoteUsers.forEach(u => {
+            if (u.audioTrack && !u.audioTrack.isPlaying) {
+              try {
+                u.audioTrack.setVolume(100);
+                u.audioTrack.play();
+              } catch (playErr) {}
+            }
+          });
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener("touchstart", unlockAllAudio);
+    window.addEventListener("click", unlockAllAudio);
+    return () => {
+      window.removeEventListener("touchstart", unlockAllAudio);
+      window.removeEventListener("click", unlockAllAudio);
+    };
+  }, []);
 
   useEffect(() => {
     // Play pickup sound when call connects
@@ -413,34 +465,25 @@ export default function AgoraCallModal({
         // 2. Join channel AFTER permissions are granted and tracks created
         let joinSuccess = false;
         let retries = 3;
-        // Priority: try user account string first, with automatic fallback to null for wildcard numeric token
-        let currentJoinParam: string | null = joinUid || String(uid);
-        let triedFallback = false;
+        const currentJoinParam: string = joinUid || String(uid);
 
         while (!joinSuccess && retries > 0) {
           try {
             await client.join(appId, channelName, token, currentJoinParam);
             joinSuccess = true;
+            console.log(`[Agora] Successfully joined channel ${channelName} with UID ${currentJoinParam}`);
           } catch (err: any) {
             console.warn(`Agora join attempt failed with param [${currentJoinParam}] (retries left: ${retries - 1}):`, err);
             const errStr = (err?.message || '') + (err?.code || '');
 
-            // If token authorization fails due to UID mismatch (e.g. token signed for user account vs wildcard 0)
-            if (!triedFallback && (errStr.includes('invalid token') || errStr.includes('CAN_NOT_GET_GATEWAY_SERVER') || err?.code === 4096)) {
-              console.warn("Switching join parameter between account UID and wildcard null...");
-              currentJoinParam = currentJoinParam ? null : String(uid);
-              triedFallback = true;
-              continue;
-            }
-
             if (err?.code === 'UID_CONFLICT' || errStr.includes('UID_CONFLICT')) {
               console.warn("UID_CONFLICT detected, retrying join in 600ms...");
               await new Promise(r => setTimeout(r, 600));
-              retries--;
-              if (retries === 0) throw err;
             } else {
-              throw err;
+              await new Promise(r => setTimeout(r, 800));
             }
+            retries--;
+            if (retries === 0) throw err;
           }
         }
         if (!isMounted) {
@@ -710,7 +753,7 @@ export default function AgoraCallModal({
             {remoteUsers.map(user => (
               <div 
                 key={user.uid} 
-                className="absolute inset-0 w-full h-full bg-black overflow-hidden"
+                className="absolute inset-0 w-full h-full bg-black overflow-hidden z-10"
               >
                 {user.hasVideo && user.videoTrack ? (
                   <VideoTrackPlayer track={user.videoTrack} isLocal={false} />

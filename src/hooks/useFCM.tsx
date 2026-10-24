@@ -3,9 +3,10 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "firebase/messaging";
-import { auth, messaging, db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
+import { apiFetch } from "@/utils/apiBase";
 
 /**
  * Saves the FCM token to both the users and artisans collections.
@@ -20,11 +21,13 @@ async function persistToken(uid: string, token: string) {
     console.warn("Failed to save fcmToken directly to users/:", e);
   }
   try {
-    await fetch("/api/notifications/register-token", {
+    const res = await apiFetch("/api/notifications/register-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uid, token }),
     });
+    const data = await res.json().catch(() => ({}));
+    console.log("[useFCM] /api/notifications/register-token result:", data);
   } catch (e) {
     console.warn("Failed calling /api/notifications/register-token:", e);
   }
@@ -38,85 +41,83 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
   const pendingNativeToken = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !messaging) return;
+    if (typeof window === "undefined") return;
 
     // Track whether listeners have been added so we don't double-add
     let nativeListenersAdded = false;
 
     const setupNativePush = async (uid: string) => {
-      const { PushNotifications } = await import("@capacitor/push-notifications");
-
-      let permStatus = await PushNotifications.checkPermissions();
-      if (permStatus.receive === "prompt") {
-        permStatus = await PushNotifications.requestPermissions();
-      }
-      if (permStatus.receive !== "granted") {
-        console.warn("Native push permission denied");
-        return;
-      }
-
-      if (!nativeListenersAdded) {
-        nativeListenersAdded = true;
-
-        PushNotifications.addListener("registration", async (tokenResult) => {
-          console.log("Native FCM token:", tokenResult.value);
-          pendingNativeToken.current = tokenResult.value;
-
-          // auth.currentUser may or may not be set by now.
-          // Use the uid we closed over from onAuthStateChanged.
-          await persistToken(uid, tokenResult.value);
-        });
-
-        PushNotifications.addListener("registrationError", (err) => {
-          console.error("Native push registration failed:", err);
-        });
-
-
-        PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-          console.log("Notification action:", action);
-          const data = action.notification.data;
-          
-          if (data && data.type) {
-            // Wait slightly to ensure capacitor has foregrounded before routing
-            setTimeout(() => {
-              switch (data.type) {
-                case "chat":
-                case "call":
-                case "job_update":
-                  if (data.requestId) {
-                    router.push(`/chat/${data.requestId}`);
-                  }
-                  break;
-                case "new_request":
-                  router.push("/technician/jobs");
-                  break;
-                default:
-                  if (data.requestId) {
-                    router.push(`/chat/${data.requestId}`);
-                  }
-                  break;
-              }
-            }, 100);
-          }
-        });
-      }
-
       try {
-        await PushNotifications.createChannel({
-          id: "high_priority_alerts",
-          name: "High Priority Alerts",
-          description: "Important updates that require immediate attention",
-          importance: 5,
-          sound: "default",
-          vibration: true,
-          visibility: 1
-        });
+        const { PushNotifications } = await import("@capacitor/push-notifications");
 
-      } catch (e) {
-        console.warn("Failed to create notification channel:", e);
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === "prompt") {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+        if (permStatus.receive !== "granted") {
+          console.warn("[useFCM] Native push permission denied");
+          return;
+        }
+
+        if (!nativeListenersAdded) {
+          nativeListenersAdded = true;
+
+          PushNotifications.addListener("registration", async (tokenResult) => {
+            console.log("[useFCM] Native FCM token:", tokenResult.value);
+            pendingNativeToken.current = tokenResult.value;
+            await persistToken(uid, tokenResult.value);
+          });
+
+          PushNotifications.addListener("registrationError", (err) => {
+            console.error("[useFCM] Native push registration failed:", err);
+          });
+
+          PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+            console.log("[useFCM] Notification action:", action);
+            const data = action.notification.data;
+            
+            if (data && data.type) {
+              setTimeout(() => {
+                switch (data.type) {
+                  case "chat":
+                  case "call":
+                  case "job_update":
+                    if (data.requestId) {
+                      router.push(`/chat/${data.requestId}`);
+                    }
+                    break;
+                  case "new_request":
+                    router.push("/technician/jobs");
+                    break;
+                  default:
+                    if (data.requestId) {
+                      router.push(`/chat/${data.requestId}`);
+                    }
+                    break;
+                }
+              }, 100);
+            }
+          });
+        }
+
+        try {
+          await PushNotifications.createChannel({
+            id: "high_priority_alerts",
+            name: "High Priority Alerts",
+            description: "Important updates that require immediate attention",
+            importance: 5,
+            sound: "default",
+            vibration: true,
+            visibility: 1
+          });
+        } catch (e) {
+          console.warn("[useFCM] Failed to create notification channel:", e);
+        }
+
+        await PushNotifications.register();
+      } catch (err) {
+        console.warn("[useFCM] setupNativePush error:", err);
       }
-
-      await PushNotifications.register();
     };
 
     const setupWebPush = async (uid: string) => {
@@ -129,7 +130,14 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
         }
         if (permission !== "granted") return;
 
-        const token = await getToken(messaging as any, {
+        const { getMessaging, isSupported } = await import("firebase/messaging");
+        const supported = await isSupported().catch(() => false);
+        if (!supported) return;
+
+        const { app } = await import("@/lib/firebase");
+        const msg = getMessaging(app);
+
+        const token = await getToken(msg, {
           vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",
         });
 
@@ -142,9 +150,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // On native: eagerly create the high-priority channel as soon as the
-    // app boots. Android requires the channel to exist BEFORE any notification
-    // arrives. Doing this before auth means it's ready even on a fresh install.
+    // On native Capacitor: eagerly create the high-priority channel
     if (Capacitor.isNativePlatform()) {
       import("@capacitor/push-notifications").then(({ PushNotifications }) => {
         PushNotifications.createChannel({
@@ -156,23 +162,23 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
           vibration: true,
           visibility: 1,
         }).catch((e) => console.warn("Channel creation error:", e));
-      });
+      }).catch(() => {});
     }
 
-    // Listen for native iOS token bridge events
+    // Listen for native iOS token bridge events (from WebKit userContentController)
     const handleNativeToken = (e: any) => {
       const token = e.detail?.token;
       if (!token) return;
+      console.log("[useFCM] Native iOS push token event received:", token.substring(0, 10) + "...");
       pendingNativeToken.current = token;
       const currentUid = auth.currentUser?.uid;
       if (currentUid) {
-        console.log("[useFCM] Native iOS push token received:", token.substring(0, 10) + "...");
         persistToken(currentUid, token);
       }
     };
     window.addEventListener("needNativePushToken", handleNativeToken);
 
-    // Proactively ask native wrapper for cached token if already received
+    // Proactively request native wrapper to send the push token if already obtained
     try {
       (window as any).webkit?.messageHandlers?.needNative?.postMessage?.({ action: "getPushToken" });
     } catch (e) {}
@@ -182,6 +188,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (pendingNativeToken.current) {
+          console.log("[useFCM] Persisting pending native token for user:", user.uid);
           await persistToken(user.uid, pendingNativeToken.current);
         }
         if (Capacitor.isNativePlatform()) {
@@ -194,7 +201,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
           (window as any).webkit?.messageHandlers?.needNative?.postMessage?.({ action: "getPushToken" });
         } catch (e) {}
       } catch (error: any) {
-        console.warn("FCM setup failed:", error);
+        console.warn("[useFCM] FCM setup failed:", error);
       }
     });
 
