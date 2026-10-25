@@ -279,6 +279,17 @@ public class AudioTogglePlugin extends Plugin {
                 // 3. Set telephony communication mode and speakerphone
                 audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
                 audioManager.setSpeakerphoneOn(true);
+                try {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0);
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0);
+                    int currentVol = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL);
+                    int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL);
+                    if (currentVol < maxVol / 3) {
+                        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, (int)(maxVol * 0.8), 0);
+                    }
+                } catch (Exception volEx) {
+                    Log.w(TAG, "Volume adjust warning: " + volEx.getMessage());
+                }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();

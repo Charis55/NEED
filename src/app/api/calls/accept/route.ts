@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         if (!callerId) {
           callerId = jobData.activeCall?.callerId;
         }
-        if (!channelName && jobData.activeCall?.channelName) {
+        if (jobData.activeCall?.channelName) {
           channelName = jobData.activeCall.channelName;
         }
 

@@ -848,7 +848,7 @@ export default function GlobalCallManager() {
         {isOngoingForMe && (
           <AgoraCallModal
             jobId={activeJob.requestId}
-            channelName={activeCall.channelName || activeJob.requestId}
+            channelName={activeJob.requestId}
             uid={userUid}
             isVideo={(activeCall.type || (activeCall as any).callType) === "video"}
             partnerName={inCallPartnerName}

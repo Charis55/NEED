@@ -63,6 +63,9 @@ function VideoTrackPlayer({
     const playVideo = () => {
       if (isCancelled || !containerRef.current) return;
       try {
+        try {
+          track.stop();
+        } catch (e) {}
         while (containerRef.current.firstChild) {
           containerRef.current.removeChild(containerRef.current.firstChild);
         }
@@ -149,6 +152,12 @@ export default function AgoraCallModal({
 
   // Both participants are connected in the channel
   const bothConnected = joined && remoteUsers.length > 0;
+
+  useEffect(() => {
+    if (bothConnected && !bothConnectedAt && onBothConnected) {
+      onBothConnected(Date.now());
+    }
+  }, [bothConnected, bothConnectedAt, onBothConnected]);
 
   // Proactively unlock Web Audio Context & Agora audio on ANY user touch or click
   useEffect(() => {
@@ -362,6 +371,9 @@ export default function AgoraCallModal({
               console.warn("Agora audioTrack play error:", playErr);
             }
             if (typeof window !== "undefined") {
+              if (Capacitor.isNativePlatform()) {
+                AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(console.warn);
+              }
               notifyNativeCall("setAudioMode", { mode: speakerOnRef.current ? "speaker" : "earpiece" });
             }
           }
@@ -412,54 +424,82 @@ export default function AgoraCallModal({
           window.addEventListener("touchstart", unlock, { once: true });
         };
 
-        // 1. Create local tracks with discrete voice filtering and fallback
-        try {
-          localA = await AgoraRTC.createMicrophoneAudioTrack({
-            AEC: true,
-            ANS: true,
-            AGC: true,
-            encoderConfig: "speech_standard",
-          });
-        } catch (audioConstraintErr) {
-          console.warn("[Agora] createMicrophoneAudioTrack with constraints failed, retrying default:", audioConstraintErr);
+        // Probe permissions on mobile / WebViews to ensure permission dialogs are surfaced
+        if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
           try {
+            const probe = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: isVideo ? { facingMode: "user" } : false,
+            });
+            probe.getTracks().forEach((t) => t.stop());
+          } catch (probeErr) {
+            console.warn("[Agora] UserMedia probe warning:", probeErr);
+          }
+        }
+
+        // 1. Create local tracks: combined on video calls for single-query mobile stability
+        if (isVideo) {
+          try {
+            const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+              { AEC: true, ANS: true, AGC: true, encoderConfig: "speech_standard" },
+              { facingMode: "user", encoderConfig: "480p_1" }
+            );
+            localA = audioTrack;
+            localV = videoTrack;
+          } catch (combinedErr) {
+            console.warn("[Agora] Combined tracks with presets failed, trying minimal:", combinedErr);
+            try {
+              const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
+                {},
+                { facingMode: "user" }
+              );
+              localA = audioTrack;
+              localV = videoTrack;
+            } catch (fallbackErr) {
+              console.warn("[Agora] Combined fallback failed, creating tracks individually:", fallbackErr);
+              try {
+                localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+              } catch (aErr) {
+                localA = await AgoraRTC.createMicrophoneAudioTrack();
+              }
+              try {
+                localV = await AgoraRTC.createCameraVideoTrack({ facingMode: "user" });
+              } catch (camErr) {
+                try {
+                  localV = await AgoraRTC.createCameraVideoTrack();
+                } catch (camErr2) {
+                  console.warn("[Agora] Camera completely unavailable:", camErr2);
+                }
+              }
+            }
+          }
+          if (isMounted && localV) {
+            setLocalVideoTrack(localV);
+          }
+        } else {
+          try {
+            localA = await AgoraRTC.createMicrophoneAudioTrack({
+              AEC: true,
+              ANS: true,
+              AGC: true,
+              encoderConfig: "speech_standard",
+            });
+          } catch (audioConstraintErr) {
+            console.warn("[Agora] createMicrophoneAudioTrack with constraints failed, retrying default:", audioConstraintErr);
             localA = await AgoraRTC.createMicrophoneAudioTrack();
-          } catch (audioFallbackErr) {
-            console.error("[Agora] createMicrophoneAudioTrack fallback failed:", audioFallbackErr);
-            throw audioFallbackErr;
           }
         }
 
         if (!isMounted) {
-          localA.stop();
-          localA.close();
+          if (localA) { (localA as any).stop?.(); (localA as any).close?.(); }
+          if (localV) { (localV as any).stop?.(); (localV as any).close?.(); }
           return;
         }
 
         try {
-          localA.setVolume(100);
+          localA?.setVolume(100);
         } catch (volErr) {
           console.warn("[Agora] Failed setting local track volume:", volErr);
-        }
-
-        if (isVideo) {
-          try {
-            localV = await AgoraRTC.createCameraVideoTrack();
-            if (isMounted) {
-              setLocalVideoTrack(localV);
-            }
-          } catch (videoErr) {
-            console.warn("[Agora] createCameraVideoTrack failed:", videoErr);
-          }
-          if (!isMounted) {
-            localA.stop();
-            localA.close();
-            if (localV) {
-              localV.stop();
-              localV.close();
-            }
-            return;
-          }
         }
 
         // 2. Join channel AFTER permissions are granted and tracks created
@@ -582,7 +622,7 @@ export default function AgoraCallModal({
         client.leave().catch(console.error);
       }
     };
-  }, [token, appId, channelName]);
+  }, [token, appId, channelName, isVideo]);
 
   const toggleMic = async () => {
     if (localAudioTrack) {
@@ -776,7 +816,7 @@ export default function AgoraCallModal({
             {/* Local Video Picture-in-Picture */}
             {localVideoTrack && (
               <div 
-                className={`absolute ${remoteUsers.some(u => u.hasVideo) ? 'top-6 right-6 w-28 h-40 sm:w-40 sm:h-56 border-4 border-black shadow-[8px_8px_0_0_#000]' : 'inset-0 w-full h-full'} bg-black overflow-hidden transition-all duration-300 z-20`}
+                className={`absolute ${remoteUsers.length > 0 ? 'top-6 right-6 w-28 h-40 sm:w-40 sm:h-56 border-4 border-black shadow-[8px_8px_0_0_#000]' : 'inset-0 w-full h-full'} bg-black overflow-hidden transition-all duration-300 z-20`}
               >
                 <VideoTrackPlayer track={localVideoTrack} isLocal={true} />
                 <div className="absolute bottom-2 left-2 z-10 bg-white text-black border-2 border-black px-2 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000]">

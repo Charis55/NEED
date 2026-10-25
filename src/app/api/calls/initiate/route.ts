@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     const callerAgoraUid = 1000 + Math.floor(Math.random() * 8000);
     const calleeAgoraUid = 10000 + Math.floor(Math.random() * 8000);
     const ringExpiresAt = now + 45000;
-    const channelName = `${jobId}_${now}`;
+    const channelName = jobId;
 
     const activeCallPayload = {
       callId,

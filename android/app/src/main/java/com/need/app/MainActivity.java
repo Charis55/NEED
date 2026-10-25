@@ -13,6 +13,12 @@ import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.util.Log;
+import android.content.pm.PackageManager;
+import android.webkit.WebSettings;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import java.util.ArrayList;
+import java.util.List;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.util.PermissionHelper;
@@ -29,6 +35,22 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         createNotificationChannel();
         handleCallIntent(getIntent());
+
+        // Pre-request native OS permissions for Agora audio/video calls
+        final String[] callPermissions = {
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.CAMERA,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS
+        };
+        List<String> missing = new ArrayList<>();
+        for (String p : callPermissions) {
+            if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(p);
+            }
+        }
+        if (!missing.isEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toArray(new String[0]), 2001);
+        }
     }
 
     @Override
@@ -162,6 +184,12 @@ public class MainActivity extends BridgeActivity {
     public void onStart() {
         super.onStart();
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            WebSettings settings = this.bridge.getWebView().getSettings();
+            if (settings != null) {
+                // Allow WebRTC audio/video to play automatically without requiring a user gesture on each incoming track
+                settings.setMediaPlaybackRequiresUserGesture(false);
+            }
+
             this.bridge.getWebView().setWebChromeClient(new BridgeWebChromeClient(this.bridge) {
                 @Override
                 public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
@@ -182,7 +210,24 @@ public class MainActivity extends BridgeActivity {
                 public void onPermissionRequest(final PermissionRequest request) {
                     MainActivity.this.runOnUiThread(() -> {
                         try {
-                            request.grant(request.getResources());
+                            String[] resources = request.getResources();
+                            boolean needsAudio = false;
+                            boolean needsVideo = false;
+                            for (String r : resources) {
+                                if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) needsAudio = true;
+                                if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) needsVideo = true;
+                            }
+
+                            boolean hasAudio = !needsAudio || ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+                            boolean hasVideo = !needsVideo || ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+
+                            if (!hasAudio || !hasVideo) {
+                                List<String> toRequest = new ArrayList<>();
+                                if (needsAudio && !hasAudio) toRequest.add(Manifest.permission.RECORD_AUDIO);
+                                if (needsVideo && !hasVideo) toRequest.add(Manifest.permission.CAMERA);
+                                ActivityCompat.requestPermissions(MainActivity.this, toRequest.toArray(new String[0]), 2002);
+                            }
+                            request.grant(resources);
                         } catch (Exception e) {
                             Log.w("MainActivity", "onPermissionRequest grant error: " + e.getMessage());
                         }
