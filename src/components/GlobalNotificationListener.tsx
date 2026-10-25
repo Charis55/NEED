@@ -4,18 +4,20 @@ import { useEffect, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getDoc, doc, QuerySnapshot, QueryDocumentSnapshot } from "firebase/firestore";
 import { useAlert } from "@/components/AlertProvider";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { JobRequest } from "@/types";
 
 export default function GlobalNotificationListener() {
   const { showAlert } = useAlert();
   const router = useRouter();
+  const pathname = usePathname();
   
   // Refs to skip the initial load of onSnapshot
   const initialArtisanLoad = useRef(true);
   const initialCustomerLoad = useRef(true);
   const lastMessageAtMap = useRef<Record<string, number>>({});
   const listenerAttachedAt = useRef(Date.now());
+  const seenNotificationIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
@@ -27,17 +29,69 @@ export default function GlobalNotificationListener() {
       } catch (e) {}
 
       // Check if user has notifications enabled
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const prefs = userDoc.data()?.preferences;
-      if (prefs && prefs.inAppNotifications === false) {
-        return; // Disabled
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const prefs = userDoc.data()?.preferences;
+        if (prefs && prefs.inAppNotifications === false) {
+          return; // In-app alerts disabled by user preference
+        }
+      } catch (prefErr) {
+        // Continue if offline or read restricted
       }
 
       // Check if artisan (to know which routes to use)
-      const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
-      const isArtisan = artisanDoc.exists();
+      let isArtisan = false;
+      try {
+        const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
+        isArtisan = artisanDoc.exists();
+      } catch (artErr) {}
 
-      // 1. Listen to Job Requests (Both direct and customer requests)
+      // 1. Direct listener to users/{uid}/notifications collection
+      // Catches all push/in-app notifications created by /api/send-notification
+      let unsubNotifications = () => {};
+      try {
+        const qNotifications = query(
+          collection(db, "users", user.uid, "notifications"),
+          where("createdAt", ">", listenerAttachedAt.current)
+        );
+        unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
+          for (const change of snapshot.docChanges()) {
+            if (change.type === "added") {
+              const notif = change.doc.data();
+              const notifId = change.doc.id || notif.id;
+              if (seenNotificationIds.current.has(notifId)) continue;
+              seenNotificationIds.current.add(notifId);
+
+              // Don't alert if user is already on the relevant chat screen
+              if (notif.data?.type === "chat" && notif.data?.requestId && pathname === `/chat/${notif.data.requestId}`) {
+                continue;
+              }
+
+              // Don't alert for incoming calls here (handled by GlobalCallManager & native CallKit)
+              if (notif.data?.type === "call") continue;
+
+              const alertTitle = notif.title || "Notification";
+              const alertBody = notif.body || "";
+              const fullText = alertBody ? `${alertTitle}: ${alertBody}` : alertTitle;
+
+              showAlert(
+                fullText,
+                "info",
+                notif.data?.requestId ? {
+                  label: "VIEW",
+                  onClick: () => router.push(`/chat/${notif.data.requestId}`)
+                } : undefined
+              );
+            }
+          }
+        }, (err) => {
+          console.warn("[GlobalNotificationListener] Notifications stream notice:", err?.message || err);
+        });
+      } catch (notifErr) {
+        console.warn("[GlobalNotificationListener] Could not attach notifications listener:", notifErr);
+      }
+
+      // 2. Direct listener to jobRequests where user is participant
       const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", user.uid));
       const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", user.uid));
 
@@ -45,10 +99,10 @@ export default function GlobalNotificationListener() {
         const isInitial = role === "artisan" ? initialArtisanLoad.current : initialCustomerLoad.current;
         
         if (isInitial) {
-          snapshot.docs.forEach((doc: QueryDocumentSnapshot) => {
-            const data = doc.data();
+          snapshot.docs.forEach((d: QueryDocumentSnapshot) => {
+            const data = d.data();
             if (data.lastMessageAt) {
-              lastMessageAtMap.current[doc.id] = data.lastMessageAt;
+              lastMessageAtMap.current[d.id] = data.lastMessageAt;
             }
           });
           
@@ -62,32 +116,33 @@ export default function GlobalNotificationListener() {
           const job = change.doc.data() as JobRequest & { lastMessageAt?: number; lastMessageSenderId?: string; lastMessageText?: string };
           
           if (change.type === "added" || change.type === "modified") {
-            
+            // New chat message or voice note received
             if (job.lastMessageAt && job.lastMessageSenderId !== user.uid) {
               const previousLastMessageAt = lastMessageAtMap.current[job.requestId];
-              
-              // Only alert if this message is ACTUALLY new (newer than when we loaded the app, or newer than the last one we saw)
               const isHistorical = job.lastMessageAt < listenerAttachedAt.current;
               
               if ((!previousLastMessageAt && !isHistorical) || (previousLastMessageAt && job.lastMessageAt > previousLastMessageAt)) {
                 lastMessageAtMap.current[job.requestId] = job.lastMessageAt;
                 
+                // If user is currently looking at this exact chat page, don't show the duplicate in-app banner
+                if (pathname === `/chat/${job.requestId}`) {
+                  continue;
+                }
+
                 try {
-                  // Fetch sender details for avatar and name
-                  let senderName = "Someone";
-                  let senderAvatar = undefined;
+                  let senderName = role === "artisan" ? "Customer" : "Technician";
+                  let senderAvatar: string | undefined = undefined;
                   
-                  // If we are artisan, sender is customer.
                   const senderCollection = role === "artisan" ? "users" : "artisans";
                   const senderDoc = await getDoc(doc(db, senderCollection, job.lastMessageSenderId!));
                   if (senderDoc.exists()) {
                     const data = senderDoc.data();
                     if (role === "artisan") {
-                      senderName = data.firstName ? `${data.firstName} ${data.lastName || ""}` : "Customer";
-                      senderAvatar = data.photoURL;
+                      senderName = data.firstName ? `${data.firstName} ${data.lastName || ""}`.trim() : (data.displayName || "Customer");
+                      senderAvatar = data.photoURL || data.profilePictureUrl;
                     } else {
                       senderName = data.businessName || data.name || "Technician";
-                      senderAvatar = data.photoURL;
+                      senderAvatar = data.profilePictureUrl || data.photoURL;
                     }
                   }
 
@@ -100,16 +155,12 @@ export default function GlobalNotificationListener() {
                     const callDuration = parts.slice(2).join(":"); 
                     
                     const isUserCaller = job.activeCall?.callerId === user.uid;
-
                     if (isUserCaller) {
-                      // The current user was the caller. A caller should NEVER receive a missed call alert on their devices!
                       continue;
                     } else {
-                      // The current user was the receiver.
                       if (callDuration.toLowerCase().includes("missed") || callDuration.toLowerCase().includes("cancelled") || callDuration.toLowerCase().includes("timeout")) {
                         notificationText = `Missed ${callType} Call from ${senderName}`;
                       } else {
-                        // Call ended normally or was declined by receiver - no notification needed
                         continue;
                       }
                     }
@@ -120,34 +171,33 @@ export default function GlobalNotificationListener() {
 
                   showAlert(notificationText, "info", { 
                     label: "VIEW", 
-                    onClick: () => router.push(role === "artisan" ? `/chat/${job.requestId}` : `/chat/${job.requestId}`) 
+                    onClick: () => router.push(`/chat/${job.requestId}`) 
                   }, senderAvatar);
                 } catch (e) {
-                  console.error("Error fetching sender details", e);
-                  showAlert(`New message regarding ${job.trade}`, "info", { 
+                  showAlert(`New message from ${role === "artisan" ? "customer" : "technician"} regarding ${job.trade || "job"}`, "info", { 
                     label: "VIEW", 
-                    onClick: () => router.push(role === "artisan" ? `/chat/${job.requestId}` : `/chat/${job.requestId}`) 
+                    onClick: () => router.push(`/chat/${job.requestId}`) 
                   });
                 }
               }
             }
 
+            // New Job Request alert for artisans
             if (role === "artisan" && job.status === "pending" && change.type === "added") {
-              showAlert(`New Job Request: ${job.trade}`, "info", { 
+              showAlert(`New Job Request: ${job.trade || "Service Request"}`, "info", { 
                 label: "VIEW", 
                 onClick: () => router.push("/technician/jobs") 
               });
             }
 
+            // Counter-offer alerts
             if (job.status === "countered") {
-              // If artisan, alert if customer countered
               if (role === "artisan" && job.lastCounterBy === "customer") {
                 showAlert(`Customer countered your offer for ${job.trade}`, "info", { 
                   label: "VIEW", 
                   onClick: () => router.push("/technician/jobs") 
                 });
               }
-              // If customer, alert if artisan countered
               if (role === "customer" && job.lastCounterBy !== "customer") {
                 showAlert(`Technician countered your offer for ${job.trade}`, "info", { 
                   label: "VIEW", 
@@ -160,20 +210,46 @@ export default function GlobalNotificationListener() {
       };
 
       const handleSnapError = (err: any) => {
-        console.warn("GlobalNotificationListener Firestore error:", err?.message || err);
+        console.warn("[GlobalNotificationListener] Job stream notice:", err?.message || err);
       };
 
       const unsubArtisan = onSnapshot(qArtisan, (snap) => handleJobChange(snap, "artisan"), handleSnapError);
       const unsubCustomer = onSnapshot(qCustomer, (snap) => handleJobChange(snap, "customer"), handleSnapError);
 
+      const handleForegroundPush = (e: any) => {
+        const detail = e.detail;
+        const title = detail?.notification?.title || detail?.title || "Notification";
+        const body = detail?.notification?.body || detail?.body || "";
+        const data = detail?.data || {};
+
+        if (data?.type === "call") return;
+        if (data?.type === "chat" && data?.requestId && pathname === `/chat/${data.requestId}`) {
+          return;
+        }
+
+        const fullText = body ? `${title}: ${body}` : title;
+        showAlert(
+          fullText,
+          "info",
+          data?.requestId ? {
+            label: "VIEW",
+            onClick: () => router.push(`/chat/${data.requestId}`)
+          } : undefined
+        );
+      };
+
+      window.addEventListener("needForegroundPush", handleForegroundPush);
+
       return () => {
+        window.removeEventListener("needForegroundPush", handleForegroundPush);
+        unsubNotifications();
         unsubArtisan();
         unsubCustomer();
       };
     });
 
     return () => unsubscribeAuth();
-  }, [router, showAlert]);
+  }, [router, pathname, showAlert]);
 
-  return null; // This component does not render anything
+  return null;
 }

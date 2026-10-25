@@ -72,6 +72,13 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
             console.error("[useFCM] Native push registration failed:", err);
           });
 
+          PushNotifications.addListener("pushNotificationReceived", (notification) => {
+            console.log("[useFCM] Foreground native push notification:", notification);
+            if (notification.data?.type !== "call") {
+              window.dispatchEvent(new CustomEvent("needForegroundPush", { detail: notification }));
+            }
+          });
+
           PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
             console.log("[useFCM] Notification action:", action);
             const data = action.notification.data;
@@ -130,12 +137,17 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
         }
         if (permission !== "granted") return;
 
-        const { getMessaging, isSupported } = await import("firebase/messaging");
+        const { getMessaging, isSupported, onMessage } = await import("firebase/messaging");
         const supported = await isSupported().catch(() => false);
         if (!supported) return;
 
         const { app } = await import("@/lib/firebase");
         const msg = getMessaging(app);
+
+        onMessage(msg, (payload) => {
+          console.log("[useFCM] Foreground web push message:", payload);
+          window.dispatchEvent(new CustomEvent("needForegroundPush", { detail: payload }));
+        });
 
         const token = await getToken(msg, {
           vapidKey: "BB7xpv1wQlb8_ygbtdXZvwEKGimkhG5Hl_2-K5QJB7DvzvkpRdS7Y2XIw1nE3E7HfzA1ztECHMzBW_P1atFEMMo",

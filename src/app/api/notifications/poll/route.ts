@@ -11,6 +11,15 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
+// In-memory poll cache to prevent runaway polling from exhausting Firestore free/paid quotas
+interface PollCacheEntry {
+  timestamp: number;
+  call: any;
+  notifications: any[];
+}
+
+const pollCache = new Map<string, PollCacheEntry>();
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -22,14 +31,24 @@ export async function GET(req: NextRequest) {
     }
 
     const now = Date.now();
-    // Default to last 30 seconds if 'since' not provided or too old
+
+    // 1. Quota & Rate Guard: If this exact UID polled less than 3500ms ago, return cached state with zero DB reads
+    const cached = pollCache.get(uid);
+    if (cached && (now - cached.timestamp < 3500)) {
+      return NextResponse.json({
+        call: cached.call,
+        notifications: [],
+        serverTime: now,
+      }, { headers: corsHeaders });
+    }
+
     const since = sinceParam ? Math.max(Number(sinceParam) || 0, now - 120000) : (now - 30000);
 
-    // 1. Check for Active Incoming Calls (CallKit)
+    // 2. Check for Active Incoming Calls (CallKit)
     let callData: any = { hasCall: false };
 
     try {
-      // A. Check indexed callInbox
+      // Primary check: user's personal callInbox (written atomically on /api/calls/initiate)
       const inboxSnap = await adminDb
         .collection("users")
         .doc(uid)
@@ -57,8 +76,8 @@ export async function GET(req: NextRequest) {
       // Ignore index sync errors
     }
 
+    // Secondary fallback only if callInbox was empty
     if (!callData.hasCall) {
-      // B. Fallback to jobRequests for ringing calls
       try {
         const [artisanSnap, customerSnap] = await Promise.all([
           adminDb
@@ -101,159 +120,75 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // C. Check if user is in an ongoing / connected call so native background sync doesn't falsely end it
-    if (!callData.hasCall) {
-      try {
-        const [artisanOngoingSnap, customerOngoingSnap] = await Promise.all([
-          adminDb
-            .collection("jobRequests")
-            .where("artisanId", "==", uid)
-            .where("activeCall.status", "in", ["ongoing", "connected", "accepted"])
-            .limit(1)
-            .get(),
-          adminDb
-            .collection("jobRequests")
-            .where("customerId", "==", uid)
-            .where("activeCall.status", "in", ["ongoing", "connected", "accepted"])
-            .limit(1)
-            .get(),
-        ]);
-
-        const ongoingDoc = !artisanOngoingSnap.empty
-          ? artisanOngoingSnap.docs[0]
-          : (!customerOngoingSnap.empty ? customerOngoingSnap.docs[0] : null);
-
-        if (ongoingDoc) {
-          const job = ongoingDoc.data();
-          const call = job.activeCall;
-          callData = {
-            hasCall: false,
-            isOngoing: true,
-            jobId: ongoingDoc.id,
-            callId: call?.callId,
-          };
-        }
-      } catch (e) {
-        // Ignore fallback errors
-      }
-    }
-
-    // 2. Check for New Unread Notifications
+    // 3. Check for New Unread Notifications
     const notifications: any[] = [];
     const seenIds = new Set<string>();
 
     try {
-      // A. Fetch from users/{uid}/notifications
       const notifsSnap = await adminDb
         .collection("users")
         .doc(uid)
         .collection("notifications")
         .where("createdAt", ">", since)
         .orderBy("createdAt", "asc")
-        .limit(15)
+        .limit(10)
         .get();
 
-      notifsSnap.docs.forEach((doc) => {
-        const d = doc.data();
-        if (!seenIds.has(d.id || doc.id)) {
-          seenIds.add(d.id || doc.id);
+      notifsSnap.docs.forEach((d) => {
+        const data = d.data();
+        if (!seenIds.has(data.id || d.id)) {
+          seenIds.add(data.id || d.id);
           notifications.push({
-            id: d.id || doc.id,
-            title: d.title || "Need Notification",
-            body: d.body || "",
-            data: d.data || {},
-            createdAt: d.createdAt || now,
+            id: data.id || d.id,
+            title: data.title || "Need Notification",
+            body: data.body || "",
+            data: data.data || {},
+            createdAt: data.createdAt || now,
           });
         }
       });
     } catch (e) {
-      // If composite index is pending, fallback to reading recent documents
+      // In case of indexing error, fallback gracefully
       try {
-        const recentSnap = await adminDb
+        const fallbackSnap = await adminDb
           .collection("users")
           .doc(uid)
           .collection("notifications")
           .orderBy("createdAt", "desc")
-          .limit(10)
+          .limit(5)
           .get();
 
-        recentSnap.docs.forEach((doc) => {
-          const d = doc.data();
-          if (d.createdAt && d.createdAt > since && !seenIds.has(d.id || doc.id)) {
-            seenIds.add(d.id || doc.id);
+        fallbackSnap.docs.forEach((d) => {
+          const data = d.data();
+          if (data.createdAt && data.createdAt > since && !seenIds.has(data.id || d.id)) {
+            seenIds.add(data.id || d.id);
             notifications.push({
-              id: d.id || doc.id,
-              title: d.title || "Need Notification",
-              body: d.body || "",
-              data: d.data || {},
-              createdAt: d.createdAt,
+              id: data.id || d.id,
+              title: data.title || "Need Notification",
+              body: data.body || "",
+              data: data.data || {},
+              createdAt: data.createdAt,
             });
           }
         });
-      } catch (fallbackErr) {
-        // Ignore
-      }
+      } catch (fallbackErr) {}
     }
 
-    // B. Direct check on jobRequests for recent chat messages or pending job requests
-    try {
-      const [artisanJobs, customerJobs] = await Promise.all([
-        adminDb.collection("jobRequests").where("artisanId", "==", uid).limit(10).get(),
-        adminDb.collection("jobRequests").where("customerId", "==", uid).limit(10).get(),
-      ]);
+    // Cache this result in memory to throttle subsequent poll requests from this device
+    pollCache.set(uid, {
+      timestamp: now,
+      call: callData,
+      notifications,
+    });
 
-      const allJobs = [...artisanJobs.docs, ...customerJobs.docs];
-      for (const jDoc of allJobs) {
-        const jData = jDoc.data();
-        // Check new chat message
-        if (
-          jData.lastMessageAt &&
-          jData.lastMessageAt > since &&
-          jData.lastMessageSenderId &&
-          jData.lastMessageSenderId !== uid
-        ) {
-          const msgId = `msg_${jDoc.id}_${jData.lastMessageAt}`;
-          if (!seenIds.has(msgId)) {
-            seenIds.add(msgId);
-            let preview = jData.lastMessageText || "New message";
-            if (preview.startsWith("[CALL_LOG]:")) continue; // Call logs handled by CallKit
-            if (preview.length > 50) preview = preview.substring(0, 50) + "...";
-            notifications.push({
-              id: msgId,
-              title: "New Message",
-              body: preview,
-              data: { type: "chat", requestId: jDoc.id },
-              createdAt: jData.lastMessageAt,
-            });
-          }
-        }
-
-        // Check new job request for artisan
-        if (
-          jData.artisanId === uid &&
-          jData.status === "pending" &&
-          jData.createdAt &&
-          jData.createdAt > since
-        ) {
-          const jobId = `job_${jDoc.id}`;
-          if (!seenIds.has(jobId)) {
-            seenIds.add(jobId);
-            notifications.push({
-              id: jobId,
-              title: "New Job Request",
-              body: jData.trade ? `New request for ${jData.trade}` : "You have a new job request",
-              data: { type: "job", requestId: jDoc.id },
-              createdAt: jData.createdAt,
-            });
-          }
+    // Prune stale cache entries if map grows large
+    if (pollCache.size > 500) {
+      for (const [k, v] of pollCache.entries()) {
+        if (now - v.timestamp > 60000) {
+          pollCache.delete(k);
         }
       }
-    } catch (e) {
-      // Ignore job scan errors
     }
-
-    // Sort notifications chronologically
-    notifications.sort((a, b) => a.createdAt - b.createdAt);
 
     return NextResponse.json({
       call: callData,
