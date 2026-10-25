@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { RtcTokenBuilder, RtcRole } from 'agora-token';
+import pkg from "agora-token";
+
+const RtcTokenBuilder = (pkg as any).RtcTokenBuilder || (pkg as any).default?.RtcTokenBuilder;
+const RtcRole = (pkg as any).RtcRole || (pkg as any).default?.RtcRole;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,14 +29,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Agora credentials not configured' }, { status: 500, headers: corsHeaders });
     }
 
-    // If channelName corresponds to a jobId, gate calls by state
+    if (!RtcTokenBuilder || !RtcRole) {
+      console.error("[agora/token] RtcTokenBuilder or RtcRole not resolved from agora-token package");
+      return NextResponse.json({ error: 'Agora token builder module unavailable' }, { status: 500, headers: corsHeaders });
+    }
+
+    // If channelName corresponds to a jobId, log call event
     try {
       const { adminDb } = await import("@/lib/firebaseAdmin");
       const { writeJobEvent } = await import("@/lib/jobEvents");
       const jobSnap = await adminDb.collection("jobRequests").doc(channelName).get();
       if (jobSnap.exists) {
-        const job = jobSnap.data();
-        // Log call start event
         await writeJobEvent(channelName, "call_started", uid, { channelName });
       }
     } catch (checkErr) {
@@ -46,8 +52,6 @@ export async function POST(req: Request) {
     // Token expires in 2 hours (7200 seconds)
     const expirationTimeInSeconds = 7200;
 
-    // In agora-token v2, expiration is passed in seconds.
-    // Build token with User Account (String(uid)) so Agora Gateway precisely validates the participant.
     const token = RtcTokenBuilder.buildTokenWithUserAccount(
       appId,
       appCertificate,
@@ -59,8 +63,8 @@ export async function POST(req: Request) {
     );
 
     return NextResponse.json({ token, joinUid: String(uid) }, { headers: corsHeaders });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Agora Token Generation Error:", error);
-    return NextResponse.json({ error: 'Failed to generate token' }, { status: 500, headers: corsHeaders });
+    return NextResponse.json({ error: error?.message || 'Failed to generate token' }, { status: 500, headers: corsHeaders });
   }
 }

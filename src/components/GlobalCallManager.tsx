@@ -71,7 +71,11 @@ export default function GlobalCallManager() {
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((user) => {
-      setUserUid(user ? user.uid : null);
+      const uid = user ? user.uid : null;
+      setUserUid(uid);
+      if (uid) {
+        notifyNativeCall("setUserId", { uid });
+      }
     });
     return () => unsub();
   }, []);

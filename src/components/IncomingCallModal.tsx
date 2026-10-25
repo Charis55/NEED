@@ -1,6 +1,7 @@
 import { Phone, Video, X } from "lucide-react";
 import { useEffect } from "react";
 import UserAvatar from "./UserAvatar";
+import { isMobileDevice } from "@/utils/device";
 
 interface IncomingCallModalProps {
   callerName: string;
@@ -21,8 +22,10 @@ export default function IncomingCallModal({
 }: IncomingCallModalProps) {
   useEffect(() => {
     let audio: HTMLAudioElement | null = null;
-    if (typeof window !== "undefined") {
-      // Audible looping ringtone for incoming calls (web & mobile)
+    // On native mobile (iOS CallKit / Android Notification service), the device automatically plays
+    // the user's native system ringtone as configured in Settings -> Sounds & Haptics.
+    // Web audio playback is only used as a fallback on desktop browsers without telephony hardware.
+    if (typeof window !== "undefined" && !isMobileDevice()) {
       audio = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
       audio.loop = true;
       audio.volume = 0.85;
