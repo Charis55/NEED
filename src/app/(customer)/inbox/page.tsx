@@ -237,60 +237,66 @@ function InboxContent() {
   });
 
   return (
-    <div className="w-full pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] px-6 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
-      <h1 className="text-[3rem] font-black text-black tracking-tighter uppercase leading-none mb-8 drop-shadow-[2px_2px_0px_rgba(255,255,255,1)]">
+    <div className="w-full pt-[calc(env(safe-area-inset-top,0px)+4.5rem)] px-4 md:px-12 pb-20 selection:bg-[var(--color-brutal-pink)] selection:text-black">
+      <h1 className="text-5xl md:text-7xl font-black text-black mb-3 tracking-tighter uppercase leading-none drop-shadow-[2px_2px_0px_rgba(255,255,255,1)]">
         MESSAGES
       </h1>
 
-      <div className="mb-8 flex flex-col gap-4">
-        <div className="flex justify-end w-full relative z-[60]">
-          <div className="relative">
-            <button 
-              onClick={() => setIsSortOpen(!isSortOpen)}
-              className="flex items-center justify-center w-12 h-12 md:w-auto md:px-4 md:py-3 border-4 border-black bg-[var(--color-brutal-pink)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all cursor-pointer"
-            >
-              <SlidersHorizontal className="w-6 h-6 stroke-[3]" />
-            </button>
+      {/* Subtitle & Sorter Row */}
+      <div className="flex items-center justify-between gap-3 mb-3 relative z-[60]">
+        <p className="text-black font-bold text-sm sm:text-base md:text-lg border-l-4 border-black pl-3 bg-[var(--color-brutal-teal)] inline-block pr-3 -rotate-1 shadow-[2px_2px_0_0_#000]">
+          Chat with your technicians.
+        </p>
 
-            {isSortOpen && (
-              <div className="absolute top-14 md:top-16 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
-                <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
-                {[
-                  { label: "Most Recent", value: "recent" },
-                  { label: "Oldest", value: "oldest" },
-                  { label: "Ongoing", value: "ongoing" },
-                  { label: "Completed", value: "completed" },
-                  { label: "A to Z", value: "az" },
-                  { label: "Z to A", value: "za" },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      setSortOption(option.value as any);
-                      setIsSortOpen(false);
-                    }}
-                    className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortOption === option.value ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <div className="relative shrink-0">
+          <button 
+            onClick={() => setIsSortOpen(!isSortOpen)}
+            className="flex items-center justify-center w-11 h-11 md:w-auto md:px-4 md:py-2.5 border-4 border-black bg-[var(--color-brutal-pink)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
+            aria-label="Sort options"
+          >
+            <SlidersHorizontal className="w-5 h-5 stroke-[3] md:mr-2" />
+            <span className="hidden md:inline font-black uppercase text-black text-sm">Sort</span>
+          </button>
 
-        <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-            <Search className="w-6 h-6 text-black stroke-[3]" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search by Name, Job or Date..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white border-4 border-black font-bold text-black focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-pink)] brutal-shadow transition-all"
-          />
+          {isSortOpen && (
+            <div className="absolute top-13 md:top-14 right-0 z-50 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] w-48 flex flex-col p-2 animate-in fade-in slide-in-from-top-2">
+              <p className="text-xs font-black uppercase text-gray-500 mb-2 px-2 border-b-2 border-gray-200 pb-1">Sort By</p>
+              {[
+                { label: "Most Recent", value: "recent" },
+                { label: "Oldest", value: "oldest" },
+                { label: "Ongoing", value: "ongoing" },
+                { label: "Completed", value: "completed" },
+                { label: "A to Z", value: "az" },
+                { label: "Z to A", value: "za" },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setSortOption(option.value as any);
+                    setIsSortOpen(false);
+                  }}
+                  className={`text-left px-2 py-2 font-black uppercase text-xs sm:text-sm border-2 transition-all ${sortOption === option.value ? "bg-[var(--color-brutal-yellow)] border-black" : "border-transparent hover:border-black hover:bg-gray-100"} break-words`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Search Bar - directly under the subtitle & sorter row */}
+      <div className="relative w-full mb-6">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+          <Search className="w-6 h-6 text-black stroke-[3]" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search by Name, Job or Date..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-12 pr-4 py-3 bg-white border-4 border-black font-bold text-black focus:outline-none focus:ring-4 focus:ring-[var(--color-brutal-pink)] brutal-shadow transition-all"
+        />
       </div>
       
       {loading ? (

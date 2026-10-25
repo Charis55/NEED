@@ -29,7 +29,7 @@ export default function FloatingBrandingLogo({ href }: FloatingBrandingLogoProps
   return (
     <Link 
       href={href} 
-      className="fixed top-4 left-4 z-50 flex items-center bg-[var(--color-brutal-yellow)] border-4 border-black px-2 py-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform"
+      className="fixed top-[calc(env(safe-area-inset-top,0px)+0.75rem)] left-4 z-50 flex items-center bg-[var(--color-brutal-yellow)] border-4 border-black px-2 py-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform"
       aria-label="Need Home"
     >
       <img src="/LOGO.png" alt="N Logo" className="h-6 w-auto" />
