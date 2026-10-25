@@ -21,6 +21,11 @@ export default function GlobalNotificationListener() {
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
 
+      try {
+        const { notifyNativeCall } = await import("@/utils/device");
+        notifyNativeCall("setUserId", { uid: user.uid });
+      } catch (e) {}
+
       // Check if user has notifications enabled
       const userDoc = await getDoc(doc(db, "users", user.uid));
       const prefs = userDoc.data()?.preferences;
@@ -94,11 +99,19 @@ export default function GlobalNotificationListener() {
                     const callType = parts[1]?.toUpperCase() === "VIDEO" ? "Video" : "Voice";
                     const callDuration = parts.slice(2).join(":"); 
                     
-                    if (callDuration.toLowerCase().includes("missed") || callDuration.toLowerCase().includes("declined") || callDuration.toLowerCase().includes("cancelled") || callDuration.includes("-")) {
-                        notificationText = `Missed ${callType} Call from ${senderName}`;
+                    const isUserCaller = job.activeCall?.callerId === user.uid;
+
+                    if (isUserCaller) {
+                      // The current user was the caller. A caller should NEVER receive a missed call alert on their devices!
+                      continue;
                     } else {
-                        // Do not send an alert if the call just ended normally (was connected)
+                      // The current user was the receiver.
+                      if (callDuration.toLowerCase().includes("missed") || callDuration.toLowerCase().includes("cancelled") || callDuration.toLowerCase().includes("timeout")) {
+                        notificationText = `Missed ${callType} Call from ${senderName}`;
+                      } else {
+                        // Call ended normally or was declined by receiver - no notification needed
                         continue;
+                      }
                     }
                   } else {
                     if (messagePreview.length > 40) messagePreview = messagePreview.substring(0, 40) + "...";

@@ -58,7 +58,7 @@ export default function GlobalCallManager() {
   const lastHandledUrlRef = useRef<{ url: string; time: number } | null>(null);
 
   const clearCallNotification = async () => {
-    notifyNativeCall("endCall");
+    notifyNativeCall("clearDeliveredNotifications");
     if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
       try {
         const { PushNotifications } = await import("@capacitor/push-notifications");
@@ -125,6 +125,7 @@ export default function GlobalCallManager() {
         // Remote decline/cancellation detection: hold for 1.5s
         if (status === "ended") {
           if (activeJobRef.current?.requestId === foundJob.requestId) {
+            notifyNativeCall("endCall");
             clearCallNotification();
             playCallSound("end");
             clearActiveOutgoingCallId();
@@ -203,6 +204,7 @@ export default function GlobalCallManager() {
           if (!answeredHere) {
             // Call was answered on another device (e.g. answered on iPhone while laptop was ringing)
             // Immediately stop ringing, dismiss incoming call modal, and stay idle.
+            notifyNativeCall("endCall");
             clearCallNotification();
             setActiveJob(null);
             setNotifiedCallId(null);
@@ -325,6 +327,7 @@ export default function GlobalCallManager() {
               }),
             }).catch((err) => console.warn("Failed to accept call via server:", err));
           } else if (isDecline && targetId) {
+            notifyNativeCall("endCall");
             clearCallNotification();
             playCallSound("end");
             apiFetch("/api/calls/decline", {
@@ -427,6 +430,7 @@ export default function GlobalCallManager() {
     if (!activeJob || !activeJob.activeCall || !userUid) return;
 
     playCallSound("end");
+    notifyNativeCall("endCall");
     clearCallNotification();
     clearActiveOutgoingCallId();
     safeRemoveSession("need_active_outgoing_call_id");

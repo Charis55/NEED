@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!callData.hasCall) {
-      // B. Fallback to jobRequests
+      // B. Fallback to jobRequests for ringing calls
       try {
         const [artisanSnap, customerSnap] = await Promise.all([
           adminDb
@@ -95,6 +95,43 @@ export async function GET(req: NextRequest) {
               };
             }
           }
+        }
+      } catch (e) {
+        // Ignore fallback errors
+      }
+    }
+
+    // C. Check if user is in an ongoing / connected call so native background sync doesn't falsely end it
+    if (!callData.hasCall) {
+      try {
+        const [artisanOngoingSnap, customerOngoingSnap] = await Promise.all([
+          adminDb
+            .collection("jobRequests")
+            .where("artisanId", "==", uid)
+            .where("activeCall.status", "in", ["ongoing", "connected", "accepted"])
+            .limit(1)
+            .get(),
+          adminDb
+            .collection("jobRequests")
+            .where("customerId", "==", uid)
+            .where("activeCall.status", "in", ["ongoing", "connected", "accepted"])
+            .limit(1)
+            .get(),
+        ]);
+
+        const ongoingDoc = !artisanOngoingSnap.empty
+          ? artisanOngoingSnap.docs[0]
+          : (!customerOngoingSnap.empty ? customerOngoingSnap.docs[0] : null);
+
+        if (ongoingDoc) {
+          const job = ongoingDoc.data();
+          const call = job.activeCall;
+          callData = {
+            hasCall: false,
+            isOngoing: true,
+            jobId: ongoingDoc.id,
+            callId: call?.callId,
+          };
         }
       } catch (e) {
         // Ignore fallback errors

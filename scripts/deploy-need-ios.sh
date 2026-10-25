@@ -76,15 +76,20 @@ for UDID in $DEVICES; do
     [ -z "$UDID" ] && continue
     COUNT=$((COUNT + 1))
     
-    # Try fetching device name with RUNNER or directly
-    DEV_NAME=""
-    if [ -n "$RUNNER" ]; then
-        DEV_NAME=$($RUNNER ideviceinfo -u "$UDID" -k DeviceName 2>/dev/null || true)
-        DEV_MODEL=$($RUNNER ideviceinfo -u "$UDID" -k ProductType 2>/dev/null || true)
+    IS_NATIVE=false
+    if idevice_id -l 2>/dev/null | grep -q "$UDID"; then
+        IS_NATIVE=true
     fi
-    if [ -z "$DEV_NAME" ]; then
+
+    # Try fetching device name directly or with RUNNER
+    DEV_NAME=""
+    DEV_MODEL=""
+    if [ "$IS_NATIVE" = "true" ]; then
         DEV_NAME=$(ideviceinfo -u "$UDID" -k DeviceName 2>/dev/null || echo "iOS Device $COUNT")
         DEV_MODEL=$(ideviceinfo -u "$UDID" -k ProductType 2>/dev/null || echo "iPhone")
+    elif [ -n "$RUNNER" ]; then
+        DEV_NAME=$($RUNNER ideviceinfo -u "$UDID" -k DeviceName 2>/dev/null || echo "iOS Device $COUNT")
+        DEV_MODEL=$($RUNNER ideviceinfo -u "$UDID" -k ProductType 2>/dev/null || echo "iPhone")
     fi
 
     echo ""
@@ -92,15 +97,10 @@ for UDID in $DEVICES; do
     echo "📲 [$COUNT] Installing on $DEV_NAME ($DEV_MODEL | $UDID)..."
     echo "--------------------------------------------------"
     
-    INSTALLED=false
-    if [ -n "$RUNNER" ]; then
-        if $RUNNER ideviceinstaller -u "$UDID" install "$PROJECT_DIR/xtool/Need.ipa"; then
-            INSTALLED=true
-        fi
-    fi
-    
-    if [ "$INSTALLED" = "false" ]; then
+    if [ "$IS_NATIVE" = "true" ]; then
         ideviceinstaller -u "$UDID" install "$PROJECT_DIR/xtool/Need.ipa"
+    elif [ -n "$RUNNER" ]; then
+        $RUNNER ideviceinstaller -u "$UDID" install "$PROJECT_DIR/xtool/Need.ipa"
     fi
     
     echo "✅ COMPLETE: Installed on $DEV_NAME ($UDID)!"
