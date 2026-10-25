@@ -32,14 +32,14 @@ if [ -f "/mnt/c/Program Files/usbipd-win/usbipd.exe" ]; then
     done
 fi
 
-# 3. Detect connected devices via relay and/or native usbmuxd
-DEVICES=""
+# 3. Detect connected devices via relay and native usbmuxd
+RELAY_DEVICES=""
 if [ -n "$RUNNER" ]; then
-    DEVICES=$($RUNNER idevice_id -l 2>/dev/null || true)
+    RELAY_DEVICES=$($RUNNER idevice_id -l 2>/dev/null || true)
 fi
-if [ -z "$DEVICES" ]; then
-    DEVICES=$(idevice_id -l 2>/dev/null || true)
-fi
+NATIVE_DEVICES=$(idevice_id -l 2>/dev/null || true)
+
+DEVICES=$(printf "%s\n%s\n" "$RELAY_DEVICES" "$NATIVE_DEVICES" | sed '/^[[:space:]]*$/d' | sort -u)
 
 echo "Connected Device UDID(s):"
 if [ -n "$DEVICES" ]; then
