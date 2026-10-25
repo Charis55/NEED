@@ -44,11 +44,32 @@ export async function GET(req: NextRequest) {
           const data = jobDoc.data()!;
           const call = data.activeCall;
           if (call) {
+            const now = Date.now();
+            let effectiveStatus = call.status || "none";
+            let effectiveEndedReason = call.endedReason || null;
+            if (effectiveStatus === "ringing") {
+              const age = now - (call.timestamp || call.createdAt || 0);
+              const expiresAt = call.ringExpiresAt || (call.timestamp ? call.timestamp + 45000 : 0);
+              if ((expiresAt && now >= expiresAt) || age > 45000) {
+                effectiveStatus = "ended";
+                effectiveEndedReason = "timeout";
+              }
+            } else if (effectiveStatus === "ongoing" || effectiveStatus === "connected" || effectiveStatus === "accepted") {
+              const syncTime = call.bothConnectedAt || call.connectedAt || call.timestamp || 0;
+              if (!call.bothConnectedAt && now - syncTime > 45000) {
+                effectiveStatus = "ended";
+                effectiveEndedReason = "ended";
+              }
+            }
             return NextResponse.json({
               success: true,
-              status: call.status || "none",
-              endedReason: call.endedReason || null,
-              activeCall: call,
+              status: effectiveStatus,
+              endedReason: effectiveEndedReason,
+              activeCall: {
+                ...call,
+                status: effectiveStatus,
+                endedReason: effectiveEndedReason,
+              },
             }, { headers: corsHeaders });
           }
         }

@@ -119,7 +119,8 @@ export async function GET(req: NextRequest) {
           const call = job.activeCall;
           if (call && call.status === "ringing" && call.callerId !== uid) {
             const age = now - (call.timestamp || call.createdAt || 0);
-            if (age <= 45000) {
+            const expiresAt = call.ringExpiresAt || (call.timestamp ? call.timestamp + 45000 : 0);
+            if (age <= 45000 && (expiresAt ? now < expiresAt : true) && age >= -10000) {
               callData = {
                 hasCall: true,
                 jobId: activeDoc.id,

@@ -90,18 +90,86 @@ export default function GlobalCallManager() {
       const combined = [...aJobs, ...cJobs];
       const now = Date.now();
 
-      // Find the most recent active call
+      // Proactively clean up any stale ringing or abandoned calls in background so Firestore / server stay clean
+      for (const job of combined) {
+        if (!job.activeCall) continue;
+        const st = job.activeCall.status;
+        const rawTs = job.activeCall.timestamp || (job.activeCall as any).createdAt;
+        const ts =
+          typeof rawTs === "number"
+            ? rawTs
+            : (rawTs as any)?.toMillis?.() || 0;
+        const rawExp = (job.activeCall as any).ringExpiresAt;
+        const exp = typeof rawExp === "number" ? rawExp : (rawExp as any)?.toMillis?.();
+
+        const isExpiredRinging =
+          st === "ringing" &&
+          (ts <= 0 || (exp && now >= exp) || now - ts > 45 * 1000);
+
+        const isAbandonedOngoing =
+          (st === "ongoing" || (st as string) === "connected" || (st as string) === "accepted") &&
+          (!job.activeCall.bothConnectedAt && now - ts > 45 * 1000);
+
+        if (isExpiredRinging || isAbandonedOngoing) {
+          apiFetch("/api/calls/end", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jobId: job.requestId,
+              requestId: job.requestId,
+              callId: (job.activeCall as any)?.callId,
+              callerId: job.activeCall.callerId,
+              reason: isExpiredRinging ? "timeout" : "ended",
+            }),
+          }).catch(() => {});
+        }
+      }
+
+      // Find the most recent active call (strictly rejecting expired/phantom calls)
       const candidateJobs = combined.filter((data) => {
         if (!data.activeCall) return false;
         const status = data.activeCall.status;
         if (status === "ringing") {
-          const ringingAge = now - (data.activeCall.timestamp || (data.activeCall as any).createdAt || 0);
-          return ringingAge <= 2 * 60 * 60 * 1000;
+          const rawTs = data.activeCall.timestamp || (data.activeCall as any).createdAt;
+          const timestamp =
+            typeof rawTs === "number"
+              ? rawTs
+              : (rawTs as any)?.toMillis?.() || 0;
+          const rawExp = (data.activeCall as any).ringExpiresAt;
+          const ringExpiresAt =
+            typeof rawExp === "number"
+              ? rawExp
+              : (rawExp as any)?.toMillis?.();
+
+          // Reject if timestamp missing or non-positive
+          if (!timestamp || timestamp <= 0) return false;
+
+          // Reject if explicitly expired
+          if (ringExpiresAt && now >= ringExpiresAt) return false;
+
+          const ringingAge = now - timestamp;
+          // In-app calls ring for 45s max
+          if (ringingAge > 45 * 1000 || ringingAge < -10 * 1000) return false;
+
+          return true;
         }
         if (status === "ongoing" || (status as string) === "connected" || (status as string) === "accepted") {
-          const ongoingAge =
-            now - (data.activeCall.bothConnectedAt || data.activeCall.connectedAt || data.activeCall.timestamp || 0);
-          return ongoingAge <= 2 * 60 * 60 * 1000;
+          const rawStart = data.activeCall.bothConnectedAt || data.activeCall.connectedAt || data.activeCall.timestamp;
+          const syncStartTime =
+            typeof rawStart === "number"
+              ? rawStart
+              : (rawStart as any)?.toMillis?.() || 0;
+
+          if (!syncStartTime || syncStartTime <= 0) return false;
+
+          const ongoingAge = now - syncStartTime;
+          // Maximum ongoing call age 45 minutes
+          if (ongoingAge > 45 * 60 * 1000 || ongoingAge < -10 * 1000) return false;
+
+          // Abandoned ongoing call: if marked ongoing but bothConnectedAt was never set within 45s
+          if (!data.activeCall.bothConnectedAt && ongoingAge > 45 * 1000) return false;
+
+          return true;
         }
         // If current active call was just marked ended remotely while we were in it, allow for 1.5s terminal display
         if (status === "ended" && activeJobRef.current?.requestId === data.requestId) {
@@ -198,8 +266,7 @@ export default function GlobalCallManager() {
           const answeredHere =
             (safeGetSession("need_my_answered_call") === foundJob.requestId) ||
             (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
-            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId) ||
-            (Boolean(call.acceptedByPlatform) && call.acceptedByPlatform === getPlatformName());
+            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId);
 
           if (!answeredHere) {
             // Call was answered on another device (e.g. answered on iPhone while laptop was ringing)
@@ -458,18 +525,33 @@ export default function GlobalCallManager() {
     }
   };
 
-  // Caller auto-timeout guard (45s TTL)
+  // Synchronized auto-timeout guard (45s TTL from call creation) for BOTH caller and callee
   useEffect(() => {
     if (activeJob && activeJob.activeCall && activeJob.activeCall.status === "ringing") {
-      const isCaller = activeJob.activeCall.callerId === userUid;
-      if (isCaller) {
-        const timer = setTimeout(() => {
-          endCallWithLog("timeout");
-        }, 45000);
-        return () => clearTimeout(timer);
+      const rawTs = activeJob.activeCall.timestamp || (activeJob.activeCall as any).createdAt;
+      const ts =
+        typeof rawTs === "number"
+          ? rawTs
+          : (rawTs as any)?.toMillis?.() || 0;
+      const rawExp = (activeJob.activeCall as any).ringExpiresAt;
+      const targetExpiry =
+        typeof rawExp === "number"
+          ? rawExp
+          : (rawExp as any)?.toMillis?.() || (ts ? ts + 45000 : Date.now() + 45000);
+      const remainingMs = Math.max(0, targetExpiry - Date.now());
+
+      if (remainingMs <= 0) {
+        endCallWithLog("timeout");
+        return;
       }
+
+      const timer = setTimeout(() => {
+        endCallWithLog("timeout");
+      }, remainingMs);
+
+      return () => clearTimeout(timer);
     }
-  }, [activeJob?.requestId, activeJob?.activeCall?.status, userUid]);
+  }, [activeJob?.requestId, (activeJob?.activeCall as any)?.callId, activeJob?.activeCall?.status, userUid]);
 
   const endCallWithLog = async (
     reason?: "cancelled" | "declined" | "timeout" | "ended",
@@ -687,8 +769,7 @@ export default function GlobalCallManager() {
   const isThisDeviceAcceptedReceiver = !isCaller && (
     (safeGetSession("need_my_answered_call") === activeJob.requestId) ||
     (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
-    (Boolean((activeCall as any).acceptedByDeviceId) && (activeCall as any).acceptedByDeviceId === myDeviceId) ||
-    (Boolean((activeCall as any).acceptedByPlatform) && (activeCall as any).acceptedByPlatform === getPlatformName())
+    (Boolean((activeCall as any).acceptedByDeviceId) && (activeCall as any).acceptedByDeviceId === myDeviceId)
   );
 
   const isRingingForMe = activeCall.status === "ringing" && !isCaller && !terminalState;

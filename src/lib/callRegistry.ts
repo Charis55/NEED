@@ -75,7 +75,27 @@ export function registerActiveCall(record: ActiveCallRecord): ActiveCallRecord {
 
 export function getActiveCall(jobIdOrCallId: string): ActiveCallRecord | undefined {
   if (!jobIdOrCallId) return undefined;
-  return callsByJob.get(jobIdOrCallId) || callsById.get(jobIdOrCallId);
+  const call = callsByJob.get(jobIdOrCallId) || callsById.get(jobIdOrCallId);
+  if (!call) return undefined;
+
+  const now = Date.now();
+  if (call.status === "ringing") {
+    const expiresAt = call.ringExpiresAt || (call.timestamp ? call.timestamp + 45000 : 0);
+    const age = now - (call.timestamp || 0);
+    if ((expiresAt && now >= expiresAt) || age > 45000) {
+      call.status = "ended";
+      call.endedReason = "timeout";
+      call.endedAt = now;
+    }
+  } else if (call.status === "ongoing") {
+    const syncTime = call.bothConnectedAt || call.connectedAt || call.timestamp || 0;
+    if (!call.bothConnectedAt && now - syncTime > 45000) {
+      call.status = "ended";
+      call.endedReason = "ended";
+      call.endedAt = now;
+    }
+  }
+  return call;
 }
 
 export function updateActiveCallStatus(
@@ -121,11 +141,20 @@ export function getActiveCallForUser(uid: string): ActiveCallRecord | undefined 
   if (!uid) return undefined;
   const now = Date.now();
   for (const call of callsByJob.values()) {
-    if (call.status === "ringing" && call.receiverId === uid) {
-      if (!call.ringExpiresAt || call.ringExpiresAt > now) {
-        return call;
+    if (call.receiverId === uid) {
+      if (call.status === "ringing") {
+        const expiresAt = call.ringExpiresAt || (call.timestamp ? call.timestamp + 45000 : 0);
+        const age = now - (call.timestamp || 0);
+        if (now < expiresAt && age <= 45000 && age >= -10000) {
+          return call;
+        } else {
+          call.status = "ended";
+          call.endedReason = "timeout";
+          call.endedAt = now;
+        }
       }
     }
   }
   return undefined;
 }
+
