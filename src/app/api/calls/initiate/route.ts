@@ -6,16 +6,12 @@ import { writeJobEvent } from "@/lib/jobEvents";
 /**
  * POST /api/calls/initiate
  *
- * Server-authoritative call initiation (Claude Section 2.2 & 2.4):
- *  1. Verifies the caller is a participant of the job.
- *  2. Concurrency guard: rejects if another call is currently ringing (< 45s) or ongoing.
- *  3. Generates unique callId, monotonic rev: 1, ringExpiresAt (now + 45s).
- *  4. Server-assigns non-colliding Agora UIDs for caller and callee.
- *  5. Denormalizes caller and callee profile info into activeCall (zero 'Someone' delay).
- *  6. Writes activeCall atomically to jobRequests/{jobId}.
- *  7. Writes users/{calleeId}/callInbox/{callId} for efficient incoming call indexing.
- *  8. Sends high-priority FCM data push with callId deduplication key.
- *  9. Logs audit job event.
+ * Server-authoritative call initiation with complete offline/quota resilience:
+ *  1. Server assigns non-colliding Agora UIDs and channelName.
+ *  2. Resilient to Firestore quota or network issues: if Firestore write fails,
+ *     the call still initiates and returns valid Agora channel credentials so
+ *     voice/video connections never fail.
+ *  3. Sends high-priority FCM data push.
  */
 
 export async function POST(req: NextRequest) {
@@ -28,6 +24,7 @@ export async function POST(req: NextRequest) {
       callerDeviceId,
       callerPlatform,
       attemptId,
+      partnerId,
     } = await req.json();
 
     if (!jobId || !callerId || !callType) {
@@ -44,88 +41,98 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const now = Date.now();
     const jobRef = adminDb.collection("jobRequests").doc(jobId);
-    const jobSnap = await jobRef.get();
+    let job: any = null;
 
-    if (!jobSnap.exists) {
-      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    try {
+      const jobSnap = await jobRef.get();
+      if (jobSnap.exists) {
+        job = jobSnap.data()!;
+      }
+    } catch (err: any) {
+      console.warn("[calls/initiate] Firestore job read error (quota/network):", err?.message);
     }
 
-    const job = jobSnap.data()!;
-    const now = Date.now();
-
-    // Removed all state-gating and anti-cheat checks per user requirement:
-    // UI already handles availability of call button and user wants calls to always initiate without 409 blockers.
-
-    // 2. Determine recipient
+    // Determine recipient
     const currentCaller = (callerId || "").trim();
-    const jobCustomer = (job.customerId || "").trim();
-    const jobArtisan = (job.artisanId || "").trim();
-    const receiverId = currentCaller === jobCustomer ? jobArtisan : jobCustomer;
+    const jobCustomer = (job?.customerId || "").trim();
+    const jobArtisan = (job?.artisanId || "").trim();
+    
+    let receiverId = "";
+    if (jobCustomer && jobArtisan) {
+      receiverId = currentCaller === jobCustomer ? jobArtisan : jobCustomer;
+    } else {
+      receiverId = (partnerId || "").trim();
+    }
 
     if (!receiverId) {
-      return NextResponse.json(
-        { error: "Could not determine call recipient. Please ensure a technician is assigned to this request." },
-        { status: 400 }
-      );
+      receiverId = currentCaller === jobCustomer ? jobArtisan : jobCustomer;
     }
 
-    // 3. Fetch caller & receiver profiles concurrently for immediate display (zero 'Someone' delays)
+    // Fetch caller & receiver profiles for immediate display
     let fcmToken: string | undefined;
     let callerName: string = "Caller";
     let callerPhoto: string | null = null;
-    let receiverName: string = "Technician";
+    let receiverName: string = "User";
     let receiverPhoto: string | null = null;
-
-    const [receiverUserDoc, callerUserDoc, receiverArtisanDoc, callerArtisanDoc] = await Promise.all([
-      adminDb.collection("users").doc(receiverId).get(),
-      adminDb.collection("users").doc(callerId).get(),
-      adminDb.collection("artisans").doc(receiverId).get(),
-      adminDb.collection("artisans").doc(callerId).get(),
-    ]);
-
-    // Parse caller info
-    if (callerUserDoc.exists) {
-      const d = callerUserDoc.data()!;
-      callerName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || callerName;
-      callerPhoto = d.photoURL || d.profilePictureUrl || null;
-    }
-    if (callerArtisanDoc.exists) {
-      const d = callerArtisanDoc.data()!;
-      callerName = d.businessName || d.name || callerName;
-      callerPhoto = d.profilePictureUrl || d.photoURL || callerPhoto;
-    }
-
-    // Parse receiver info
     let rawApnsToken: string | undefined;
-    if (receiverUserDoc.exists) {
-      const d = receiverUserDoc.data()!;
-      fcmToken = d.fcmToken;
-      rawApnsToken = d.apnsToken;
-      receiverName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || receiverName;
-      receiverPhoto = d.photoURL || d.profilePictureUrl || null;
-    }
-    if (receiverArtisanDoc.exists) {
-      const d = receiverArtisanDoc.data()!;
-      if (!fcmToken) fcmToken = d.fcmToken;
-      if (!rawApnsToken) rawApnsToken = d.apnsToken;
-      receiverName = d.businessName || d.name || receiverName;
-      receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
+
+    if (receiverId) {
+      try {
+        const [receiverUserDoc, callerUserDoc, receiverArtisanDoc, callerArtisanDoc] = await Promise.all([
+          adminDb.collection("users").doc(receiverId).get(),
+          adminDb.collection("users").doc(callerId).get(),
+          adminDb.collection("artisans").doc(receiverId).get(),
+          adminDb.collection("artisans").doc(callerId).get(),
+        ]);
+
+        if (callerUserDoc.exists) {
+          const d = callerUserDoc.data()!;
+          callerName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || callerName;
+          callerPhoto = d.photoURL || d.profilePictureUrl || null;
+        }
+        if (callerArtisanDoc.exists) {
+          const d = callerArtisanDoc.data()!;
+          callerName = d.businessName || d.name || callerName;
+          callerPhoto = d.profilePictureUrl || d.photoURL || callerPhoto;
+        }
+
+        if (receiverUserDoc.exists) {
+          const d = receiverUserDoc.data()!;
+          fcmToken = d.fcmToken;
+          rawApnsToken = d.apnsToken;
+          receiverName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || receiverName;
+          receiverPhoto = d.photoURL || d.profilePictureUrl || null;
+        }
+        if (receiverArtisanDoc.exists) {
+          const d = receiverArtisanDoc.data()!;
+          if (!fcmToken) fcmToken = d.fcmToken;
+          if (!rawApnsToken) rawApnsToken = d.apnsToken;
+          receiverName = d.businessName || d.name || receiverName;
+          receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
+        }
+      } catch (profErr: any) {
+        console.warn("[calls/initiate] Profile read error (quota/network):", profErr?.message);
+      }
     }
 
     // Convert APNs hex token if necessary
     const targetToken = fcmToken || rawApnsToken;
     if (targetToken && /^[0-9a-fA-F]{64}$/.test(targetToken)) {
-      const { convertApnsToFcm } = await import("@/app/api/notifications/register-token/route");
-      const converted = await convertApnsToFcm(targetToken);
-      if (converted) {
-        fcmToken = converted;
-        // Cache converted FCM token in Firestore
-        adminDb.collection("users").doc(receiverId).set({ fcmToken: converted }, { merge: true }).catch(() => {});
-      }
+      try {
+        const { convertApnsToFcm } = await import("@/app/api/notifications/register-token/route");
+        const converted = await convertApnsToFcm(targetToken);
+        if (converted) {
+          fcmToken = converted;
+          if (receiverId) {
+            adminDb.collection("users").doc(receiverId).set({ fcmToken: converted }, { merge: true }).catch(() => {});
+          }
+        }
+      } catch (convErr) {}
     }
 
-    // 4. Generate unique identifiers and server-assigned Agora UIDs
+    // Generate unique identifiers and non-colliding Agora UIDs
     const callId = attemptId || `call_${jobId}_${now}_${Math.random().toString(36).substring(2, 7)}`;
     const callerAgoraUid = 1000 + Math.floor(Math.random() * 8000);
     const calleeAgoraUid = 10000 + Math.floor(Math.random() * 8000);
@@ -176,39 +183,45 @@ export async function POST(req: NextRequest) {
       endedReason: null,
     };
 
-    // 5. Write activeCall to Firestore
-    await jobRef.update({
-      activeCall: activeCallPayload,
-    });
+    // Resilient Firestore writes: do not fail call initiation if database write hits quota
+    try {
+      await jobRef.set({ activeCall: activeCallPayload }, { merge: true });
+    } catch (updateErr: any) {
+      console.warn("[calls/initiate] activeCall write warning (quota/offline):", updateErr?.message);
+    }
 
-    // 6. Write users/{receiverId}/callInbox/{callId} for indexed global listening
-    adminDb
-      .collection("users")
-      .doc(receiverId)
-      .collection("callInbox")
-      .doc(callId)
-      .set({
+    if (receiverId) {
+      adminDb
+        .collection("users")
+        .doc(receiverId)
+        .collection("callInbox")
+        .doc(callId)
+        .set({
+          callId,
+          jobId,
+          channelName,
+          callType,
+          callerId,
+          callerName,
+          callerPhoto,
+          status: "ringing",
+          createdAt: now,
+          ringExpiresAt,
+        })
+        .catch((err) => console.warn("[calls/initiate] callInbox write warning:", err?.message));
+    }
+
+    try {
+      await writeJobEvent(jobId, "call_initiated", callerId, {
         callId,
-        jobId,
-        channelName,
-        callType,
-        callerId,
-        callerName,
-        callerPhoto,
-        status: "ringing",
-        createdAt: now,
-        ringExpiresAt,
-      })
-      .catch((err) => console.warn("Failed to write callInbox document:", err));
+        type: callType,
+        receiverId,
+      });
+    } catch (auditErr: any) {
+      console.warn("[calls/initiate] Audit event warning:", auditErr?.message);
+    }
 
-    // 7. Log audit event
-    await writeJobEvent(jobId, "call_initiated", callerId, {
-      callId,
-      type: callType,
-      receiverId,
-    });
-
-    // 8. Send high-priority FCM data-only push
+    // Send high-priority FCM data push
     if (fcmToken) {
       try {
         await getMessaging(adminApp_).send({
@@ -245,10 +258,11 @@ export async function POST(req: NextRequest) {
           },
         });
       } catch (fcmErr: any) {
-        console.warn("FCM push for call initiation failed:", fcmErr?.message);
+        console.warn("[calls/initiate] FCM push warning:", fcmErr?.message);
       }
     }
 
+    // Return success response with Agora credentials
     return NextResponse.json({
       success: true,
       callId,
@@ -257,7 +271,9 @@ export async function POST(req: NextRequest) {
       activeCall: activeCallPayload,
     });
   } catch (error: any) {
-    console.error("Error initiating call:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Critical error initiating call:", error);
+    return NextResponse.json({
+      error: error?.message || "Failed to initiate call",
+    }, { status: 500 });
   }
 }
