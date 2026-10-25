@@ -10,7 +10,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Lookup recipient token: check users collection first, fallback to artisans collection
+    const now = Date.now();
+    const notifRef = adminDb.collection("users").doc(userId).collection("notifications").doc();
+    const notifPayload = {
+      id: notifRef.id,
+      userId,
+      title,
+      body,
+      data: data || {},
+      createdAt: now,
+      read: false,
+    };
+
+    // 1. Always persist notification to Firestore so it is never lost
+    await notifRef.set(notifPayload);
+
+    // Also persist to artisans collection if user is an artisan
+    try {
+      const artisanDoc = await adminDb.collection("artisans").doc(userId).get();
+      if (artisanDoc.exists) {
+        await adminDb.collection("artisans").doc(userId).collection("notifications").doc(notifRef.id).set(notifPayload);
+      }
+    } catch (e) {
+      // Ignore secondary write errors
+    }
+
+    // 2. Lookup recipient token: check users collection first, fallback to artisans collection
     let fcmToken: string | undefined = undefined;
     let pushEnabled = true;
     let collectionName = "users";
@@ -31,10 +56,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!fcmToken) {
-      return NextResponse.json({ error: "No FCM token registered for recipient" }, { status: 404 });
-    }
-
     if (fcmToken && /^[0-9a-fA-F]{64}$/.test(fcmToken)) {
       const { convertApnsToFcm } = await import("@/app/api/notifications/register-token/route");
       const converted = await convertApnsToFcm(fcmToken);
@@ -51,6 +72,7 @@ export async function POST(req: NextRequest) {
       const stringData: Record<string, string> = {
         title,
         body,
+        notificationId: notifRef.id,
       };
       if (data && typeof data === "object") {
         for (const [key, value] of Object.entries(data)) {
@@ -59,8 +81,6 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        // Only incoming call notifications are data-only on Android (so Java handles the ringing & action buttons).
-        // On iOS (APNs), all notifications need alert { title, body } to show banner, with category for calls.
         const isIncomingCall = data?.type === "call";
         await getMessaging(adminApp_).send({
           token: fcmToken,
@@ -108,7 +128,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, pushSent: pushSuccess });
+    return NextResponse.json({
+      success: true,
+      saved: true,
+      notificationId: notifRef.id,
+      pushSent: pushSuccess,
+    });
   } catch (err: any) {
     console.error("Error sending push notification:", err);
     return NextResponse.json(
