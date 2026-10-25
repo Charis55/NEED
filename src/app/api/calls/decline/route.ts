@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb, adminApp_ } from '@/lib/firebaseAdmin';
 import { getMessaging } from 'firebase-admin/messaging';
+import { updateActiveCallStatus, getActiveCall } from '@/lib/callRegistry';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,94 +17,96 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const requestId = body.requestId || body.jobId;
+    const providedCallerId = body.callerId || null;
 
     if (!requestId) {
       return NextResponse.json({ error: 'Missing requestId' }, { status: 400, headers: corsHeaders });
     }
 
-    const jobRef = adminDb.collection('jobRequests').doc(requestId);
-    const jobSnap = await jobRef.get();
+    const now = Date.now();
 
-    if (!jobSnap.exists) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404, headers: corsHeaders });
-    }
+    // 1. Immediately update in-memory registry (sub-millisecond, zero-quota)
+    const inMemoryCall = updateActiveCallStatus(requestId, "ended", {
+      endedAt: now,
+      endedReason: "declined",
+    });
 
-    const jobData = jobSnap.data()!;
-    const activeCall = jobData.activeCall;
+    let callerId = providedCallerId || inMemoryCall?.callerId;
+    let jobData: any = null;
 
-    // Guard: allow declining if ringing OR if it was just set to 'ended' with 'declined' by native/client
-    const isRinging = activeCall && activeCall.status === 'ringing';
-    const wasJustDeclined = activeCall && activeCall.status === 'ended' && activeCall.endedReason === 'declined';
-    if (!activeCall || (!isRinging && !wasJustDeclined)) {
-      return NextResponse.json({ success: true, skipped: true }, { headers: corsHeaders });
-    }
-
-    const callerId = activeCall.callerId as string | undefined;
-
-    // 1. Update Firestore so ALL clients (including caller) pick it up via real-time listener (if not already updated)
-    if (activeCall.status !== 'ended') {
-      await jobRef.update({
-        'activeCall.status': 'ended',
-        'activeCall.endedAt': Date.now(),
-        'activeCall.endedReason': 'declined',
-        'lastMessageAt': Date.now(),
-      });
-    }
-
-    // 2. Append call log message to messages subcollection so chat reflects declined call
-    const isVideo = activeCall.type === 'video' || activeCall.callType === 'video';
-    const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:Declined Call`;
-    const messageSenderId = jobData.customerId === callerId ? jobData.artisanId : jobData.customerId;
+    // 2. Safely attempt Firestore update (never crash if quota is exceeded)
     try {
-      await jobRef.collection('messages').add({
-        text: messageText,
-        senderId: messageSenderId || 'system',
-        createdAt: Date.now(),
-      });
-    } catch (msgErr) {
-      console.warn('Failed to append call log message in decline:', msgErr);
+      const jobRef = adminDb.collection('jobRequests').doc(requestId);
+      const jobSnap = await jobRef.get();
+      if (jobSnap.exists) {
+        jobData = jobSnap.data()!;
+        if (!callerId) {
+          callerId = jobData.activeCall?.callerId;
+        }
+
+        await jobRef.update({
+          'activeCall.status': 'ended',
+          'activeCall.endedAt': now,
+          'activeCall.endedReason': 'declined',
+          'lastMessageAt': now,
+        });
+
+        // Append chat log message
+        const isVideo = jobData.activeCall?.type === 'video' || jobData.activeCall?.callType === 'video';
+        const messageText = `[CALL_LOG]:${isVideo ? 'video' : 'voice'}:Declined Call`;
+        const messageSenderId = jobData.customerId === callerId ? jobData.artisanId : jobData.customerId;
+        await jobRef.collection('messages').add({
+          text: messageText,
+          senderId: messageSenderId || 'system',
+          createdAt: now,
+        }).catch(() => {});
+      }
+    } catch (dbErr: any) {
+      console.warn('[calls/decline] Firestore update warning (quota/offline):', dbErr?.message);
     }
 
-    // 3. Send a silent FCM push directly to the CALLER so their app wakes up immediately
-    //    even if they are backgrounded and the Firestore listener is throttled.
+    // 3. Send high-priority FCM push to CALLER so their ringing modal immediately stops and shows Declined
     if (callerId) {
-      let callerFcmToken: string | undefined;
+      try {
+        let callerFcmToken: string | undefined;
+        const [callerUserDoc, callerArtisanDoc] = await Promise.all([
+          adminDb.collection("users").doc(callerId).get().catch(() => null),
+          adminDb.collection("artisans").doc(callerId).get().catch(() => null),
+        ]);
 
-      const callerUserDoc = await adminDb.collection('users').doc(callerId).get();
-      if (callerUserDoc.exists) {
-        callerFcmToken = callerUserDoc.data()?.fcmToken;
-      }
-      if (!callerFcmToken) {
-        const callerArtisanDoc = await adminDb.collection('artisans').doc(callerId).get();
-        if (callerArtisanDoc.exists) {
+        if (callerUserDoc && callerUserDoc.exists) {
+          callerFcmToken = callerUserDoc.data()?.fcmToken;
+        }
+        if (!callerFcmToken && callerArtisanDoc && callerArtisanDoc.exists) {
           callerFcmToken = callerArtisanDoc.data()?.fcmToken;
         }
-      }
 
-      if (callerFcmToken) {
-        try {
+        if (callerFcmToken) {
           await getMessaging(adminApp_).send({
             token: callerFcmToken,
             data: {
               type: 'cancel_call',
               requestId,
+              jobId: requestId,
               title: 'Call Declined',
               body: 'The other person declined your call.',
+              reason: 'declined',
             },
             android: { priority: 'high' },
             apns: {
+              headers: { "apns-priority": "10" },
               payload: { aps: { contentAvailable: true } },
             },
           });
-        } catch (fcmErr: any) {
-          console.warn('FCM push to caller failed:', fcmErr?.message);
         }
+      } catch (fcmErr: any) {
+        console.warn('[calls/decline] FCM push to caller failed:', fcmErr?.message);
       }
     }
 
-    return NextResponse.json({ success: true }, { headers: corsHeaders });
+    return NextResponse.json({ success: true, status: 'ended', reason: 'declined' }, { headers: corsHeaders });
   } catch (error: any) {
-    console.error('Error declining call:', error);
-    return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+    console.warn('Non-fatal error in /api/calls/decline:', error?.message);
+    return NextResponse.json({ success: true, status: 'ended' }, { headers: corsHeaders });
   }
 }

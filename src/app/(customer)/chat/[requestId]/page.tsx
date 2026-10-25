@@ -727,6 +727,11 @@ export default function ChatPage() {
           callerDeviceId: getDeviceId(),
           callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
+          callerName: currentUser.displayName || (currentUser as any)?.name || (currentUser as any)?.firstName || (isCustomerViewing ? "Customer" : "Technician"),
+          callerPhoto: currentUser.photoURL || null,
+          partnerId: isCustomerViewing ? job.artisanId : job.customerId,
+          receiverName: chatPartnerName || (isCustomerViewing ? "Technician" : "Customer"),
+          receiverPhoto: (isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL) || null,
         }),
       });
       const data = await res.json();
@@ -738,6 +743,18 @@ export default function ChatPage() {
         } else {
           showAlert(data.error || "Failed to start call", "error");
         }
+      } else if (data.activeCall && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("needCallInitiated", {
+            detail: {
+              job: {
+                ...job,
+                requestId,
+                activeCall: data.activeCall,
+              },
+            },
+          })
+        );
       }
     } catch (error) {
       console.error("Failed to start call", error);

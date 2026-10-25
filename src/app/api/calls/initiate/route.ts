@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminApp_ } from "@/lib/firebaseAdmin";
 import { getMessaging } from "firebase-admin/messaging";
 import { writeJobEvent } from "@/lib/jobEvents";
+import { registerActiveCall } from "@/lib/callRegistry";
 
 /**
  * POST /api/calls/initiate
@@ -25,6 +26,10 @@ export async function POST(req: NextRequest) {
       callerPlatform,
       attemptId,
       partnerId,
+      callerName: passedCallerName,
+      callerPhoto: passedCallerPhoto,
+      receiverName: passedReceiverName,
+      receiverPhoto: passedReceiverPhoto,
     } = await req.json();
 
     if (!jobId || !callerId || !callType) {
@@ -72,13 +77,19 @@ export async function POST(req: NextRequest) {
 
     // Fetch caller & receiver profiles for immediate display
     let fcmToken: string | undefined;
-    let callerName: string = "Caller";
-    let callerPhoto: string | null = null;
-    let receiverName: string = "User";
-    let receiverPhoto: string | null = null;
+    let callerName: string = (passedCallerName || "").trim();
+    let callerPhoto: string | null = passedCallerPhoto || null;
+    let receiverName: string = (passedReceiverName || "").trim();
+    let receiverPhoto: string | null = passedReceiverPhoto || null;
     let rawApnsToken: string | undefined;
 
-    if (receiverId) {
+    const isGenericName = (name?: string | null) => {
+      if (!name) return true;
+      const lower = name.trim().toLowerCase();
+      return lower === "caller" || lower === "user" || lower === "someone";
+    };
+
+    if (receiverId && (isGenericName(callerName) || isGenericName(receiverName) || !fcmToken)) {
       try {
         const [receiverUserDoc, callerUserDoc, receiverArtisanDoc, callerArtisanDoc] = await Promise.all([
           adminDb.collection("users").doc(receiverId).get(),
@@ -89,32 +100,48 @@ export async function POST(req: NextRequest) {
 
         if (callerUserDoc.exists) {
           const d = callerUserDoc.data()!;
-          callerName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || callerName;
-          callerPhoto = d.photoURL || d.profilePictureUrl || null;
+          if (isGenericName(callerName)) {
+            callerName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || callerName;
+          }
+          if (!callerPhoto) callerPhoto = d.photoURL || d.profilePictureUrl || null;
         }
         if (callerArtisanDoc.exists) {
           const d = callerArtisanDoc.data()!;
-          callerName = d.businessName || d.name || callerName;
-          callerPhoto = d.profilePictureUrl || d.photoURL || callerPhoto;
+          if (isGenericName(callerName)) {
+            callerName = d.businessName || d.name || callerName;
+          }
+          if (!callerPhoto) callerPhoto = d.profilePictureUrl || d.photoURL || callerPhoto;
         }
 
         if (receiverUserDoc.exists) {
           const d = receiverUserDoc.data()!;
           fcmToken = d.fcmToken;
           rawApnsToken = d.apnsToken;
-          receiverName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || receiverName;
-          receiverPhoto = d.photoURL || d.profilePictureUrl || null;
+          if (isGenericName(receiverName)) {
+            receiverName = d.displayName || (d.firstName ? `${d.firstName} ${d.lastName || ""}`.trim() : null) || receiverName;
+          }
+          if (!receiverPhoto) receiverPhoto = d.photoURL || d.profilePictureUrl || null;
         }
         if (receiverArtisanDoc.exists) {
           const d = receiverArtisanDoc.data()!;
           if (!fcmToken) fcmToken = d.fcmToken;
           if (!rawApnsToken) rawApnsToken = d.apnsToken;
-          receiverName = d.businessName || d.name || receiverName;
-          receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
+          if (isGenericName(receiverName)) {
+            receiverName = d.businessName || d.name || receiverName;
+          }
+          if (!receiverPhoto) receiverPhoto = d.profilePictureUrl || d.photoURL || receiverPhoto;
         }
       } catch (profErr: any) {
         console.warn("[calls/initiate] Profile read error (quota/network):", profErr?.message);
       }
+    }
+
+    // Role-based fallbacks instead of generic "Caller"/"User"
+    if (isGenericName(callerName)) {
+      callerName = currentCaller === jobCustomer ? "Customer" : "Technician";
+    }
+    if (isGenericName(receiverName)) {
+      receiverName = receiverId === jobCustomer ? "Customer" : "Technician";
     }
 
     // Convert APNs hex token if necessary
@@ -182,6 +209,9 @@ export async function POST(req: NextRequest) {
       endedBy: null,
       endedReason: null,
     };
+
+    // Store in-memory for instant, quota-immune sync across all endpoints
+    registerActiveCall(activeCallPayload as any);
 
     // Resilient Firestore writes: do not fail call initiation if database write hits quota
     try {

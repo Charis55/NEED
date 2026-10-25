@@ -58,11 +58,26 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
           callerDeviceId: getDeviceId(),
           callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
+          callerName: currentUser?.displayName || "Customer",
+          callerPhoto: currentUser?.photoURL || null,
+          partnerId: job.artisanId,
+          receiverName: "Technician",
         }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         console.warn("Call initiation rejected:", data.error);
+      } else if (data.activeCall && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("needCallInitiated", {
+            detail: {
+              job: {
+                ...job,
+                activeCall: data.activeCall,
+              },
+            },
+          })
+        );
       }
     } catch (err) {
       console.error(err);

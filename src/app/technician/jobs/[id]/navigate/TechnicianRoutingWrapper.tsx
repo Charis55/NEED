@@ -62,11 +62,26 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
           callerDeviceId: getDeviceId(),
           callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
+          callerName: currentUser?.displayName || "Technician",
+          callerPhoto: currentUser?.photoURL || null,
+          partnerId: job.customerId,
+          receiverName: "Customer",
         }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         console.warn("Call initiation rejected:", data.error);
+      } else if (data.activeCall && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("needCallInitiated", {
+            detail: {
+              job: {
+                ...job,
+                activeCall: data.activeCall,
+              },
+            },
+          })
+        );
       }
     } catch (err) {
       console.error(err);

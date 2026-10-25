@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { getActiveCallForUser } from "@/lib/callRegistry";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,9 +48,25 @@ export async function GET(req: NextRequest) {
     // 2. Check for Active Incoming Calls (CallKit)
     let callData: any = { hasCall: false };
 
-    try {
-      // Primary check: user's personal callInbox (written atomically on /api/calls/initiate)
-      const inboxSnap = await adminDb
+    // Step 2a: Instant in-memory check (sub-millisecond, zero-quota)
+    const inMemoryCall = getActiveCallForUser(uid);
+    if (inMemoryCall && inMemoryCall.status === "ringing") {
+      callData = {
+        hasCall: true,
+        jobId: inMemoryCall.jobId,
+        callId: inMemoryCall.callId,
+        channelName: inMemoryCall.channelName,
+        isVideo: inMemoryCall.callType === "video",
+        callerName: inMemoryCall.callerName || "Customer",
+        callerPhoto: inMemoryCall.callerPhoto || null,
+        callerId: inMemoryCall.callerId,
+      };
+    }
+
+    if (!callData.hasCall) {
+      try {
+        // Primary check: user's personal callInbox (written atomically on /api/calls/initiate)
+        const inboxSnap = await adminDb
         .collection("users")
         .doc(uid)
         .collection("callInbox")
@@ -75,6 +92,7 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       // Ignore index sync errors
     }
+  }
 
     // Secondary fallback only if callInbox was empty
     if (!callData.hasCall) {

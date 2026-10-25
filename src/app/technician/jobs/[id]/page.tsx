@@ -346,6 +346,11 @@ export default function TechnicianManageJobPage() {
           callerDeviceId: getDeviceId(),
           callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
+          callerName: user.displayName || "Technician",
+          callerPhoto: user.photoURL || null,
+          partnerId: job.customerId,
+          receiverName: (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : customer?.displayName) || "Customer",
+          receiverPhoto: customer?.photoURL || null,
         }),
       });
       const data = await res.json();
@@ -357,6 +362,17 @@ export default function TechnicianManageJobPage() {
         } else {
           showAlert(data.error || "Failed to start in-app call", "error");
         }
+      } else if (data.activeCall && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("needCallInitiated", {
+            detail: {
+              job: {
+                ...job,
+                activeCall: data.activeCall,
+              },
+            },
+          })
+        );
       }
     } catch (err: any) {
       console.error("Failed to start in-app call", err);

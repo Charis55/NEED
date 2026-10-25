@@ -212,6 +212,12 @@ export default function GlobalCallManager() {
           }
         }
 
+        const isGenericName = (name?: string | null) => {
+          if (!name) return true;
+          const lower = name.trim().toLowerCase();
+          return lower === "caller" || lower === "user" || lower === "someone" || lower === "customer" || lower === "technician";
+        };
+
         const directPartnerName = isCallerJob
           ? call.receiverName || call.callee?.displayName
           : call.callerName || call.caller?.displayName;
@@ -219,7 +225,7 @@ export default function GlobalCallManager() {
           ? call.receiverPhoto || call.callee?.photoUrl
           : call.callerPhoto || call.caller?.photoUrl;
 
-        if (directPartnerName && directPartnerName !== "Someone" && directPartnerName !== "Caller") {
+        if (directPartnerName && !isGenericName(directPartnerName)) {
           setPartnerName(directPartnerName);
         }
         if (directPartnerPhoto) {
@@ -374,12 +380,31 @@ export default function GlobalCallManager() {
       endCallWithLog("declined");
     };
 
+    const handleCallInitiated = (e: any) => {
+      const job = e?.detail?.job;
+      if (job && job.activeCall) {
+        console.log("[GlobalCallManager] Instant client-initiated call mounted:", job.requestId);
+        const isGeneric = (name?: string | null) => {
+          if (!name) return true;
+          const lower = name.trim().toLowerCase();
+          return lower === "caller" || lower === "user" || lower === "someone";
+        };
+        const name = job.activeCall.receiverName || job.activeCall.callee?.displayName;
+        const photo = job.activeCall.receiverPhoto || job.activeCall.callee?.photoUrl;
+        if (name && !isGeneric(name)) setPartnerName(name);
+        if (photo) setPartnerPhoto(photo);
+        setActiveJob(job);
+      }
+    };
+
     window.addEventListener("needNativeCallAnswer", handleNativeAnswer);
     window.addEventListener("needNativeCallDecline", handleNativeDecline);
+    window.addEventListener("needCallInitiated", handleCallInitiated);
 
     return () => {
       window.removeEventListener("needNativeCallAnswer", handleNativeAnswer);
       window.removeEventListener("needNativeCallDecline", handleNativeDecline);
+      window.removeEventListener("needCallInitiated", handleCallInitiated);
     };
   }, [activeJob?.requestId]);
 
@@ -387,6 +412,29 @@ export default function GlobalCallManager() {
     try {
       const isCustomer = job.customerId === uid;
       const partnerId = isCustomer ? job.artisanId : job.customerId;
+
+      // 1. Instant sessionStorage profile lookup (quota-free)
+      if (typeof window !== "undefined") {
+        try {
+          const cachedCustomer = sessionStorage.getItem(`need_tech_customer_${job.requestId}`);
+          if (cachedCustomer && !isCustomer) {
+            const parsed = JSON.parse(cachedCustomer);
+            const name = parsed.displayName || (parsed.firstName ? `${parsed.firstName} ${parsed.lastName || ""}`.trim() : null);
+            if (name) setPartnerName(name);
+            if (parsed.photoURL) setPartnerPhoto(parsed.photoURL);
+            return;
+          }
+          const cachedArtisan = sessionStorage.getItem(`need_job_artisan_${job.requestId}`);
+          if (cachedArtisan && isCustomer) {
+            const parsed = JSON.parse(cachedArtisan);
+            const name = parsed.name || parsed.businessName;
+            if (name) setPartnerName(name);
+            if (parsed.profilePictureUrl) setPartnerPhoto(parsed.profilePictureUrl);
+            return;
+          }
+        } catch {}
+      }
+
       if (!partnerId) return;
 
       const collectionName = isCustomer ? "artisans" : "users";
@@ -401,12 +449,12 @@ export default function GlobalCallManager() {
           setPartnerName(data.businessName || data.name || data.firstName || "Technician");
           setPartnerPhoto(data.profilePictureUrl || data.photoURL);
         } else {
-          setPartnerName(data.firstName ? `${data.firstName} ${data.lastName || ""}` : "Customer");
-          setPartnerPhoto(data.photoURL);
+          setPartnerName(data.displayName || (data.firstName ? `${data.firstName} ${data.lastName || ""}`.trim() : "Customer"));
+          setPartnerPhoto(data.photoURL || data.profilePictureUrl);
         }
       }
     } catch (e) {
-      console.error("Error fetching partner info for call", e);
+      console.warn("fetchPartnerInfo note (quota/network):", e);
     }
   };
 
@@ -441,6 +489,8 @@ export default function GlobalCallManager() {
 
     const targetJobId = activeJob.requestId;
     const finalReason = reason || "ended";
+    const actualCallerId = activeJob.activeCall.callerId;
+    const callId = (activeJob.activeCall as any)?.callId;
 
     let durationMs: number | null = null;
     if (typeof explicitDurationSec === "number" && explicitDurationSec > 0) {
@@ -456,13 +506,17 @@ export default function GlobalCallManager() {
     // Dismiss overlay immediately on initiator tap
     setActiveJob(null);
 
-    // Call server to update Firestore, write chat log, and send cancel/missed FCM pushes
-    apiFetch("/api/calls/end", {
+    // Call server to update Firestore & in-memory registry, and send cancel FCM pushes
+    const endpoint = finalReason === "declined" ? "/api/calls/decline" : "/api/calls/end";
+    apiFetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jobId: targetJobId,
-        callerId: userUid,
+        requestId: targetJobId,
+        callId,
+        callerId: actualCallerId,
+        declinedBy: userUid,
         reason: finalReason,
         durationMs,
       }),
@@ -485,6 +539,22 @@ export default function GlobalCallManager() {
       safeSetSession("need_my_answered_call_id", (activeJob.activeCall as any).callId);
     }
 
+    // Optimistically transition immediately into ongoing state on this device
+    setActiveJob((prev) => {
+      if (!prev || !prev.activeCall) return prev;
+      return {
+        ...prev,
+        activeCall: {
+          ...prev.activeCall,
+          status: "ongoing",
+          connectedAt: Date.now(),
+          acceptedByDeviceId: effectiveDeviceId,
+          acceptedByPlatform: effectivePlatform,
+          acceptedBySession: effectiveSessionId,
+        },
+      };
+    });
+
     apiFetch("/api/calls/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -497,6 +567,84 @@ export default function GlobalCallManager() {
       }),
     }).catch((err) => console.warn("Failed to accept call via server:", err));
   };
+
+  // Active call status poller:
+  // When a call is active (ringing or ongoing), poll /api/calls/status every 1.5s.
+  // This guarantees that if callee declines, caller's dial tone stops immediately (under 1.5s)
+  // and if callee accepts, caller immediately connects to Agora, even if Firestore listener is throttled/blocked.
+  useEffect(() => {
+    if (!activeJob || !activeJob.activeCall || !userUid) return;
+
+    const jobId = activeJob.requestId;
+    const callId = (activeJob.activeCall as any).callId;
+    const isCaller = activeJob.activeCall.callerId === userUid;
+
+    let isPolling = true;
+
+    const checkStatus = async () => {
+      if (!isPolling) return;
+      try {
+        const res = await apiFetch(`/api/calls/status?jobId=${jobId}&callId=${callId || ""}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.success) return;
+
+        if (data.status === "ended") {
+          const endedReason = data.endedReason || "ended";
+          notifyNativeCall("endCall");
+          clearCallNotification();
+          playCallSound("end");
+          clearActiveOutgoingCallId();
+          safeRemoveSession("need_active_outgoing_call_id");
+          safeRemoveSession("need_active_outgoing_call_job");
+          safeRemoveSession("need_active_outgoing_call");
+          safeRemoveSession("need_my_answered_call");
+          safeRemoveSession("need_my_answered_call_id");
+
+          let text = "Call Ended";
+          if (endedReason === "declined") {
+            text = "Call Declined";
+          } else if (endedReason === "cancelled") {
+            text = "Call Cancelled";
+          } else if (endedReason === "timeout") {
+            text = "No Answer";
+          }
+
+          setTerminalState({
+            status: endedReason,
+            text,
+            dismissAt: Date.now() + 1500,
+          });
+
+          setTimeout(() => {
+            setActiveJob(null);
+            setTerminalState(null);
+          }, 1500);
+        } else if (data.status === "ongoing" && isCaller && activeJobRef.current?.activeCall?.status === "ringing") {
+          // Caller was ringing and callee accepted! Transition to ongoing immediately.
+          setActiveJob((prev) => {
+            if (!prev || !prev.activeCall) return prev;
+            return {
+              ...prev,
+              activeCall: {
+                ...prev.activeCall,
+                status: "ongoing",
+                connectedAt: data.activeCall?.connectedAt || Date.now(),
+              },
+            };
+          });
+        }
+      } catch (err) {
+        // Ignore network hiccups during poll
+      }
+    };
+
+    const intervalId = setInterval(checkStatus, 1500);
+    return () => {
+      isPolling = false;
+      clearInterval(intervalId);
+    };
+  }, [activeJob?.requestId, (activeJob?.activeCall as any)?.callId, activeJob?.activeCall?.status, userUid]);
 
   const handleBothConnected = async (jobId: string, timestamp: number) => {
     try {
@@ -558,17 +706,33 @@ export default function GlobalCallManager() {
       ? activeCall.bothConnectedAt
       : null;
 
-  const resolvedCalleeName =
-    (activeCall as any).receiverName ||
-    (activeCall as any).callee?.displayName ||
-    (partnerName !== "Someone" ? partnerName : "Technician");
+  const isGeneric = (name?: string | null) => {
+    if (!name) return true;
+    const lower = name.trim().toLowerCase();
+    return lower === "caller" || lower === "user" || lower === "someone" || lower === "customer" || lower === "technician";
+  };
+
+  const getCleanName = (candidates: (string | null | undefined)[], fallback: string) => {
+    for (const cand of candidates) {
+      if (cand && !isGeneric(cand)) return cand;
+    }
+    return fallback;
+  };
+
+  const defaultCalleeRole = activeJob.artisanId === userUid ? "Customer" : "Technician";
+  const defaultCallerRole = activeJob.artisanId === userUid ? "Technician" : "Customer";
+
+  const resolvedCalleeName = getCleanName(
+    [(activeCall as any).receiverName, (activeCall as any).callee?.displayName, partnerName],
+    defaultCalleeRole
+  );
   const resolvedCalleePhoto =
     (activeCall as any).receiverPhoto || (activeCall as any).callee?.photoUrl || partnerPhoto;
 
-  const resolvedCallerName =
-    (activeCall as any).callerName ||
-    (activeCall as any).caller?.displayName ||
-    (partnerName !== "Someone" ? partnerName : "Customer");
+  const resolvedCallerName = getCleanName(
+    [(activeCall as any).callerName, (activeCall as any).caller?.displayName, partnerName],
+    defaultCallerRole
+  );
   const resolvedCallerPhoto =
     (activeCall as any).callerPhoto || (activeCall as any).caller?.photoUrl || partnerPhoto;
 

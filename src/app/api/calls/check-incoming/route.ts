@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { getActiveCallForUser } from "@/lib/callRegistry";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,21 @@ export async function GET(req: NextRequest) {
     }
 
     const now = Date.now();
+
+    // 0. Instant in-memory check (sub-millisecond, zero Firestore quota cost)
+    const inMemoryCall = getActiveCallForUser(uid);
+    if (inMemoryCall && inMemoryCall.status === "ringing") {
+      return NextResponse.json({
+        hasCall: true,
+        jobId: inMemoryCall.jobId,
+        callId: inMemoryCall.callId,
+        channelName: inMemoryCall.channelName,
+        isVideo: inMemoryCall.callType === "video",
+        callerName: inMemoryCall.callerName || "Customer",
+        callerPhoto: inMemoryCall.callerPhoto || null,
+        callerId: inMemoryCall.callerId,
+      }, { headers: corsHeaders });
+    }
 
     // 1. Check indexed callInbox for lightning-fast lookup
     try {

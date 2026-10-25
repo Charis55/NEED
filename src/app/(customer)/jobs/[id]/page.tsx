@@ -431,6 +431,11 @@ function JobsContent() {
           callerDeviceId: getDeviceId(),
           callerPlatform: getPlatformName(),
           callerSessionId: getSessionId(),
+          callerName: user.displayName || "Customer",
+          callerPhoto: user.photoURL || null,
+          partnerId: job.artisanId,
+          receiverName: artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician",
+          receiverPhoto: artisan?.profilePictureUrl || artisanUser?.photoURL || null,
         }),
       });
       const data = await res.json();
@@ -442,6 +447,17 @@ function JobsContent() {
         } else {
           showAlert(data.error || "Failed to start in-app call", "error");
         }
+      } else if (data.activeCall && typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("needCallInitiated", {
+            detail: {
+              job: {
+                ...job,
+                activeCall: data.activeCall,
+              },
+            },
+          })
+        );
       }
     } catch (err: any) {
       console.error("Failed to start in-app call", err);
