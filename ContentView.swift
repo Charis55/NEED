@@ -804,7 +804,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
 // MARK: - Native Permission Manager
 @MainActor
-final class PermissionManager: NSObject, CLLocationManagerDelegate {
+final class PermissionManager: NSObject, @preconcurrency CLLocationManagerDelegate {
     static let shared = PermissionManager()
     private let locationManager = CLLocationManager()
     private var onLocationDecision: (() -> Void)?
@@ -896,27 +896,32 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
 
         // Fallback safety timeout in case delegate doesn't fire
         DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) { [weak self] in
-            guard let self = self, let callback = self.onLocationDecision else { return }
+            guard let self = self else { return }
+            let callback = self.onLocationDecision
             self.onLocationDecision = nil
-            callback()
-        }
-    }
-
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status: CLAuthorizationStatus
-        if #available(iOS 14.0, *) {
-            status = manager.authorizationStatus
-        } else {
-            status = CLLocationManager.authorizationStatus()
-        }
-        if status != .notDetermined {
-            let callback = onLocationDecision
-            onLocationDecision = nil
             callback?()
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            self.handleAuthorizationChange()
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        Task { @MainActor in
+            self.handleAuthorizationChange()
+        }
+    }
+
+    private func handleAuthorizationChange() {
+        let status: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            status = locationManager.authorizationStatus
+        } else {
+            status = CLLocationManager.authorizationStatus()
+        }
         if status != .notDetermined {
             let callback = onLocationDecision
             onLocationDecision = nil
