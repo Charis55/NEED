@@ -28,11 +28,8 @@ public class CustomMessagingService extends MessagingService {
 
         String type = data.get("type");
         if ("call".equals(type)) {
-            // When app is in the foreground, the in-app IncomingCallModal displays and rings.
-            // Only show the system status-bar notification when the app is backgrounded or closed.
-            if (!MainActivity.isAppInForeground) {
-                showCallNotification(data);
-            }
+            // Always post high-priority heads-up call banner with ringtone & answer/decline actions
+            showCallNotification(data);
         } else if ("cancel_call".equals(type)) {
             // The caller cancelled or call was declined/ended — dismiss persistent ringing notification
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);

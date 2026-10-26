@@ -29,7 +29,7 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { jobId, callerId, reason, durationMs } = await req.json();
+    const { jobId, callId, callerId, reason, durationMs } = await req.json();
     // reason: "ended" | "cancelled" | "declined" | "timeout"
 
     const targetJobId = jobId;
@@ -133,6 +133,16 @@ export async function POST(req: NextRequest) {
         senderId: messageSenderId || effectiveCallerId,
         createdAt: now,
       }).catch(() => {});
+
+      if (receiverId && (activeCall?.callId || callId)) {
+        adminDb
+          .collection("users")
+          .doc(receiverId)
+          .collection("callInbox")
+          .doc(activeCall?.callId || callId)
+          .delete()
+          .catch(() => {});
+      }
     } catch (fsUpdateErr: any) {
       console.warn("[calls/end] Firestore update warning (quota/offline):", fsUpdateErr?.message);
     }

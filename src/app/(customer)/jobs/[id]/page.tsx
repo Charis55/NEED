@@ -434,7 +434,7 @@ function JobsContent() {
           callerName: user.displayName || "Customer",
           callerPhoto: user.photoURL || null,
           partnerId: job.artisanId,
-          receiverName: artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician",
+          receiverName: artisan?.businessName || artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician",
           receiverPhoto: artisan?.profilePictureUrl || artisanUser?.photoURL || null,
         }),
       });

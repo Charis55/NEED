@@ -88,10 +88,11 @@ export function getActiveCall(jobIdOrCallId: string): ActiveCallRecord | undefin
       call.endedAt = now;
     }
   } else if (call.status === "ongoing") {
+    // Ongoing calls persist until explicitly hung up. Guard only against orphaned abandoned calls (> 4 hours).
     const syncTime = call.bothConnectedAt || call.connectedAt || call.timestamp || 0;
-    if (!call.bothConnectedAt && now - syncTime > 45000) {
+    if (syncTime && now - syncTime > 4 * 60 * 60 * 1000) {
       call.status = "ended";
-      call.endedReason = "ended";
+      call.endedReason = "timeout";
       call.endedAt = now;
     }
   }

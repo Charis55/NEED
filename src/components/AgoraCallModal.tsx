@@ -59,49 +59,34 @@ function VideoTrackPlayer({
     const el = containerRef.current;
     if (!el || !track) return;
 
-    let isCancelled = false;
+    try {
+      track.play(el, { fit: "cover", mirror: isLocal });
 
-    const playVideo = () => {
-      if (isCancelled || !containerRef.current) return;
-      try {
-        try {
-          track.stop();
-        } catch (e) {}
-        while (containerRef.current.firstChild) {
-          containerRef.current.removeChild(containerRef.current.firstChild);
-        }
-        track.play(containerRef.current, { fit: "cover", mirror: isLocal });
-
-        const fixVideo = () => {
-          if (!containerRef.current) return;
-          const video = containerRef.current.querySelector("video");
-          if (video) {
-            video.setAttribute("playsinline", "true");
-            video.setAttribute("webkit-playsinline", "true");
-            video.setAttribute("autoplay", "true");
-            video.playsInline = true;
-            video.autoplay = true;
-            if (isLocal) {
-              video.muted = true;
-              video.setAttribute("muted", "true");
-            }
-            video.play().catch(() => {});
+      const fixVideo = () => {
+        if (!containerRef.current) return;
+        const video = containerRef.current.querySelector("video");
+        if (video) {
+          video.setAttribute("playsinline", "true");
+          video.setAttribute("webkit-playsinline", "true");
+          video.setAttribute("autoplay", "true");
+          video.playsInline = true;
+          video.autoplay = true;
+          if (isLocal) {
+            video.muted = true;
+            video.setAttribute("muted", "true");
           }
-        };
+          video.play().catch(() => {});
+        }
+      };
 
-        fixVideo();
-        setTimeout(fixVideo, 50);
-        setTimeout(fixVideo, 200);
-        setTimeout(fixVideo, 600);
-      } catch (err) {
-        console.warn("[Agora VideoTrackPlayer] Play error:", err);
-      }
-    };
-
-    playVideo();
+      fixVideo();
+      setTimeout(fixVideo, 80);
+      setTimeout(fixVideo, 300);
+    } catch (err) {
+      console.warn("[Agora VideoTrackPlayer] Play error:", err);
+    }
 
     return () => {
-      isCancelled = true;
       try {
         track.stop();
       } catch (e) {}
@@ -146,6 +131,7 @@ export default function AgoraCallModal({
   const [speakerOn, setSpeakerOn] = useState(true);
   const speakerOnRef = useRef(speakerOn);
   speakerOnRef.current = speakerOn;
+  const lastUserSpeakerToggleRef = useRef<number>(0);
   const [error, setError] = useState("");
   const [callDuration, setCallDuration] = useState(0);
   const callDurationRef = useRef(0);
@@ -229,6 +215,10 @@ export default function AgoraCallModal({
         leaveCallRef.current();
       };
       const handleNativeRoute = (e: any) => {
+        if (Date.now() - lastUserSpeakerToggleRef.current < 3000) {
+          // Ignore native route echo shortly after manual user toggle
+          return;
+        }
         if (e.detail && typeof e.detail.isSpeaker === "boolean") {
           setSpeakerOn(e.detail.isSpeaker);
         }
@@ -306,6 +296,7 @@ export default function AgoraCallModal({
   };
 
   const toggleSpeaker = () => {
+    lastUserSpeakerToggleRef.current = Date.now();
     const nextSpeakerState = !speakerOn;
     setSpeakerOn(nextSpeakerState);
     if (typeof window !== 'undefined') {
@@ -354,8 +345,8 @@ export default function AgoraCallModal({
     let localV: ICameraVideoTrack;
     let connectionPromise: Promise<void> | null = null;
     
-    // Create a fresh client with h264 for universal iOS Safari / WebKit hardware support
-    const client = AgoraRTC.createClient({ mode: "rtc", codec: "h264" });
+    // Create a fresh client with vp8 for universal Android and iOS WebRTC support
+    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     clientRef.current = client;
 
     const initCall = async () => {

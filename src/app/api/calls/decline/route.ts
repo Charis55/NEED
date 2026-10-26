@@ -60,6 +60,17 @@ export async function POST(req: Request) {
           senderId: messageSenderId || 'system',
           createdAt: now,
         }).catch(() => {});
+
+        const receiverId = (body as any)?.declinedBy || (jobData.customerId === callerId ? jobData.artisanId : jobData.customerId);
+        if (receiverId && (jobData.activeCall?.callId || (body as any)?.callId)) {
+          adminDb
+            .collection("users")
+            .doc(receiverId)
+            .collection("callInbox")
+            .doc(jobData.activeCall?.callId || (body as any)?.callId)
+            .delete()
+            .catch(() => {});
+        }
       }
     } catch (dbErr: any) {
       console.warn('[calls/decline] Firestore update warning (quota/offline):', dbErr?.message);

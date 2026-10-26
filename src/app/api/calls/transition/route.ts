@@ -10,6 +10,7 @@ import {
   CallActor,
   isTerminalCallStatus,
 } from "@/lib/callStateMachine";
+import { updateActiveCallStatus } from "@/lib/callRegistry";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Asynchronous side effects outside the transaction (logging & silent pushes)
+    // Asynchronous side effects outside the transaction (logging, in-memory sync, & silent pushes)
     if (transactionResult.success && !transactionResult.skipped && !transactionResult.noop) {
       const {
         messageText,
@@ -191,6 +192,27 @@ export async function POST(req: NextRequest) {
         isTerminal,
         activeCall,
       } = transactionResult as any;
+
+      // Sync server in-memory call registry immediately
+      try {
+        updateActiveCallStatus(
+          jobId,
+          isTerminal ? "ended" : "ongoing",
+          activeCall
+        );
+      } catch (regErr) {
+        console.warn("[calls/transition] in-memory registry sync warning:", regErr);
+      }
+
+      if (isTerminal && activeCall?.receiverId && activeCall?.callId) {
+        adminDb
+          .collection("users")
+          .doc(activeCall.receiverId)
+          .collection("callInbox")
+          .doc(activeCall.callId)
+          .delete()
+          .catch(() => {});
+      }
 
       if (isTerminal && messageText && messageSenderId) {
         // 1. Add chat message

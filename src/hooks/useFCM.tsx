@@ -76,7 +76,13 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
             console.log("[useFCM] Foreground native push notification:", notification);
             const data = notification.data || {};
             const isCall = data.type === "call" || data.type === "cancel_call" || data.callId || (notification as any).type === "call" || data.channelName;
-            if (!isCall) {
+            if (isCall) {
+              if (data.type === "call" || data.callId) {
+                window.dispatchEvent(new CustomEvent("needIncomingCallPush", { detail: data }));
+              } else if (data.type === "cancel_call") {
+                window.dispatchEvent(new CustomEvent("needNativeCallEnd", { detail: data }));
+              }
+            } else {
               window.dispatchEvent(new CustomEvent("needForegroundPush", { detail: notification }));
             }
           });

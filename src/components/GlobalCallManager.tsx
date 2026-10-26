@@ -85,9 +85,10 @@ export default function GlobalCallManager() {
 
     let artisanJobs: JobRequest[] = [];
     let customerJobs: JobRequest[] = [];
+    let inboxJobs: JobRequest[] = [];
 
-    const updateCombined = (aJobs: JobRequest[], cJobs: JobRequest[]) => {
-      const combined = [...aJobs, ...cJobs];
+    const updateCombined = (aJobs: JobRequest[], cJobs: JobRequest[], iJobs: JobRequest[] = []) => {
+      const combined = [...aJobs, ...cJobs, ...iJobs];
       const now = Date.now();
 
       // Find the most recent active call (tolerating clock skew between client and server)
@@ -120,11 +121,8 @@ export default function GlobalCallManager() {
           if (!syncStartTime || syncStartTime <= 0) return false;
 
           const ongoingAge = now - syncStartTime;
-          // Maximum ongoing call age 45 minutes
-          if (ongoingAge > 45 * 60 * 1000 || ongoingAge < -10 * 1000) return false;
-
-          // Abandoned ongoing call: if marked ongoing but bothConnectedAt was never set within 45s
-          if (!data.activeCall.bothConnectedAt && ongoingAge > 45 * 1000) return false;
+          // Maximum ongoing call age 4 hours (guard against orphaned calls)
+          if (ongoingAge > 4 * 60 * 60 * 1000 || ongoingAge < -10 * 1000) return false;
 
           return true;
         }
@@ -297,18 +295,49 @@ export default function GlobalCallManager() {
     const qArtisan = query(collection(db, "jobRequests"), where("artisanId", "==", userUid));
     const unsubArtisan = onSnapshot(qArtisan, (snap) => {
       artisanJobs = snap.docs.map((d) => ({ requestId: d.id, ...d.data() } as JobRequest));
-      updateCombined(artisanJobs, customerJobs);
+      updateCombined(artisanJobs, customerJobs, inboxJobs);
     }, handleError);
 
     const qCustomer = query(collection(db, "jobRequests"), where("customerId", "==", userUid));
     const unsubCustomer = onSnapshot(qCustomer, (snap) => {
       customerJobs = snap.docs.map((d) => ({ requestId: d.id, ...d.data() } as JobRequest));
-      updateCombined(artisanJobs, customerJobs);
+      updateCombined(artisanJobs, customerJobs, inboxJobs);
+    }, handleError);
+
+    // Direct personal callInbox listener for instant zero-latency incoming call detection
+    const qInbox = collection(db, "users", userUid, "callInbox");
+    const unsubInbox = onSnapshot(qInbox, (snap) => {
+      inboxJobs = snap.docs.map((d) => {
+        const item = d.data();
+        return {
+          requestId: item.jobId,
+          customerId: item.callerId,
+          artisanId: userUid,
+          activeCall: {
+            ...item,
+            callId: item.callId || d.id,
+            status: item.status || "ringing",
+            callerId: item.callerId,
+            receiverId: userUid,
+            callerName: item.callerName,
+            callerPhoto: item.callerPhoto,
+            receiverName: item.receiverName,
+            receiverPhoto: item.receiverPhoto,
+            timestamp: item.createdAt || item.timestamp,
+            createdAt: item.createdAt,
+            ringExpiresAt: item.ringExpiresAt,
+            type: item.callType || item.type || "audio",
+            channelName: item.channelName,
+          },
+        } as unknown as JobRequest;
+      });
+      updateCombined(artisanJobs, customerJobs, inboxJobs);
     }, handleError);
 
     return () => {
       unsubArtisan();
       unsubCustomer();
+      unsubInbox();
     };
   }, [userUid]);
 
@@ -407,15 +436,23 @@ export default function GlobalCallManager() {
       endCallWithLog("declined");
     };
 
+    const isGeneric = (name?: string | null) => {
+      if (!name) return true;
+      const lower = name.trim().toLowerCase();
+      return (
+        lower === "caller" ||
+        lower === "user" ||
+        lower === "someone" ||
+        lower === "technician" ||
+        lower === "customer" ||
+        lower === "artisan"
+      );
+    };
+
     const handleCallInitiated = (e: any) => {
       const job = e?.detail?.job;
       if (job && job.activeCall) {
         console.log("[GlobalCallManager] Instant client-initiated call mounted:", job.requestId);
-        const isGeneric = (name?: string | null) => {
-          if (!name) return true;
-          const lower = name.trim().toLowerCase();
-          return lower === "caller" || lower === "user" || lower === "someone";
-        };
         const name = job.activeCall.receiverName || job.activeCall.callee?.displayName;
         const photo = job.activeCall.receiverPhoto || job.activeCall.callee?.photoUrl;
         if (name && !isGeneric(name)) setPartnerName(name);
@@ -424,14 +461,52 @@ export default function GlobalCallManager() {
       }
     };
 
+    const handleIncomingCallPush = (e: any) => {
+      const data = e?.detail;
+      if (!data || !data.jobId) return;
+      console.log("[GlobalCallManager] Instant incoming call push received:", data);
+      const reqId = data.jobId || data.requestId;
+      const callerName = data.callerName || data.title;
+      const callType = data.callType || "audio";
+      const callId = data.callId;
+
+      if (!activeJobRef.current || activeJobRef.current.requestId !== reqId) {
+        if (callerName && !isGeneric(callerName)) {
+          setPartnerName(callerName);
+        }
+        if (data.callerPhoto) {
+          setPartnerPhoto(data.callerPhoto);
+        }
+        setActiveJob({
+          requestId: reqId,
+          activeCall: {
+            callId,
+            jobId: reqId,
+            channelName: data.channelName || reqId,
+            callType,
+            callerId: data.callerId || "",
+            callerName: callerName || "Customer",
+            callerPhoto: data.callerPhoto || null,
+            receiverId: userUidRef.current || "",
+            status: "ringing",
+            createdAt: Date.now(),
+            timestamp: Date.now(),
+            ringExpiresAt: Date.now() + 45000,
+          },
+        } as unknown as JobRequest);
+      }
+    };
+
     window.addEventListener("needNativeCallAnswer", handleNativeAnswer);
     window.addEventListener("needNativeCallDecline", handleNativeDecline);
     window.addEventListener("needCallInitiated", handleCallInitiated);
+    window.addEventListener("needIncomingCallPush", handleIncomingCallPush);
 
     return () => {
       window.removeEventListener("needNativeCallAnswer", handleNativeAnswer);
       window.removeEventListener("needNativeCallDecline", handleNativeDecline);
       window.removeEventListener("needCallInitiated", handleCallInitiated);
+      window.removeEventListener("needIncomingCallPush", handleIncomingCallPush);
     };
   }, [activeJob?.requestId]);
 
@@ -454,7 +529,7 @@ export default function GlobalCallManager() {
           const cachedArtisan = sessionStorage.getItem(`need_job_artisan_${job.requestId}`);
           if (cachedArtisan && isCustomer) {
             const parsed = JSON.parse(cachedArtisan);
-            const name = parsed.name || parsed.businessName;
+            const name = parsed.businessName || parsed.name;
             if (name) setPartnerName(name);
             if (parsed.profilePictureUrl) setPartnerPhoto(parsed.profilePictureUrl);
             return;
@@ -687,6 +762,17 @@ export default function GlobalCallManager() {
       await updateDoc(fsDoc(db, "jobRequests", jobId), {
         "activeCall.bothConnectedAt": timestamp,
       });
+      // Notify server transition endpoint to record joined state and sync in-memory registry
+      fetch("/api/calls/transition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId,
+          callId: (activeJobRef.current?.activeCall as any)?.callId,
+          action: "joined",
+          userId: userUid,
+        }),
+      }).catch(() => {});
     } catch (e) {
       console.warn("handleBothConnected client update failed:", e);
     }

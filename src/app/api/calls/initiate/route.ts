@@ -86,10 +86,19 @@ export async function POST(req: NextRequest) {
     const isGenericName = (name?: string | null) => {
       if (!name) return true;
       const lower = name.trim().toLowerCase();
-      return lower === "caller" || lower === "user" || lower === "someone";
+      return (
+        lower === "caller" ||
+        lower === "user" ||
+        lower === "someone" ||
+        lower === "technician" ||
+        lower === "customer" ||
+        lower === "artisan" ||
+        lower === "client" ||
+        lower === "service provider"
+      );
     };
 
-    if (receiverId && (isGenericName(callerName) || isGenericName(receiverName) || !fcmToken)) {
+    if (receiverId && (isGenericName(callerName) || isGenericName(receiverName) || !callerPhoto || !receiverPhoto || !fcmToken)) {
       try {
         const [receiverUserDoc, callerUserDoc, receiverArtisanDoc, callerArtisanDoc] = await Promise.all([
           adminDb.collection("users").doc(receiverId).get(),

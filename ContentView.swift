@@ -482,11 +482,23 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     @objc private func handleAudioRouteChange(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+
+        // Only react to real hardware routing changes (Bluetooth connected/disconnected, headphones plugged/unplugged)
+        // Never process internal app category or port overrides which causes an echo loop bouncing speaker back.
+        guard reason == .newDeviceAvailable || reason == .oldDeviceUnavailable else {
+            return
+        }
+
         Task { @MainActor in
             let session = AVAudioSession.sharedInstance()
             let isSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
             UIDevice.current.isProximityMonitoringEnabled = !isSpeaker && (self.activeCallUUID != nil)
-            print("[CallKit] Audio route changed: isSpeaker=\(isSpeaker)")
+            print("[CallKit] Physical audio route changed (reason=\(reason.rawValue)): isSpeaker=\(isSpeaker)")
             self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('needNativeRouteChanged', { detail: { isSpeaker: \(isSpeaker) } }))", completionHandler: nil)
         }
     }

@@ -61,7 +61,8 @@ export default function TrackingMapWrapper({ jobId }: { jobId: string }) {
           callerName: currentUser?.displayName || "Customer",
           callerPhoto: currentUser?.photoURL || null,
           partnerId: job.artisanId,
-          receiverName: "Technician",
+          receiverName: (job as any).artisanBusinessName || (job as any).artisanName || "Technician",
+          receiverPhoto: (job as any).artisanPhotoUrl || (job as any).artisanProfilePictureUrl || null,
         }),
       });
       const data = await res.json();

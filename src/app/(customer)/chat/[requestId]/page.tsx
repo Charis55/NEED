@@ -694,7 +694,7 @@ export default function ChatPage() {
 
   const isCustomerViewing = currentUser?.uid === job?.customerId;
   const chatPartnerName = isCustomerViewing 
-    ? (artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician") 
+    ? (artisan?.businessName || artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician") 
     : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || "Customer");
 
   const startCall = async (type: "audio" | "video") => {

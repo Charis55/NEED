@@ -55,10 +55,11 @@ export async function GET(req: NextRequest) {
                 effectiveEndedReason = "timeout";
               }
             } else if (effectiveStatus === "ongoing" || effectiveStatus === "connected" || effectiveStatus === "accepted") {
+              // Ongoing calls persist until hung up. Only terminate if abandoned for > 4 hours.
               const syncTime = call.bothConnectedAt || call.connectedAt || call.timestamp || 0;
-              if (!call.bothConnectedAt && now - syncTime > 45000) {
+              if (syncTime && now - syncTime > 4 * 60 * 60 * 1000) {
                 effectiveStatus = "ended";
-                effectiveEndedReason = "ended";
+                effectiveEndedReason = "timeout";
               }
             }
             return NextResponse.json({
