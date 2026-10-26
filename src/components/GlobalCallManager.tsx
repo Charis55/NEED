@@ -742,13 +742,12 @@ export default function GlobalCallManager() {
     }
   };
 
-  if (!activeJob || !activeJob.activeCall || !userUid) return null;
-
-  const { activeCall } = activeJob;
-  const isCaller = activeCall.callerId === userUid;
+  const isCallPresent = Boolean(activeJob && activeJob.activeCall && userUid);
+  const rawActiveCall = activeJob?.activeCall;
+  const isCaller = Boolean(isCallPresent && rawActiveCall?.callerId === userUid);
 
   const myDeviceId = getDeviceId();
-  const activeCallId = (activeCall as any).callId;
+  const activeCallId = (rawActiveCall as any)?.callId;
   const registeredOutgoingCallId = getActiveOutgoingCallId();
 
   // Outgoing Caller Device Isolation:
@@ -759,8 +758,8 @@ export default function GlobalCallManager() {
       registeredOutgoingCallId === activeCallId ||
       safeGetSession("need_active_outgoing_call_id") === activeCallId
     )) ||
-    (Boolean((activeCall as any).callerDeviceId) && (activeCall as any).callerDeviceId === myDeviceId) ||
-    (activeJobRef.current?.requestId === activeJob.requestId &&
+    (Boolean((rawActiveCall as any)?.callerDeviceId) && (rawActiveCall as any)?.callerDeviceId === myDeviceId) ||
+    (activeJobRef.current?.requestId === activeJob?.requestId &&
      Boolean(activeJobRef.current?.activeCall?.callId) &&
      activeJobRef.current?.activeCall?.callId === activeCallId);
 
@@ -770,17 +769,19 @@ export default function GlobalCallManager() {
   // Once answered, only the device that tapped Answer connects to Agora.
   // Other devices that were ringing immediately stop ringing and stay idle.
   const isThisDeviceAcceptedReceiver = !isCaller && (
-    (safeGetSession("need_my_answered_call") === activeJob.requestId) ||
+    (safeGetSession("need_my_answered_call") === activeJob?.requestId) ||
     (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
-    (Boolean((activeCall as any).acceptedByDeviceId) && (activeCall as any).acceptedByDeviceId === myDeviceId)
+    (Boolean((rawActiveCall as any)?.acceptedByDeviceId) && (rawActiveCall as any)?.acceptedByDeviceId === myDeviceId)
   );
 
-  const isRingingForMe = activeCall.status === "ringing" && !isCaller && !terminalState;
-  const isRingingByMe = (activeCall.status === "ringing" || !!terminalState) && isThisDeviceCaller;
-  const isOngoingForMe =
-    (activeCall.status === "ongoing" || (activeCall.status as string) === "connected" || (activeCall.status as string) === "accepted") &&
+  const isRingingForMe = Boolean(isCallPresent && rawActiveCall?.status === "ringing" && !isCaller && !terminalState);
+  const isRingingByMe = Boolean(isCallPresent && (rawActiveCall?.status === "ringing" || !!terminalState) && isThisDeviceCaller);
+  const isOngoingForMe = Boolean(
+    isCallPresent &&
+    (rawActiveCall?.status === "ongoing" || (rawActiveCall?.status as string) === "connected" || (rawActiveCall?.status as string) === "accepted") &&
     (isCaller ? isThisDeviceCaller : isThisDeviceAcceptedReceiver) &&
-    !terminalState;
+    !terminalState
+  );
 
   useEffect(() => {
     const isCallActive = isRingingForMe || isRingingByMe || isOngoingForMe;
@@ -798,7 +799,10 @@ export default function GlobalCallManager() {
     };
   }, [isRingingForMe, isRingingByMe, isOngoingForMe]);
 
+  if (!isCallPresent || !activeJob || !activeJob.activeCall || !userUid) return null;
   if (!isRingingForMe && !isRingingByMe && !isOngoingForMe) return null;
+
+  const activeCall = activeJob.activeCall;
 
   const validBothConnectedAt =
     activeCall.bothConnectedAt &&
