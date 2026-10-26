@@ -31,7 +31,6 @@ public class AudioTogglePlugin extends Plugin {
     private static final String TAG = "AudioTogglePlugin";
     private static final String ONGOING_CALL_CHANNEL_ID = "ongoing_call_channel_v1";
     private static final int ONGOING_CALL_NOTIFICATION_ID = 1005;
-    private AudioFocusRequest audioFocusRequest;
     private PowerManager.WakeLock proximityWakeLock;
 
     private void acquireProximityWakeLock(Context context) {
@@ -239,14 +238,11 @@ public class AudioTogglePlugin extends Plugin {
 
         try {
             if ("earpiece".equalsIgnoreCase(mode)) {
-                // 1. Request Voice Communication Audio Focus so WebView audio is treated as phone call
-                requestCallAudioFocus(audioManager);
-
-                // 2. Set telephony communication mode
+                // 1. Set telephony communication mode
                 audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
                 audioManager.setSpeakerphoneOn(false);
 
-                // 3. On Android S+ (API 31+), route communication audio to the built-in earpiece
+                // 2. On Android S+ (API 31+), route communication audio to the built-in earpiece
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
                     AudioDeviceInfo earpieceDevice = null;
@@ -265,7 +261,7 @@ public class AudioTogglePlugin extends Plugin {
                     }
                 }
 
-                // 4. Engage hardware proximity sensor to dim screen when phone is held to ear
+                // 3. Engage hardware proximity sensor to dim screen when phone is held to ear
                 acquireProximityWakeLock(context);
                 Log.d(TAG, "Audio routed to EARPIECE with proximity screen dimming enabled");
 
@@ -273,10 +269,7 @@ public class AudioTogglePlugin extends Plugin {
                 // 1. Release proximity wake lock so screen remains on for loudspeaker
                 releaseProximityWakeLock();
 
-                // 2. Request Voice Communication Audio Focus
-                requestCallAudioFocus(audioManager);
-
-                // 3. Set telephony communication mode and speakerphone
+                // 2. Set telephony communication mode and speakerphone
                 audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
                 audioManager.setSpeakerphoneOn(true);
                 try {
@@ -310,7 +303,6 @@ public class AudioTogglePlugin extends Plugin {
             } else {
                 // Reset to normal mode (call ended)
                 releaseProximityWakeLock();
-                abandonCallAudioFocus(audioManager);
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     audioManager.clearCommunicationDevice();
@@ -327,46 +319,6 @@ public class AudioTogglePlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "Failed to set audio mode: " + e.getMessage(), e);
             call.reject("Failed to set audio mode: " + e.getMessage());
-        }
-    }
-
-    private void requestCallAudioFocus(AudioManager audioManager) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (audioFocusRequest == null) {
-                    AudioAttributes playbackAttributes = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build();
-                    audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(playbackAttributes)
-                        .setAcceptsDelayedFocusGain(true)
-                        .setOnAudioFocusChangeListener(focusChange -> {
-                            Log.d(TAG, "Call audio focus changed: " + focusChange);
-                        })
-                        .build();
-                }
-                audioManager.requestAudioFocus(audioFocusRequest);
-            } else {
-                audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN);
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to request call audio focus: " + t.getMessage());
-        }
-    }
-
-    private void abandonCallAudioFocus(AudioManager audioManager) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (audioFocusRequest != null) {
-                    audioManager.abandonAudioFocusRequest(audioFocusRequest);
-                    audioFocusRequest = null;
-                }
-            } else {
-                audioManager.abandonAudioFocus(null);
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to abandon call audio focus: " + t.getMessage());
         }
     }
 

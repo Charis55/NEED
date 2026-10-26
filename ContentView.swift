@@ -225,6 +225,9 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     }
 
     @objc private func handleAppLifecycle(_ notification: Notification) {
+        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected {
+            return
+        }
         ensureActive()
     }
 
@@ -506,6 +509,12 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         }
     }
 
+    func activateCallAudio(isSpeaker: Bool = true) {
+        self.isCallConnected = true
+        SilentAudioGateway.shared.pauseForCall()
+        configureAudioSession(isSpeaker: isSpeaker)
+    }
+
     func reportIncomingCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
         if UIApplication.shared.applicationState == .active {
             print("[CallKit] App is in foreground, suppressing CallKit UI for in-app ringing modal")
@@ -545,7 +554,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         }
         self.currentJobId = jobId
         self.currentCallerId = uid
-        self.isCallConnected = false
+        self.isCallConnected = true
+        SilentAudioGateway.shared.pauseForCall()
 
         let uuid = UUID()
         self.activeCallUUID = uuid
@@ -563,7 +573,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         }
 
         // Configure audio routing: default to loudspeaker
-        configureAudioSession(isSpeaker: true)
+        activateCallAudio(isSpeaker: true)
     }
 
     func resetCallState() {
@@ -609,10 +619,9 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     func onNativeAnswerRequested() {
-        self.isCallConnected = true
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         UIApplication.shared.applicationIconBadgeNumber = 0
-        configureAudioSession(isSpeaker: true)
+        activateCallAudio(isSpeaker: true)
 
         let savedJobId = self.currentJobId
         print("[CallKit] Dynamic Island / CallKit Answer tapped for jobId: \(savedJobId ?? "")")
@@ -683,7 +692,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     func setAudioMode(mode: String) {
-        configureAudioSession(isSpeaker: mode != "earpiece")
+        let isSpeaker = mode != "earpiece"
+        activateCallAudio(isSpeaker: isSpeaker)
     }
 
     // MARK: - CXProviderDelegate
@@ -943,7 +953,6 @@ struct ErrorView: View {
 }
 
 // MARK: - Native App Delegate (APNs Push Token Handling)
-// MARK: - Native App Delegate (APNs Push Token Handling)
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
 
@@ -952,6 +961,23 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+
+        // Ensure notification categories are configured for lock screen Answer/Decline actions
+        let answerAction = UNNotificationAction(identifier: "ANSWER_ACTION", title: "Answer", options: [.foreground])
+        let declineAction = UNNotificationAction(identifier: "DECLINE_ACTION", title: "Decline", options: [.destructive])
+        let callCategory = UNNotificationCategory(identifier: "INCOMING_CALL", actions: [answerAction, declineAction], intentIdentifiers: [], options: [.customDismissAction])
+        UNUserNotificationCenter.current().setNotificationCategories([callCategory])
+
+        // Request user notification authorization & register for remote push notifications
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            if granted {
+                DispatchQueue.main.async {
+                    application.registerForRemoteNotifications()
+                }
+            }
+        }
+        application.registerForRemoteNotifications()
+
         SilentAudioGateway.shared.ensureActive()
         BackgroundSyncGateway.shared.startMonitoring()
         return true
@@ -965,6 +991,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         print("[AppDelegate] App became active")
+        application.registerForRemoteNotifications()
         SilentAudioGateway.shared.ensureActive()
         BackgroundSyncGateway.shared.startMonitoring()
     }
@@ -975,8 +1002,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
         let tokenString = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
         print("[APNs] Registered native push device token: \(tokenString)")
+        UserDefaults.standard.set(tokenString, forKey: "need_native_apns_token")
         WebViewModel.shared.apnsToken = tokenString
         WebViewModel.shared.bridgeDeviceToken(token: tokenString)
+
+        if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
+            WebViewModel.shared.syncTokenToBackend(uid: uid, token: tokenString)
+        }
     }
 
     func application(
@@ -1028,6 +1060,22 @@ final class WebViewModel: ObservableObject {
         guard let webView = self.webView else { return }
         let js = "window.dispatchEvent(new CustomEvent('needNativePushToken', { detail: { token: '\(token)' } }));"
         webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    func syncTokenToBackend(uid: String, token: String) {
+        guard let url = URL(string: "https://need-chi.vercel.app/api/notifications/register-token") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload: [String: Any] = ["uid": uid, "token": token]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        URLSession.shared.dataTask(with: req) { _, res, err in
+            if let http = res as? HTTPURLResponse, http.statusCode == 200 {
+                print("[APNs] Token registered on backend for uid \(uid)")
+            } else if let err = err {
+                print("[APNs] Token register error:", err)
+            }
+        }.resume()
     }
 
     func reload() {
@@ -1097,11 +1145,23 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         var viewModel: WebViewModel
 
         init(viewModel: WebViewModel) {
             self.viewModel = viewModel
+        }
+
+        // Automatically grant inline microphone and camera permissions to WebRTC / Agora calls
+        @available(iOS 15.0, *)
+        func webView(
+            _ webView: WKWebView,
+            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            type: WKMediaCaptureType,
+            decisionHandler: @escaping (WKPermissionDecision) -> Void
+        ) {
+            decisionHandler(.grant)
         }
 
         // MARK: - WKScriptMessageHandler (Bridge for CallKit, Haptics & Dynamic Island)
@@ -1145,8 +1205,12 @@ struct WebView: UIViewRepresentable {
             } else if action == "setUserId" {
                 let uid = dict["uid"] as? String
                 BackgroundSyncGateway.shared.setUserId(uid)
+                if let uid = uid, !uid.isEmpty, let token = WebViewModel.shared.apnsToken ?? UserDefaults.standard.string(forKey: "need_native_apns_token") {
+                    WebViewModel.shared.syncTokenToBackend(uid: uid, token: token)
+                }
             } else if action == "getPushToken" {
-                if let token = WebViewModel.shared.apnsToken {
+                let token = WebViewModel.shared.apnsToken ?? UserDefaults.standard.string(forKey: "need_native_apns_token")
+                if let token = token {
                     WebViewModel.shared.bridgeDeviceToken(token: token)
                 }
             }
@@ -1166,8 +1230,12 @@ struct WebView: UIViewRepresentable {
             viewModel.isLoading = false
             viewModel.hasLoadedOnce = true
             viewModel.showError = false
-            if let token = WebViewModel.shared.apnsToken {
+            let token = WebViewModel.shared.apnsToken ?? UserDefaults.standard.string(forKey: "need_native_apns_token")
+            if let token = token {
                 WebViewModel.shared.bridgeDeviceToken(token: token)
+                if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
+                    WebViewModel.shared.syncTokenToBackend(uid: uid, token: token)
+                }
             }
         }
 

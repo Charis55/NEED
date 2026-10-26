@@ -90,42 +90,7 @@ export default function GlobalCallManager() {
       const combined = [...aJobs, ...cJobs];
       const now = Date.now();
 
-      // Proactively clean up any stale ringing or abandoned calls in background so Firestore / server stay clean
-      for (const job of combined) {
-        if (!job.activeCall) continue;
-        const st = job.activeCall.status;
-        const rawTs = job.activeCall.timestamp || (job.activeCall as any).createdAt;
-        const ts =
-          typeof rawTs === "number"
-            ? rawTs
-            : (rawTs as any)?.toMillis?.() || 0;
-        const rawExp = (job.activeCall as any).ringExpiresAt;
-        const exp = typeof rawExp === "number" ? rawExp : (rawExp as any)?.toMillis?.();
-
-        const isExpiredRinging =
-          st === "ringing" &&
-          (ts <= 0 || (exp && now >= exp) || now - ts > 45 * 1000);
-
-        const isAbandonedOngoing =
-          (st === "ongoing" || (st as string) === "connected" || (st as string) === "accepted") &&
-          (!job.activeCall.bothConnectedAt && now - ts > 45 * 1000);
-
-        if (isExpiredRinging || isAbandonedOngoing) {
-          apiFetch("/api/calls/end", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jobId: job.requestId,
-              requestId: job.requestId,
-              callId: (job.activeCall as any)?.callId,
-              callerId: job.activeCall.callerId,
-              reason: isExpiredRinging ? "timeout" : "ended",
-            }),
-          }).catch(() => {});
-        }
-      }
-
-      // Find the most recent active call (strictly rejecting expired/phantom calls)
+      // Find the most recent active call (tolerating clock skew between client and server)
       const candidateJobs = combined.filter((data) => {
         if (!data.activeCall) return false;
         const status = data.activeCall.status;
@@ -135,21 +100,13 @@ export default function GlobalCallManager() {
             typeof rawTs === "number"
               ? rawTs
               : (rawTs as any)?.toMillis?.() || 0;
-          const rawExp = (data.activeCall as any).ringExpiresAt;
-          const ringExpiresAt =
-            typeof rawExp === "number"
-              ? rawExp
-              : (rawExp as any)?.toMillis?.();
 
           // Reject if timestamp missing or non-positive
           if (!timestamp || timestamp <= 0) return false;
 
-          // Reject if explicitly expired
-          if (ringExpiresAt && now >= ringExpiresAt) return false;
-
+          // Tolerate generous clock skew (up to 3 minutes) between devices and server
           const ringingAge = now - timestamp;
-          // In-app calls ring for 45s max
-          if (ringingAge > 45 * 1000 || ringingAge < -10 * 1000) return false;
+          if (ringingAge > 180 * 1000 || ringingAge < -120 * 1000) return false;
 
           return true;
         }
@@ -528,33 +485,16 @@ export default function GlobalCallManager() {
     }
   };
 
-  // Synchronized auto-timeout guard (45s TTL from call creation) for BOTH caller and callee
+  // Local ringing auto-timeout: gives a full 45s of ringing opportunity on this device
   useEffect(() => {
     if (activeJob && activeJob.activeCall && activeJob.activeCall.status === "ringing") {
-      const rawTs = activeJob.activeCall.timestamp || (activeJob.activeCall as any).createdAt;
-      const ts =
-        typeof rawTs === "number"
-          ? rawTs
-          : (rawTs as any)?.toMillis?.() || 0;
-      const rawExp = (activeJob.activeCall as any).ringExpiresAt;
-      const targetExpiry =
-        typeof rawExp === "number"
-          ? rawExp
-          : (rawExp as any)?.toMillis?.() || (ts ? ts + 45000 : Date.now() + 45000);
-      const remainingMs = Math.max(0, targetExpiry - Date.now());
-
-      if (remainingMs <= 0) {
-        endCallWithLog("timeout");
-        return;
-      }
-
       const timer = setTimeout(() => {
         endCallWithLog("timeout");
-      }, remainingMs);
+      }, 45000);
 
       return () => clearTimeout(timer);
     }
-  }, [activeJob?.requestId, (activeJob?.activeCall as any)?.callId, activeJob?.activeCall?.status, userUid]);
+  }, [activeJob?.requestId, (activeJob?.activeCall as any)?.callId, activeJob?.activeCall?.status]);
 
   const endCallWithLog = async (
     reason?: "cancelled" | "declined" | "timeout" | "ended",
