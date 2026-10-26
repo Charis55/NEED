@@ -1145,23 +1145,11 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var viewModel: WebViewModel
 
         init(viewModel: WebViewModel) {
             self.viewModel = viewModel
-        }
-
-        // Automatically grant inline microphone and camera permissions to WebRTC / Agora calls
-        @available(iOS 15.0, *)
-        func webView(
-            _ webView: WKWebView,
-            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
-            initiatedByFrame frame: WKFrameInfo,
-            type: WKMediaCaptureType,
-            decisionHandler: @escaping (WKPermissionDecision) -> Void
-        ) {
-            decisionHandler(.grant)
         }
 
         // MARK: - WKScriptMessageHandler (Bridge for CallKit, Haptics & Dynamic Island)
