@@ -236,90 +236,95 @@ public class AudioTogglePlugin extends Plugin {
             return;
         }
 
-        try {
-            if ("earpiece".equalsIgnoreCase(mode)) {
-                // 1. Set telephony communication mode
-                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                audioManager.setSpeakerphoneOn(false);
+        // Immediately resolve bridge call so UI touch response is instantaneous (0ms lag)
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        ret.put("mode", mode);
+        call.resolve(ret);
 
-                // 2. On Android S+ (API 31+), route communication audio to the built-in earpiece
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
-                    AudioDeviceInfo earpieceDevice = null;
-                    for (AudioDeviceInfo device : devices) {
-                        if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) {
-                            earpieceDevice = device;
-                            break;
+        // Perform hardware audio routing and volume configuration asynchronously
+        new Thread(() -> {
+            try {
+                if ("earpiece".equalsIgnoreCase(mode)) {
+                    // 1. Set telephony communication mode
+                    audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                    audioManager.setSpeakerphoneOn(false);
+
+                    // 2. On Android S+ (API 31+), route communication audio to the built-in earpiece
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
+                        AudioDeviceInfo earpieceDevice = null;
+                        for (AudioDeviceInfo device : devices) {
+                            if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) {
+                                earpieceDevice = device;
+                                break;
+                            }
+                        }
+                        if (earpieceDevice != null) {
+                            audioManager.setCommunicationDevice(earpieceDevice);
+                            Log.d(TAG, "setCommunicationDevice to EARPIECE succeeded");
+                        } else {
+                            Log.w(TAG, "No TYPE_BUILTIN_EARPIECE found, clearing communication device");
+                            audioManager.clearCommunicationDevice();
                         }
                     }
-                    if (earpieceDevice != null) {
-                        boolean ok = audioManager.setCommunicationDevice(earpieceDevice);
-                        Log.d(TAG, "setCommunicationDevice to EARPIECE result: " + ok);
-                    } else {
-                        Log.w(TAG, "No TYPE_BUILTIN_EARPIECE found, clearing communication device");
+
+                    // 3. Engage hardware proximity sensor to dim screen when phone is held to ear
+                    acquireProximityWakeLock(context);
+                    Log.d(TAG, "Audio routed to EARPIECE with proximity screen dimming enabled");
+
+                } else if ("speaker".equalsIgnoreCase(mode)) {
+                    // 1. Release proximity wake lock so screen remains on for loudspeaker
+                    releaseProximityWakeLock();
+
+                    // 2. Set telephony communication mode and speakerphone
+                    audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                    audioManager.setSpeakerphoneOn(true);
+
+                    try {
+                        audioManager.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0);
+                        audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0);
+
+                        int maxVoice = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL);
+                        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, (int)(maxVoice * 0.9), 0);
+
+                        int maxMusic = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxMusic, 0);
+                    } catch (Exception volEx) {
+                        Log.w(TAG, "Volume adjust warning: " + volEx.getMessage());
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
+                        AudioDeviceInfo speakerDevice = null;
+                        for (AudioDeviceInfo device : devices) {
+                            if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                                speakerDevice = device;
+                                break;
+                            }
+                        }
+                        if (speakerDevice != null) {
+                            audioManager.setCommunicationDevice(speakerDevice);
+                            Log.d(TAG, "setCommunicationDevice to SPEAKER succeeded");
+                        }
+                    }
+                    Log.d(TAG, "Audio routed to SPEAKER with full volume");
+
+                } else {
+                    // Reset to normal mode (call ended)
+                    releaseProximityWakeLock();
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         audioManager.clearCommunicationDevice();
                     }
+                    audioManager.setSpeakerphoneOn(false);
+                    audioManager.setMode(AudioManager.MODE_NORMAL);
+                    Log.d(TAG, "Audio mode reset to NORMAL");
                 }
-
-                // 3. Engage hardware proximity sensor to dim screen when phone is held to ear
-                acquireProximityWakeLock(context);
-                Log.d(TAG, "Audio routed to EARPIECE with proximity screen dimming enabled");
-
-            } else if ("speaker".equalsIgnoreCase(mode)) {
-                // 1. Release proximity wake lock so screen remains on for loudspeaker
-                releaseProximityWakeLock();
-
-                // 2. Set telephony communication mode and speakerphone
-                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                audioManager.setSpeakerphoneOn(true);
-                try {
-                    audioManager.adjustStreamVolume(AudioManager.STREAM_VOICE_CALL, AudioManager.ADJUST_UNMUTE, 0);
-                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0);
-                    int currentVol = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL);
-                    int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL);
-                    if (currentVol < maxVol / 3) {
-                        audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, (int)(maxVol * 0.8), 0);
-                    }
-                } catch (Exception volEx) {
-                    Log.w(TAG, "Volume adjust warning: " + volEx.getMessage());
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    List<AudioDeviceInfo> devices = audioManager.getAvailableCommunicationDevices();
-                    AudioDeviceInfo speakerDevice = null;
-                    for (AudioDeviceInfo device : devices) {
-                        if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                            speakerDevice = device;
-                            break;
-                        }
-                    }
-                    if (speakerDevice != null) {
-                        boolean ok = audioManager.setCommunicationDevice(speakerDevice);
-                        Log.d(TAG, "setCommunicationDevice to SPEAKER result: " + ok);
-                    }
-                }
-                Log.d(TAG, "Audio routed to SPEAKER");
-
-            } else {
-                // Reset to normal mode (call ended)
-                releaseProximityWakeLock();
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    audioManager.clearCommunicationDevice();
-                }
-                audioManager.setSpeakerphoneOn(false);
-                audioManager.setMode(AudioManager.MODE_NORMAL);
-                Log.d(TAG, "Audio mode reset to NORMAL");
+            } catch (Exception e) {
+                Log.e(TAG, "Async setAudioMode error: " + e.getMessage(), e);
             }
-
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            ret.put("mode", mode);
-            call.resolve(ret);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to set audio mode: " + e.getMessage(), e);
-            call.reject("Failed to set audio mode: " + e.getMessage());
-        }
+        }).start();
     }
 
     @PluginMethod

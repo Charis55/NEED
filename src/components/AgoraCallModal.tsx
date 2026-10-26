@@ -255,7 +255,7 @@ export default function AgoraCallModal({
     useEffect(() => {
       if (joined && typeof window !== "undefined") {
         if (Capacitor.isNativePlatform()) {
-          AudioToggle.setAudioMode({ mode: speakerOn ? "speaker" : "earpiece" }).catch(e =>
+          AudioToggle.setAudioMode({ mode: "speaker" }).catch(e =>
             console.warn("AudioToggle initial route failed:", e)
           );
         }
@@ -263,9 +263,9 @@ export default function AgoraCallModal({
         if (isCaller) {
           notifyNativeCall("startCall", { partnerName, isVideo, jobId: jobId || channelName, uid });
         }
-        notifyNativeCall("setAudioMode", { mode: speakerOn ? "speaker" : "earpiece" });
+        notifyNativeCall("setAudioMode", { mode: "speaker" });
       }
-    }, [joined, isCaller, partnerName, isVideo, jobId, channelName, uid, speakerOn]);
+    }, [joined, isCaller, partnerName, isVideo, jobId, channelName, uid]);
 
   // Clean, monotonic in-call timer: counts smoothly from 0 for the duration of the call on this device
   useEffect(() => {
@@ -273,17 +273,6 @@ export default function AgoraCallModal({
 
     if (!localJoinedAtRef.current) {
       localJoinedAtRef.current = Date.now();
-    }
-
-    // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
-    if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
-      AudioToggle.startOngoingCall({
-        partnerName: partnerName || "Need Call",
-        isVideo,
-        connectedAt: localJoinedAtRef.current,
-        isMuted: micMuted,
-        isSpeaker: speakerOn,
-      }).catch(e => console.warn("AudioToggle startOngoingCall failed:", e));
     }
 
     const calcElapsed = () => {
@@ -295,6 +284,19 @@ export default function AgoraCallModal({
     calcElapsed();
     const interval = setInterval(calcElapsed, 1000);
     return () => clearInterval(interval);
+  }, [joined]);
+
+  // Sync Samsung One UI "Now Bar" / Live Status Bar ongoing call notification
+  useEffect(() => {
+    if (typeof window !== "undefined" && Capacitor.isNativePlatform() && joined) {
+      AudioToggle.startOngoingCall({
+        partnerName: partnerName || "Need Call",
+        isVideo,
+        connectedAt: localJoinedAtRef.current || Date.now(),
+        isMuted: micMuted,
+        isSpeaker: speakerOn,
+      }).catch(e => console.warn("AudioToggle startOngoingCall failed:", e));
+    }
   }, [joined, isVideo, micMuted, speakerOn, partnerName]);
 
   const formatTime = (seconds: number) => {
@@ -303,18 +305,17 @@ export default function AgoraCallModal({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const toggleSpeaker = async () => {
+  const toggleSpeaker = () => {
     const nextSpeakerState = !speakerOn;
     setSpeakerOn(nextSpeakerState);
     if (typeof window !== 'undefined') {
+      const mode = nextSpeakerState ? "speaker" : "earpiece";
       if (Capacitor.isNativePlatform()) {
-        try {
-          await AudioToggle.setAudioMode({ mode: nextSpeakerState ? "speaker" : "earpiece" });
-        } catch (err) {
+        AudioToggle.setAudioMode({ mode }).catch(err => {
           console.warn("AudioToggle setAudioMode failed:", err);
-        }
+        });
       }
-      notifyNativeCall("setAudioMode", { mode: nextSpeakerState ? "speaker" : "earpiece" });
+      notifyNativeCall("setAudioMode", { mode });
     }
   };
 

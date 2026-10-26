@@ -488,13 +488,20 @@ export default function GlobalCallManager() {
   // Local ringing auto-timeout: gives a full 45s of ringing opportunity on this device
   useEffect(() => {
     if (activeJob && activeJob.activeCall && activeJob.activeCall.status === "ringing") {
+      const isCaller = activeJob.activeCall.callerId === userUid;
       const timer = setTimeout(() => {
-        endCallWithLog("timeout");
+        if (isCaller) {
+          endCallWithLog("timeout");
+        } else {
+          // Callee device: do NOT kill call for everyone. Just dismiss local ringing modal.
+          setActiveJob(null);
+          clearCallNotification();
+        }
       }, 45000);
 
       return () => clearTimeout(timer);
     }
-  }, [activeJob?.requestId, (activeJob?.activeCall as any)?.callId, activeJob?.activeCall?.status]);
+  }, [activeJob?.requestId, (activeJob?.activeCall as any)?.callId, activeJob?.activeCall?.status, userUid]);
 
   const endCallWithLog = async (
     reason?: "cancelled" | "declined" | "timeout" | "ended",
@@ -563,6 +570,9 @@ export default function GlobalCallManager() {
     if ((activeJob.activeCall as any)?.callId) {
       safeSetSession("need_my_answered_call_id", (activeJob.activeCall as any).callId);
     }
+
+    // Immediately inform native iOS CallKit / Dynamic Island that call is answered
+    notifyNativeCall("answerCall", { jobId: targetJobId });
 
     // Optimistically transition immediately into ongoing state on this device
     setActiveJob((prev) => {

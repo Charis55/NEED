@@ -494,7 +494,11 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     func configureAudioSession(isSpeaker: Bool = true) {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+            var options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP, .allowBluetoothA2DP]
+            if isSpeaker {
+                options.insert(.defaultToSpeaker)
+            }
+            try session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
             try session.setActive(true)
             if isSpeaker {
                 try session.overrideOutputAudioPort(.speaker)
@@ -515,12 +519,32 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         configureAudioSession(isSpeaker: isSpeaker)
     }
 
+    func answerActiveCall() {
+        print("[CallKit] Answering active CallKit call from in-app overlay")
+        self.isCallConnected = true
+        SilentAudioGateway.shared.pauseForCall()
+        configureAudioSession(isSpeaker: true)
+
+        if let uuid = activeCallUUID {
+            let answerAction = CXAnswerCallAction(call: uuid)
+            let transaction = CXTransaction(action: answerAction)
+            callController.request(transaction) { error in
+                if let error = error {
+                    print("[CallKit] Error requesting CXAnswerCallAction:", error)
+                    self.provider.reportOutgoingCall(with: uuid, connectedAt: Date())
+                } else {
+                    print("[CallKit] CXAnswerCallAction successfully requested from in-app overlay")
+                }
+            }
+        }
+    }
+
     func reportIncomingCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
+        SilentAudioGateway.shared.pauseForCall()
         if UIApplication.shared.applicationState == .active {
             print("[CallKit] App is in foreground, suppressing CallKit UI for in-app ringing modal")
             return
         }
-        SilentAudioGateway.shared.pauseForCall()
         self.currentJobId = jobId
         self.currentCallerId = uid
         self.isCallConnected = false
@@ -747,9 +771,15 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
     nonisolated func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         Task { @MainActor in
-            let session = AVAudioSession.sharedInstance()
-            try? session.overrideOutputAudioPort(.speaker)
-            print("[CallKit] Audio session activated by CallKit, speaker default applied")
+            let session = audioSession
+            do {
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+                try session.setActive(true)
+                try session.overrideOutputAudioPort(.speaker)
+                print("[CallKit] Audio session activated by CallKit and configured for voiceChat")
+            } catch {
+                print("[CallKit] Error configuring audio session in didActivate:", error)
+            }
         }
     }
 
@@ -1180,6 +1210,8 @@ struct WebView: UIViewRepresentable {
                 let jobId = dict["jobId"] as? String
                 let uid = dict["uid"] as? String
                 NativeCallKitManager.shared.startCall(partnerName: partnerName, isVideo: isVideo, jobId: jobId, uid: uid)
+            } else if action == "answerCall" {
+                NativeCallKitManager.shared.answerActiveCall()
             } else if action == "endCall" {
                 NativeCallKitManager.shared.endCall()
                 UNUserNotificationCenter.current().removeAllDeliveredNotifications()
