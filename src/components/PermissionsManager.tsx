@@ -7,7 +7,7 @@ import { Geolocation } from "@capacitor/geolocation";
 import { auth } from "@/lib/firebase";
 import { ShieldCheck, MapPin, Camera as CameraIcon, Bell, Mic, PhoneCall, AlertTriangle } from "lucide-react";
 import { useAlert } from "./AlertProvider";
-import { isNativeApp } from "@/utils/platform";
+import { isNativeApp, isIOSNativeApp, notifyIOSNative } from "@/utils/platform";
 
 export default function PermissionsManager() {
   const [show, setShow] = useState(false);
@@ -33,6 +33,12 @@ export default function PermissionsManager() {
   const handleGrantAll = async () => {
     setLoading(true);
     try {
+      // 1. If running inside iOS native shell, trigger native sequential permission alerts
+      if (isIOSNativeApp()) {
+        notifyIOSNative("requestAllPermissions");
+      }
+
+      // 2. If running on Android native (Capacitor), request via plugins
       if (Capacitor.isNativePlatform()) {
         try { await Camera.requestPermissions(); } catch(e) {}
         try { await Geolocation.requestPermissions(); } catch(e) {}
@@ -51,7 +57,7 @@ export default function PermissionsManager() {
         } catch(e) {}
       }
       
-      // Request WebRTC Mic/Camera
+      // 3. Request WebRTC Mic/Camera for webview calling media pipelines
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
         stream.getTracks().forEach(track => track.stop());
@@ -59,7 +65,7 @@ export default function PermissionsManager() {
         console.warn("Media devices permission issue:", e);
       }
 
-      // Request Geolocation
+      // 4. Request Geolocation for webview layer
       try {
         if ("geolocation" in navigator) {
           await new Promise<void>((resolve) => {
@@ -72,20 +78,16 @@ export default function PermissionsManager() {
         }
       } catch (e) {}
       
-      // Request Notifications
-      try {
-        await Notification.requestPermission();
-      } catch (e) {}
+      // 5. Request Notifications if web browser (non-iOS native)
+      if (!isIOSNativeApp()) {
+        try {
+          await Notification.requestPermission();
+        } catch (e) {}
+      }
 
       localStorage.setItem("need_permissions_handled", "true");
       setShow(false);
-      showAlert("Permissions granted! You're good to go.", "success");
-      
-      // Reload to ensure FCM and other services initialize with the new permissions
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-      
+      showAlert("Permissions requested! You're good to go.", "success");
     } catch (err) {
       console.error(err);
       localStorage.setItem("need_permissions_handled", "true");

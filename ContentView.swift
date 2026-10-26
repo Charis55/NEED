@@ -807,6 +807,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 final class PermissionManager: NSObject, CLLocationManagerDelegate {
     static let shared = PermissionManager()
     private let locationManager = CLLocationManager()
+    private var onLocationDecision: (() -> Void)?
 
     override init() {
         super.init()
@@ -814,20 +815,9 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
     }
 
     func requestAllPermissions() {
-        // 1. Audio / Microphone (For in-app calling)
-        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
-        AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        print("[PermissionManager] requestAllPermissions() triggered explicitly from onboarding UI.")
 
-        // 2. Camera (For taking job photos and verification)
-        AVCaptureDevice.requestAccess(for: .video) { _ in }
-
-        // 3. Photo Library (For uploading job images and service documentation)
-        PHPhotoLibrary.requestAuthorization { _ in }
-
-        // 4. Location (For connecting to nearby artisans)
-        locationManager.requestWhenInUseAuthorization()
-
-        // 5. Push Notifications & Action Categories (For job alerts and incoming call persistent notifications)
+        // Configure notification categories if not already done
         let answerAction = UNNotificationAction(
             identifier: "ANSWER_ACTION",
             title: "Answer",
@@ -847,6 +837,7 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
         UNUserNotificationCenter.current().setNotificationCategories([callCategory])
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
 
+        // 1. Notification Permission
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound, .badge]
         ) { granted, _ in
@@ -855,6 +846,81 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
                     UIApplication.shared.registerForRemoteNotifications()
                 }
             }
+
+            // 2. Location Permission (Wait for user response before triggering next modal)
+            DispatchQueue.main.async {
+                self.requestLocationPermission {
+                    // 3. Camera Permission
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        AVCaptureDevice.requestAccess(for: .video) { _ in
+                            // 4. Microphone Permission
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                AVAudioSession.sharedInstance().requestRecordPermission { _ in
+                                    // 5. Photos Library Permission
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        if #available(iOS 14, *) {
+                                            PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+                                                print("[PermissionManager] Sequential permissions cycle complete.")
+                                            }
+                                        } else {
+                                            PHPhotoLibrary.requestAuthorization { _ in
+                                                print("[PermissionManager] Sequential permissions cycle complete.")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func requestLocationPermission(completion: @escaping () -> Void) {
+        let currentStatus: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            currentStatus = locationManager.authorizationStatus
+        } else {
+            currentStatus = CLLocationManager.authorizationStatus()
+        }
+
+        if currentStatus != .notDetermined {
+            // Already determined, proceed immediately
+            completion()
+            return
+        }
+
+        self.onLocationDecision = completion
+        locationManager.requestWhenInUseAuthorization()
+
+        // Fallback safety timeout in case delegate doesn't fire
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) { [weak self] in
+            guard let self = self, let callback = self.onLocationDecision else { return }
+            self.onLocationDecision = nil
+            callback()
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            status = manager.authorizationStatus
+        } else {
+            status = CLLocationManager.authorizationStatus()
+        }
+        if status != .notDetermined {
+            let callback = onLocationDecision
+            onLocationDecision = nil
+            callback?()
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        if status != .notDetermined {
+            let callback = onLocationDecision
+            onLocationDecision = nil
+            callback?()
         }
     }
 }
@@ -896,7 +962,6 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: webViewModel.isLoading)
         .animation(.easeInOut(duration: 0.3), value: webViewModel.showError)
         .onAppear {
-            PermissionManager.shared.requestAllPermissions()
             SilentAudioGateway.shared.start()
             BackgroundSyncGateway.shared.startMonitoring()
         }
@@ -1010,15 +1075,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         let callCategory = UNNotificationCategory(identifier: "INCOMING_CALL", actions: [answerAction, declineAction], intentIdentifiers: [], options: [.customDismissAction])
         UNUserNotificationCenter.current().setNotificationCategories([callCategory])
 
-        // Request user notification authorization & register for remote push notifications
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            if granted {
+        // Register for remote notifications ONLY if user previously authorized them
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
                 DispatchQueue.main.async {
                     application.registerForRemoteNotifications()
                 }
             }
         }
-        application.registerForRemoteNotifications()
 
         SilentAudioGateway.shared.ensureActive()
         BackgroundSyncGateway.shared.startMonitoring()
@@ -1245,6 +1309,8 @@ struct WebView: UIViewRepresentable {
                 if let token = token {
                     WebViewModel.shared.bridgeDeviceToken(token: token)
                 }
+            } else if action == "requestAllPermissions" {
+                PermissionManager.shared.requestAllPermissions()
             }
         }
 

@@ -7,6 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
 import { apiFetch } from "@/utils/apiBase";
+import { isIOSNativeApp } from "@/utils/platform";
 
 /**
  * Saves the FCM token to both the users and artisans collections.
@@ -137,7 +138,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
 
     const setupWebPush = async (uid: string) => {
       try {
-        if (typeof window === "undefined" || !("Notification" in window)) return;
+        if (typeof window === "undefined" || !("Notification" in window) || isIOSNativeApp()) return;
         
         let permission = Notification.permission;
         if (permission === "default") {
@@ -213,7 +214,7 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
         }
         if (Capacitor.isNativePlatform()) {
           await setupNativePush(user.uid);
-        } else {
+        } else if (!isIOSNativeApp()) {
           await setupWebPush(user.uid);
         }
         // Ask native wrapper again post-login
