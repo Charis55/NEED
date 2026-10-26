@@ -62,17 +62,31 @@ export default function GlobalNotificationListener() {
               if (seenNotificationIds.current.has(notifId)) continue;
               seenNotificationIds.current.add(notifId);
 
+              // Suppress in-app banners completely if device is currently in a call or ringing
+              if (typeof document !== "undefined" && document.body.getAttribute("data-in-call") === "true") {
+                continue;
+              }
+
               // Don't alert if user is already on the relevant chat screen
               if (notif.data?.type === "chat" && notif.data?.requestId && pathname === `/chat/${notif.data.requestId}`) {
                 continue;
               }
 
-              // Don't alert for incoming calls here (handled by GlobalCallManager & native CallKit)
-              if (notif.data?.type === "call") continue;
+              // Don't alert for calls here (handled by GlobalCallManager & native CallKit)
+              const notifType = notif.data?.type || notif.type || notif.action;
+              if (notifType === "call" || notifType === "cancel_call" || notif.data?.callId || notif.data?.channelName) {
+                continue;
+              }
 
-              const alertTitle = notif.title || "Notification";
-              const alertBody = notif.body || "";
-              const fullText = alertBody ? `${alertTitle}: ${alertBody}` : alertTitle;
+              const alertTitle = (notif.title || "").trim();
+              const alertBody = (notif.body || "").trim();
+
+              // Drop generic empty notifications without useful content
+              if (!alertBody && (!alertTitle || alertTitle.toLowerCase() === "notification" || alertTitle.toLowerCase() === "need notification")) {
+                continue;
+              }
+
+              const fullText = alertBody ? (alertTitle && alertTitle.toLowerCase() !== "notification" ? `${alertTitle}: ${alertBody}` : alertBody) : alertTitle;
 
               showAlert(
                 fullText,
@@ -217,17 +231,30 @@ export default function GlobalNotificationListener() {
       const unsubCustomer = onSnapshot(qCustomer, (snap) => handleJobChange(snap, "customer"), handleSnapError);
 
       const handleForegroundPush = (e: any) => {
+        if (typeof document !== "undefined" && document.body.getAttribute("data-in-call") === "true") {
+          return;
+        }
+
         const detail = e.detail;
-        const title = detail?.notification?.title || detail?.title || "Notification";
-        const body = detail?.notification?.body || detail?.body || "";
+        const title = (detail?.notification?.title || detail?.title || "").trim();
+        const body = (detail?.notification?.body || detail?.body || "").trim();
         const data = detail?.data || {};
 
-        if (data?.type === "call") return;
+        const dataType = data?.type || (detail as any)?.type;
+        if (dataType === "call" || dataType === "cancel_call" || data?.callId || data?.channelName) {
+          return;
+        }
+
         if (data?.type === "chat" && data?.requestId && pathname === `/chat/${data.requestId}`) {
           return;
         }
 
-        const fullText = body ? `${title}: ${body}` : title;
+        // Drop generic notifications without text
+        if (!body && (!title || title.toLowerCase() === "notification" || title.toLowerCase() === "need notification")) {
+          return;
+        }
+
+        const fullText = body ? (title && title.toLowerCase() !== "notification" ? `${title}: ${body}` : body) : title;
         showAlert(
           fullText,
           "info",

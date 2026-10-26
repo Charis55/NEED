@@ -32,6 +32,14 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   const [alerts, setAlerts] = useState<AlertMessage[]>([]);
 
   const showAlert = useCallback((message: string, type: AlertType, action?: { label?: string; onClick: () => void }, avatarUrl?: string) => {
+    if (typeof document !== "undefined" && document.body.getAttribute("data-in-call") === "true") {
+      return; // Suppress all non-call alerts while a call or ringing overlay is active
+    }
+    const trimmed = (message || "").trim();
+    if (!trimmed || trimmed.toLowerCase() === "notification" || trimmed.toLowerCase() === "need notification") {
+      return; // Never show empty generic "Notification" banners
+    }
+
     const id = Math.random().toString(36).substr(2, 9);
     setAlerts((prev) => [...prev, { id, type, message, action, avatarUrl }]);
 

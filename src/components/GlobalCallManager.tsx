@@ -306,20 +306,23 @@ export default function GlobalCallManager() {
           return foundJob;
         });
 
-        // Trigger native CallKit / Dynamic Island & system notifications for incoming ringing calls
+        // Trigger native CallKit / Dynamic Island & system notifications for incoming ringing calls ONLY when app is in the background
         if (status === "ringing" && !isCallerJob) {
-          setNotifiedCallId((prevNotified) => {
-            if (prevNotified !== foundJob.requestId) {
-              notifyNativeCall("reportIncomingCall", {
-                partnerName: directPartnerName || "Customer",
-                isVideo: (call.type || (call as any).callType) === "video",
-                jobId: foundJob.requestId,
-                uid: userUid,
-              });
-              return foundJob.requestId;
-            }
-            return prevNotified;
-          });
+          const isBackgrounded = typeof document !== "undefined" && document.visibilityState === "hidden";
+          if (isBackgrounded) {
+            setNotifiedCallId((prevNotified) => {
+              if (prevNotified !== foundJob.requestId) {
+                notifyNativeCall("reportIncomingCall", {
+                  partnerName: directPartnerName || "Customer",
+                  isVideo: (call.type || (call as any).callType) === "video",
+                  jobId: foundJob.requestId,
+                  uid: userUid,
+                });
+                return foundJob.requestId;
+              }
+              return prevNotified;
+            });
+          }
         }
       } else {
         if (!terminalStateRef.current) {
@@ -779,6 +782,22 @@ export default function GlobalCallManager() {
     (isCaller ? isThisDeviceCaller : isThisDeviceAcceptedReceiver) &&
     !terminalState;
 
+  useEffect(() => {
+    const isCallActive = isRingingForMe || isRingingByMe || isOngoingForMe;
+    if (typeof document !== "undefined") {
+      if (isCallActive) {
+        document.body.setAttribute("data-in-call", "true");
+      } else {
+        document.body.removeAttribute("data-in-call");
+      }
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.body.removeAttribute("data-in-call");
+      }
+    };
+  }, [isRingingForMe, isRingingByMe, isOngoingForMe]);
+
   if (!isRingingForMe && !isRingingByMe && !isOngoingForMe) return null;
 
   const validBothConnectedAt =
@@ -851,6 +870,7 @@ export default function GlobalCallManager() {
             channelName={activeJob.requestId}
             uid={userUid}
             isVideo={(activeCall.type || (activeCall as any).callType) === "video"}
+            isCaller={isCaller}
             partnerName={inCallPartnerName}
             partnerPhoto={inCallPartnerPhoto}
             connectedAt={activeCall.connectedAt || null}

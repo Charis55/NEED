@@ -74,7 +74,9 @@ export function FCMProvider({ children }: { children: React.ReactNode }) {
 
           PushNotifications.addListener("pushNotificationReceived", (notification) => {
             console.log("[useFCM] Foreground native push notification:", notification);
-            if (notification.data?.type !== "call") {
+            const data = notification.data || {};
+            const isCall = data.type === "call" || data.type === "cancel_call" || data.callId || (notification as any).type === "call" || data.channelName;
+            if (!isCall) {
               window.dispatchEvent(new CustomEvent("needForegroundPush", { detail: notification }));
             }
           });

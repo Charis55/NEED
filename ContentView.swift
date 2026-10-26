@@ -33,8 +33,11 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         let actionId = response.actionIdentifier
         let userInfo = response.notification.request.content.userInfo
         let reqId = (userInfo["requestId"] as? String) ?? (userInfo["jobId"] as? String)
+        let isCall = (userInfo["action"] as? String) == "incoming_call"
 
         Task { @MainActor in
+            UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+            UIApplication.shared.applicationIconBadgeNumber = 0
             if actionId == "ANSWER_ACTION" {
                 if let reqId = reqId, !reqId.isEmpty {
                     NativeCallKitManager.shared.currentJobId = reqId
@@ -45,9 +48,398 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
                     NativeCallKitManager.shared.currentJobId = reqId
                 }
                 NativeCallKitManager.shared.onNativeEndRequested()
+            } else if actionId == UNNotificationDefaultActionIdentifier {
+                if let reqId = reqId, !reqId.isEmpty {
+                    if isCall {
+                        NativeCallKitManager.shared.currentJobId = reqId
+                    }
+                    if let url = URL(string: "https://need-chi.vercel.app/chat/\(reqId)") {
+                        WebViewModel.shared.webView?.load(URLRequest(url: url))
+                    }
+                }
             }
         }
         completionHandler()
+    }
+}
+
+// MARK: - WKUIDelegate Extension (Guarantees protocol witness matching in Swift)
+extension WebView.Coordinator: WKUIDelegate {
+    @available(iOS 15.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+    ) {
+        print("[WebKit] Media capture permission granted for type: \(type.rawValue)")
+        decisionHandler(.grant)
+    }
+
+    @available(iOS 15.0, *)
+    func webView(
+        _ webView: WKWebView,
+        requestDeviceOrientationAndMotionPermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+    ) {
+        decisionHandler(.grant)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if navigationAction.targetFrame == nil {
+            webView.load(navigationAction.request)
+        }
+        return nil
+    }
+}
+
+
+// MARK: - Silent Background Audio Gateway
+// Keeps iOS process and network pipeline alive 24/7 in background without interrupting other audio
+@MainActor
+final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
+    static let shared = SilentAudioGateway()
+    private var audioPlayer: AVAudioPlayer?
+    private var isRunning: Bool = false
+
+    override init() {
+        super.init()
+        setupAudioPlayer()
+        setupNotificationObservers()
+    }
+
+    private func setupAudioPlayer() {
+        let sampleRate: Int32 = 8000
+        let numChannels: Int16 = 1
+        let bitsPerSample: Int16 = 16
+        let durationSeconds: Int = 3
+        let byteRate = sampleRate * Int32(numChannels) * Int32(bitsPerSample / 8)
+        let blockAlign = numChannels * (bitsPerSample / 8)
+        let dataSize = byteRate * Int32(durationSeconds)
+        let chunkSize = 36 + dataSize
+
+        var wavData = Data()
+        // RIFF header
+        wavData.append(contentsOf: [0x52, 0x49, 0x46, 0x46]) // "RIFF"
+        var cSize = chunkSize.littleEndian
+        wavData.append(Data(bytes: &cSize, count: 4))
+        wavData.append(contentsOf: [0x57, 0x41, 0x56, 0x45]) // "WAVE"
+
+        // "fmt " chunk
+        wavData.append(contentsOf: [0x66, 0x6D, 0x74, 0x20]) // "fmt "
+        var subchunk1Size: Int32 = Int32(16).littleEndian
+        wavData.append(Data(bytes: &subchunk1Size, count: 4))
+        var audioFormat: Int16 = Int16(1).littleEndian // PCM
+        wavData.append(Data(bytes: &audioFormat, count: 2))
+        var channels = numChannels.littleEndian
+        wavData.append(Data(bytes: &channels, count: 2))
+        var sRate = sampleRate.littleEndian
+        wavData.append(Data(bytes: &sRate, count: 4))
+        var bRate = byteRate.littleEndian
+        wavData.append(Data(bytes: &bRate, count: 4))
+        var bAlign = blockAlign.littleEndian
+        wavData.append(Data(bytes: &bAlign, count: 2))
+        var bps = bitsPerSample.littleEndian
+        wavData.append(Data(bytes: &bps, count: 2))
+
+        // "data" chunk
+        wavData.append(contentsOf: [0x64, 0x61, 0x74, 0x61]) // "data"
+        var dSize = dataSize.littleEndian
+        wavData.append(Data(bytes: &dSize, count: 4))
+
+        // Microscopic digital dither (+1 / -1 PCM samples).
+        // Amplitude is 1/32768 (-90 dB). Combined with volume 0.001, output is -150 dB (imperceptible),
+        // but CoreAudio hardware clock and mediaserverd maintain the active render thread.
+        let totalSamples = Int(sampleRate) * durationSeconds
+        for i in 0..<totalSamples {
+            var sample: Int16 = (i % 2 == 0) ? Int16(1).littleEndian : Int16(-1).littleEndian
+            wavData.append(Data(bytes: &sample, count: 2))
+        }
+
+        do {
+            let player = try AVAudioPlayer(data: wavData)
+            player.numberOfLoops = -1 // Infinite loop
+            player.volume = 0.001 // Microscopic volume to keep hardware pipeline active
+            player.delegate = self
+            player.prepareToPlay()
+            self.audioPlayer = player
+        } catch {
+            print("[SilentGateway] Failed to create silent audio player:", error)
+        }
+    }
+
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRouteChange(_:)),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppLifecycle(_:)),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppLifecycle(_:)),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+        if type == .ended {
+            print("[SilentGateway] Audio interruption ended, resuming keepalive")
+            resumeAfterCall()
+        }
+    }
+
+    @objc private func handleRouteChange(_ notification: Notification) {
+        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected {
+            print("[SilentGateway] Route changed during call, preserving call audio")
+            return
+        }
+        ensureActive()
+    }
+
+    @objc private func handleAppLifecycle(_ notification: Notification) {
+        ensureActive()
+    }
+
+    func start() {
+        ensureActive()
+    }
+
+    func ensureActive() {
+        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected {
+            print("[SilentGateway] Call active, skipping keepalive audio activation")
+            return
+        }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+            if audioPlayer?.isPlaying != true {
+                audioPlayer?.play()
+                isRunning = true
+                print("[SilentGateway] Silent background keepalive active (mixWithOthers, volume=0.001)")
+            }
+        } catch {
+            print("[SilentGateway] Failed to activate audio session:", error)
+        }
+    }
+
+    func pauseForCall() {
+        audioPlayer?.pause()
+        isRunning = false
+        print("[SilentGateway] Paused for active CallKit call")
+    }
+
+    func resumeAfterCall() {
+        ensureActive()
+    }
+}
+
+// MARK: - Native Background Sync Gateway
+// Continuous HTTP polling loop that detects incoming calls & unread notifications 24/7 in background
+final class BackgroundSyncGateway: @unchecked Sendable {
+    static let shared = BackgroundSyncGateway()
+    private var currentUserId: String?
+    private var lastReportedCallId: String?
+    private var lastNotificationPollTime: Double
+    private var presentedNotificationIds = Set<String>()
+    private var isMonitoring: Bool = false
+    private let urlSession: URLSession
+
+    private init() {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 4.0
+        config.timeoutIntervalForResource = 6.0
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        self.urlSession = URLSession(configuration: config)
+
+        self.lastNotificationPollTime = (Date().timeIntervalSince1970 * 1000) - 60000
+
+        if let savedUid = UserDefaults.standard.string(forKey: "need_current_user_id"), !savedUid.isEmpty {
+            self.currentUserId = savedUid
+        }
+    }
+
+    func setUserId(_ uid: String?) {
+        self.currentUserId = uid
+        if let uid = uid, !uid.isEmpty {
+            UserDefaults.standard.set(uid, forKey: "need_current_user_id")
+            print("[SyncGateway] User ID registered: \(uid)")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "need_current_user_id")
+        }
+        startMonitoring()
+    }
+
+    func startMonitoring() {
+        guard !isMonitoring else { return }
+        isMonitoring = true
+
+        Task.detached(priority: .background) { [weak self] in
+            while true {
+                await self?.pollServer()
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // Poll every 1.6 seconds
+            }
+        }
+    }
+
+    private func pollServer() async {
+        guard let uid = currentUserId, !uid.isEmpty else { return }
+        let sinceMs = Int(lastNotificationPollTime)
+        guard let url = URL(string: "https://need-chi.vercel.app/api/notifications/poll?uid=\(uid)&since=\(sinceMs)") else { return }
+
+        do {
+            let (data, response) = try await urlSession.data(from: url)
+            guard let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 else { return }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+            if let serverTime = json["serverTime"] as? Double {
+                self.lastNotificationPollTime = serverTime
+            } else if let serverTime = json["serverTime"] as? Int {
+                self.lastNotificationPollTime = Double(serverTime)
+            }
+
+            // 1. Process Incoming Call
+            var hasCall = false
+            var isOngoing = false
+            var callId: String? = nil
+            var jobId: String? = nil
+            var callerName: String = "Customer"
+            var isVideo = false
+            var callerId: String? = nil
+
+            if let callDict = json["call"] as? [String: Any] {
+                hasCall = callDict["hasCall"] as? Bool ?? false
+                isOngoing = callDict["isOngoing"] as? Bool ?? false
+                if hasCall {
+                    callId = callDict["callId"] as? String
+                    jobId = callDict["jobId"] as? String
+                    callerName = (callDict["callerName"] as? String) ?? "Customer"
+                    isVideo = callDict["isVideo"] as? Bool ?? false
+                    callerId = callDict["callerId"] as? String
+                }
+            }
+
+            await MainActor.run {
+                if hasCall {
+                    if UIApplication.shared.applicationState == .active {
+                        print("[SyncGateway] App in foreground, letting in-app modal ring without CallKit/local push")
+                        return
+                    }
+                    if callId != self.lastReportedCallId {
+                        self.lastReportedCallId = callId
+                        print("[SyncGateway] New ringing call detected in background for job \(jobId ?? "") from \(callerName)")
+                        SilentAudioGateway.shared.pauseForCall()
+
+                        // 1. Report to CallKit
+                        NativeCallKitManager.shared.reportIncomingCall(
+                            partnerName: callerName,
+                            isVideo: isVideo,
+                            jobId: jobId,
+                            uid: callerId
+                        )
+
+                        // 2. Schedule local notification (guarantees lock screen banner with Answer/Decline buttons)
+                        let callContent = UNMutableNotificationContent()
+                        callContent.title = isVideo ? "Incoming Video Call" : "Incoming Voice Call"
+                        callContent.body = "\(callerName) is calling you..."
+                        callContent.sound = .default
+                        callContent.categoryIdentifier = "INCOMING_CALL"
+                        callContent.threadIdentifier = "need-incoming-call"
+                        callContent.userInfo = [
+                            "action": "incoming_call",
+                            "jobId": jobId ?? "",
+                            "requestId": jobId ?? "",
+                            "callerName": callerName,
+                            "isVideo": isVideo ? "true" : "false"
+                        ]
+
+                        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+                        let req = UNNotificationRequest(identifier: "call_\(callId ?? "incoming")", content: callContent, trigger: trigger)
+                        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+                    }
+                } else if isOngoing || NativeCallKitManager.shared.isCallConnected {
+                    // Call is active and ongoing! NEVER end it!
+                    UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                } else {
+                    // Only end if call was previously ringing and NOT yet connected
+                    if NativeCallKitManager.shared.activeCallUUID != nil && self.lastReportedCallId != nil && !NativeCallKitManager.shared.isCallConnected {
+                        print("[SyncGateway] Call was cancelled remotely before being answered, ending CallKit ringing")
+                        NativeCallKitManager.shared.endCall()
+                        self.lastReportedCallId = nil
+                        SilentAudioGateway.shared.resumeAfterCall()
+                        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                    }
+                }
+            }
+
+            // 2. Process Notifications (Chat messages, job requests, counter offers)
+            if let notifsList = json["notifications"] as? [[String: Any]] {
+                for notif in notifsList {
+                    guard let id = notif["id"] as? String else { continue }
+                    if self.presentedNotificationIds.contains(id) { continue }
+                    self.presentedNotificationIds.insert(id)
+
+                    let title = (notif["title"] as? String) ?? "Need Notification"
+                    let body = (notif["body"] as? String) ?? ""
+                    var userInfo: [String: String] = [:]
+                    if let dataDict = notif["data"] as? [String: Any] {
+                        for (k, v) in dataDict {
+                            userInfo[k] = String(describing: v)
+                        }
+                    }
+
+                    print("[SyncGateway] New notification received: \(title) - \(body)")
+
+                    let content = UNMutableNotificationContent()
+                    content.title = title
+                    content.body = body
+                    content.sound = .default
+                    content.userInfo = userInfo
+                    content.badge = 1
+
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+                    let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+
+                    UNUserNotificationCenter.current().add(request) { error in
+                        if let error = error {
+                            print("[SyncGateway] Error scheduling local notification:", error)
+                        } else {
+                            print("[SyncGateway] Local notification successfully presented: \(id)")
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Transient background connection glitch — ignore silently
+        }
     }
 }
 
@@ -59,7 +451,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     let provider: CXProvider
     private let callController = CXCallController()
     private(set) var activeCallUUID: UUID?
-    private var isCallConnected: Bool = false
+    var isCallConnected: Bool = false
 
     weak var webView: WKWebView?
     var currentJobId: String?
@@ -99,11 +491,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     func configureAudioSession(isSpeaker: Bool = true) {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(
-                .playAndRecord,
-                mode: .voiceChat,
-                options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
-            )
+            try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+            try session.setActive(true)
             if isSpeaker {
                 try session.overrideOutputAudioPort(.speaker)
                 UIDevice.current.isProximityMonitoringEnabled = false
@@ -111,14 +500,18 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
                 try session.overrideOutputAudioPort(.none)
                 UIDevice.current.isProximityMonitoringEnabled = true
             }
-            try session.setActive(true, options: [])
-            print("[CallKit] Audio session successfully configured: isSpeaker=\(isSpeaker)")
+            print("[CallKit] Audio session route updated: isSpeaker=\(isSpeaker)")
         } catch {
             print("[CallKit] Error configuring audio session:", error)
         }
     }
 
     func reportIncomingCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
+        if UIApplication.shared.applicationState == .active {
+            print("[CallKit] App is in foreground, suppressing CallKit UI for in-app ringing modal")
+            return
+        }
+        SilentAudioGateway.shared.pauseForCall()
         self.currentJobId = jobId
         self.currentCallerId = uid
         self.isCallConnected = false
@@ -146,6 +539,10 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     func startCall(partnerName: String, isVideo: Bool, jobId: String? = nil, uid: String? = nil) {
+        if self.isCallConnected && self.activeCallUUID != nil {
+            print("[CallKit] startCall skipped because call is already connected")
+            return
+        }
         self.currentJobId = jobId
         self.currentCallerId = uid
         self.isCallConnected = false
@@ -175,17 +572,37 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         self.currentCallerId = nil
         self.isCallConnected = false
         UIDevice.current.isProximityMonitoringEnabled = false
+        SilentAudioGateway.shared.resumeAfterCall()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        UIApplication.shared.applicationIconBadgeNumber = 0
     }
 
     func endCall() {
-        guard let uuid = activeCallUUID else { return }
-        let endAction = CXEndCallAction(call: uuid)
-        let transaction = CXTransaction(action: endAction)
-        callController.request(transaction) { _ in }
-        provider.reportCall(with: uuid, endedAt: Date(), reason: .remoteEnded)
-        resetCallState()
+        print("[CallKit] Ending all CallKit calls")
+        self.isCallConnected = false
 
-        // Reset audio session
+        if let uuid = activeCallUUID {
+            let endAction = CXEndCallAction(call: uuid)
+            let transaction = CXTransaction(action: endAction)
+            callController.request(transaction) { error in
+                if error != nil {
+                    self.provider.reportCall(with: uuid, endedAt: Date(), reason: .remoteEnded)
+                }
+            }
+        }
+
+        // Terminate any and all lingering calls in CallKit observer so Dynamic Island never sticks
+        for call in callController.callObserver.calls {
+            if !call.hasEnded {
+                let endAction = CXEndCallAction(call: call.uuid)
+                callController.request(CXTransaction(action: endAction)) { _ in }
+                provider.reportCall(with: call.uuid, endedAt: Date(), reason: .remoteEnded)
+            }
+        }
+
+        resetCallState()
+        SilentAudioGateway.shared.resumeAfterCall()
+
         let session = AVAudioSession.sharedInstance()
         try? session.overrideOutputAudioPort(.none)
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
@@ -193,6 +610,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
     func onNativeAnswerRequested() {
         self.isCallConnected = true
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        UIApplication.shared.applicationIconBadgeNumber = 0
         configureAudioSession(isSpeaker: true)
 
         let savedJobId = self.currentJobId
@@ -288,6 +707,9 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     nonisolated func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         action.fulfill()
         Task { @MainActor in
+            NativeCallKitManager.shared.isCallConnected = true
+            UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+            UIApplication.shared.applicationIconBadgeNumber = 0
             NativeCallKitManager.shared.onNativeAnswerRequested()
             print("[CallKit] CXAnswerCallAction fulfilled successfully from Dynamic Island / CallKit")
         }
@@ -296,6 +718,9 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     nonisolated func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         action.fulfill()
         Task { @MainActor in
+            NativeCallKitManager.shared.isCallConnected = false
+            UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+            UIApplication.shared.applicationIconBadgeNumber = 0
             NativeCallKitManager.shared.onNativeEndRequested()
             print("[CallKit] CXEndCallAction fulfilled successfully from Dynamic Island / CallKit")
         }
@@ -338,13 +763,7 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
 
     func requestAllPermissions() {
         // 1. Audio / Microphone (For in-app calling)
-        AVAudioSession.sharedInstance().requestRecordPermission { _ in
-            try? AVAudioSession.sharedInstance().setCategory(
-                .playAndRecord,
-                mode: .voiceChat,
-                options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
-            )
-        }
+        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
 
         // 2. Camera (For taking job photos and verification)
@@ -390,7 +809,7 @@ final class PermissionManager: NSObject, CLLocationManagerDelegate {
 
 // MARK: - Main ContentView
 struct ContentView: View {
-    @StateObject private var webViewModel = WebViewModel()
+    @ObservedObject private var webViewModel = WebViewModel.shared
 
     var body: some View {
         ZStack {
@@ -426,6 +845,8 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: webViewModel.showError)
         .onAppear {
             PermissionManager.shared.requestAllPermissions()
+            SilentAudioGateway.shared.start()
+            BackgroundSyncGateway.shared.startMonitoring()
         }
     }
 }
@@ -522,8 +943,32 @@ struct ErrorView: View {
 }
 
 // MARK: - Native App Delegate (APNs Push Token Handling)
+// MARK: - Native App Delegate (APNs Push Token Handling)
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+        SilentAudioGateway.shared.ensureActive()
+        BackgroundSyncGateway.shared.startMonitoring()
+        return true
+    }
+    
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        print("[AppDelegate] App entered background, ensuring SilentAudioGateway & BackgroundSyncGateway")
+        SilentAudioGateway.shared.ensureActive()
+        BackgroundSyncGateway.shared.startMonitoring()
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        print("[AppDelegate] App became active")
+        SilentAudioGateway.shared.ensureActive()
+        BackgroundSyncGateway.shared.startMonitoring()
+    }
+
     func application(
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
@@ -540,11 +985,37 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
         print("[APNs] Failed to register for remote notifications: \(error.localizedDescription)")
     }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        print("[APNs] Background notification received: \(userInfo)")
+        let type = userInfo["type"] as? String
+        if type == "call" {
+            let callerName = (userInfo["callerName"] as? String) ?? (userInfo["title"] as? String) ?? "Caller"
+            let isVideo = (userInfo["callType"] as? String) == "video"
+            let jobId = (userInfo["jobId"] as? String) ?? (userInfo["requestId"] as? String)
+            let uid = userInfo["uid"] as? String
+            NativeCallKitManager.shared.reportIncomingCall(partnerName: callerName, isVideo: isVideo, jobId: jobId, uid: uid)
+        } else if type == "cancel_call" {
+            NativeCallKitManager.shared.endCall()
+        }
+        completionHandler(.newData)
+    }
 }
 
 // MARK: - WebViewModel
 @MainActor
 final class WebViewModel: ObservableObject {
+    func navigate(to path: String) {
+        guard let webView = self.webView else { return }
+        let cleanPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let js = "window.location.href = 'https://need-chi.vercel.app/\(cleanPath)';"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     static let shared = WebViewModel()
     @Published var isLoading: Bool = true
     @Published var hasLoadedOnce: Bool = false
@@ -626,7 +1097,7 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var viewModel: WebViewModel
 
         init(viewModel: WebViewModel) {
@@ -663,45 +1134,25 @@ struct WebView: UIViewRepresentable {
                 NativeCallKitManager.shared.startCall(partnerName: partnerName, isVideo: isVideo, jobId: jobId, uid: uid)
             } else if action == "endCall" {
                 NativeCallKitManager.shared.endCall()
+                UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                UIApplication.shared.applicationIconBadgeNumber = 0
+            } else if action == "clearDeliveredNotifications" {
+                UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                UIApplication.shared.applicationIconBadgeNumber = 0
             } else if action == "setAudioMode" {
                 let mode = dict["mode"] as? String ?? "speaker"
                 NativeCallKitManager.shared.setAudioMode(mode: mode)
+            } else if action == "setUserId" {
+                let uid = dict["uid"] as? String
+                BackgroundSyncGateway.shared.setUserId(uid)
+            } else if action == "getPushToken" {
+                if let token = WebViewModel.shared.apnsToken {
+                    WebViewModel.shared.bridgeDeviceToken(token: token)
+                }
             }
         }
 
-        // MARK: - WKUIDelegate: Media Capture Permissions (Mic & Camera for Calls)
-        @available(iOS 15.0, *)
-        func webView(
-            _ webView: WKWebView,
-            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
-            initiatedByFrame frame: WKFrameInfo,
-            type: WKMediaCaptureType,
-            decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
-        ) {
-            decisionHandler(.grant)
-        }
 
-        @available(iOS 15.0, *)
-        func webView(
-            _ webView: WKWebView,
-            requestDeviceOrientationAndMotionPermissionFor origin: WKSecurityOrigin,
-            initiatedByFrame frame: WKFrameInfo,
-            decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
-        ) {
-            decisionHandler(.grant)
-        }
-
-        func webView(
-            _ webView: WKWebView,
-            createWebViewWith configuration: WKWebViewConfiguration,
-            for navigationAction: WKNavigationAction,
-            windowFeatures: WKWindowFeatures
-        ) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
-            }
-            return nil
-        }
 
         // MARK: - WKNavigationDelegate
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

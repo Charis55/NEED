@@ -35,6 +35,7 @@ interface AgoraCallModalProps {
   channelName: string;
   uid: string;
   isVideo: boolean;
+  isCaller?: boolean;
   partnerName: string;
   partnerPhoto?: string;
   connectedAt?: number | null;
@@ -121,6 +122,7 @@ export default function AgoraCallModal({
   channelName, 
   uid, 
   isVideo, 
+  isCaller = false,
   partnerName, 
   partnerPhoto, 
   connectedAt,
@@ -192,6 +194,11 @@ export default function AgoraCallModal({
   }, []);
 
   useEffect(() => {
+    // Mark body as in-call to suppress generic toasts and banners
+    if (typeof document !== "undefined") {
+      document.body.setAttribute("data-in-call", "true");
+    }
+
     // Play pickup sound when call connects
     if (typeof window !== "undefined") {
       const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
@@ -199,6 +206,9 @@ export default function AgoraCallModal({
     }
 
     return () => {
+      if (typeof document !== "undefined") {
+        document.body.removeAttribute("data-in-call");
+      }
       // Ensure audio routing is reset to normal and native call is ended
       if (typeof window !== "undefined") {
         if (Capacitor.isNativePlatform()) {
@@ -249,10 +259,13 @@ export default function AgoraCallModal({
             console.warn("AudioToggle initial route failed:", e)
           );
         }
-        notifyNativeCall("startCall", { partnerName, isVideo, jobId: jobId || channelName, uid });
+        // ONLY outgoing caller triggers startCall in native CallKit. Callee answered existing call!
+        if (isCaller) {
+          notifyNativeCall("startCall", { partnerName, isVideo, jobId: jobId || channelName, uid });
+        }
         notifyNativeCall("setAudioMode", { mode: speakerOn ? "speaker" : "earpiece" });
       }
-    }, [joined, partnerName, isVideo, jobId, channelName, uid]);
+    }, [joined, isCaller, partnerName, isVideo, jobId, channelName, uid, speakerOn]);
 
   // Clean, monotonic in-call timer: counts smoothly from 0 for the duration of the call on this device
   useEffect(() => {
@@ -424,19 +437,6 @@ export default function AgoraCallModal({
           window.addEventListener("touchstart", unlock, { once: true });
         };
 
-        // Probe permissions on mobile / WebViews to ensure permission dialogs are surfaced
-        if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
-          try {
-            const probe = await navigator.mediaDevices.getUserMedia({
-              audio: true,
-              video: isVideo ? { facingMode: "user" } : false,
-            });
-            probe.getTracks().forEach((t) => t.stop());
-          } catch (probeErr) {
-            console.warn("[Agora] UserMedia probe warning:", probeErr);
-          }
-        }
-
         // 1. Create local tracks: combined on video calls for single-query mobile stability
         if (isVideo) {
           try {
@@ -536,9 +536,11 @@ export default function AgoraCallModal({
         if (client.remoteUsers && client.remoteUsers.length > 0) {
           for (const ru of client.remoteUsers) {
             setRemoteUsers(prev => (prev.find(u => u.uid === ru.uid) ? prev : [...prev, ru]));
-            if (ru.hasAudio && !ru.audioTrack) {
+            if (ru.hasAudio) {
               try {
-                await client.subscribe(ru, "audio");
+                if (!ru.audioTrack) {
+                  await client.subscribe(ru, "audio");
+                }
                 (ru as any).audioTrack?.setVolume(100);
                 (ru as any).audioTrack?.play();
                 console.log(`[Agora] Subscribed & playing existing remote user audio for UID: ${ru.uid}`);
