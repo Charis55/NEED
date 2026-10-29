@@ -452,12 +452,16 @@ export default function AuthForm() {
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         setError("");
       } else if (code === "auth/operation-not-allowed") {
-        setError("Sign in with Apple is disabled. Enable Apple in Firebase Console > Authentication.");
+        setError("Web Apple Sign-In requires an Apple Services ID & Private Key (.p8) configured in Firebase Console.");
       } else if (code === "auth/invalid-credential") {
         setError("Invalid Apple login credentials. Please try again.");
       } else {
         const raw = err.message || "Failed to sign in with Apple.";
-        setError(raw.replace(/^Firebase:\s*(Error\s*)?(\(auth\/[^)]+\)\.?\s*)?/i, "").trim() || raw);
+        if (raw.includes("1000") || raw.includes("AuthorizationError")) {
+          setError("Apple Sign-In requires an Apple Developer Program ($99/yr) entitlement in the provisioning profile.");
+        } else {
+          setError(raw.replace(/^Firebase:\s*(Error\s*)?(\(auth\/[^)]+\)\.?\s*)?/i, "").trim() || raw);
+        }
       }
     } finally {
       setLoading(false);
