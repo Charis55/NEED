@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { adminFetch } from "@/utils/adminClient";
 import { 
   Scale, 
   CheckCircle, 
@@ -52,7 +53,7 @@ export default function AdminAppealsPage() {
   const fetchAppeals = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/admin/appeals?status=${statusFilter}`);
+      const res = await adminFetch(`/api/admin/appeals?status=${statusFilter}`);
       const data = await res.json();
       if (data.appeals) {
         setAppeals(data.appeals);
@@ -83,7 +84,7 @@ export default function AdminAppealsPage() {
       setProcessingId(strikeId);
       setFeedbackMsg(null);
 
-      const res = await fetch("/api/admin/appeals/review", {
+      const res = await adminFetch("/api/admin/appeals/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

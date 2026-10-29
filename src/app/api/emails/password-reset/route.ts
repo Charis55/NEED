@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { adminAuth } from '@/lib/firebaseAdminAuth';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -10,6 +11,25 @@ export async function POST(req: Request) {
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
+
+    // Rate Limiting: max 5 requests per 15 minutes per IP, max 3 requests per 15 minutes per email
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : 'local';
+    const cleanEmail = String(email).toLowerCase().trim();
+
+    const ipLimit = checkRateLimit(`pwd_reset_ip:${ip}`, { windowMs: 15 * 60 * 1000, maxRequests: 5 });
+    const emailLimit = checkRateLimit(`pwd_reset_email:${cleanEmail}`, { windowMs: 15 * 60 * 1000, maxRequests: 3 });
+
+    if (!ipLimit.allowed || !emailLimit.allowed) {
+      const retryAfter = Math.max(ipLimit.retryAfterSeconds || 60, emailLimit.retryAfterSeconds || 60);
+      return NextResponse.json(
+        { error: 'Too many password reset requests. Please wait before trying again.' },
+        { 
+          status: 429,
+          headers: { 'Retry-After': String(retryAfter) }
+        }
+      );
     }
 
     // Generate the password reset link using Firebase Admin

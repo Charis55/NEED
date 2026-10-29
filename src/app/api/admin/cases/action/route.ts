@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { applyStrike } from "@/lib/strikes";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const body = await req.json();
-    const { caseId, action, adminId, note } = body;
+    const { caseId, action, note } = body;
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
     // action: "dismiss" | "warn" | "strike" | "suspend" | "deactivate"
 
-    if (!caseId || !action || !adminId) {
+    if (!caseId || !action) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
     }
 

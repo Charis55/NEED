@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { adminFetch } from "@/utils/adminClient";
 import { ShieldAlert, AlertTriangle, Check, X, ShieldX, UserX, AlertOctagon } from "lucide-react";
 
 export default function AdminCasesPage() {
@@ -31,7 +32,7 @@ export default function AdminCasesPage() {
   const handleAction = async (caseId: string, action: string) => {
     try {
       setActionLoading(caseId);
-      const res = await fetch("/api/admin/cases/action", {
+      const res = await adminFetch("/api/admin/cases/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConfig, updatePlatformConfig } from "@/lib/platformConfig";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const config = await getConfig();
     return NextResponse.json({ success: true, config });
   } catch (error: any) {
@@ -12,11 +16,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { updates, adminId, note } = body;
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
 
-    if (!updates || !adminId) {
-      return NextResponse.json({ error: "Missing required config updates or adminId" }, { status: 400 });
+    const body = await req.json();
+    const { updates, note } = body;
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
+
+    if (!updates) {
+      return NextResponse.json({ error: "Missing required config updates" }, { status: 400 });
     }
 
     const updated = await updatePlatformConfig(updates, adminId, note);

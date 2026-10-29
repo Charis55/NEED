@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { adminFetch } from "@/utils/adminClient";
 import { Award, AlertTriangle, CheckCircle, XCircle, RefreshCw, DollarSign, ShieldAlert, Image as ImageIcon } from "lucide-react";
 
 export default function AdminGuaranteePage() {
@@ -66,7 +67,7 @@ export default function AdminGuaranteePage() {
       const adminId = auth.currentUser?.uid || "admin_system";
       const clawbackAmountKobo = refundNaira ? Math.round(Number(refundNaira) * 100) : undefined;
 
-      const res = await fetch("/api/guarantee/resolve", {
+      const res = await adminFetch("/api/guarantee/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

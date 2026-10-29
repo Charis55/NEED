@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { paymentProvider } from "@/lib/paystack";
 import { runReconciliationAudit } from "@/lib/reconciliation";
 import { Wallet, WalletTransaction, JobRequestData } from "@/types/platform";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function GET(req: NextRequest) {
   return handleReconciliation(req);
@@ -17,9 +18,12 @@ async function handleReconciliation(req: NextRequest) {
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
-    // If CRON_SECRET is configured, enforce token authorization unless in local development
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && process.env.NODE_ENV === "production") {
-      return NextResponse.json({ error: "Unauthorized cron trigger" }, { status: 401 });
+    // If CRON_SECRET is configured, enforce token authorization or admin authentication
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      const adminCheck = await verifyAdminRequest(req);
+      if (adminCheck.errorResponse) {
+        return NextResponse.json({ error: "Unauthorized cron trigger" }, { status: 401 });
+      }
     }
 
     const now = Date.now();

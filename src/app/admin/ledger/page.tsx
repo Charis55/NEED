@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { adminFetch } from "@/utils/adminClient";
 import {
   DollarSign,
   Search,
@@ -88,7 +89,7 @@ export default function AdminLedgerPage() {
       setRunningAudit(true);
       setAuditMessage(null);
 
-      const res = await fetch("/api/cron/reconcile-ledger", {
+      const res = await adminFetch("/api/cron/reconcile-ledger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -122,7 +123,7 @@ export default function AdminLedgerPage() {
 
       const adminId = auth.currentUser?.uid || "admin_manual";
 
-      const res = await fetch("/api/admin/ledger/discrepancy", {
+      const res = await adminFetch("/api/admin/ledger/discrepancy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

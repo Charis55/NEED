@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { LedgerDiscrepancy } from "@/types/platform";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const body = await req.json();
-    const { discrepancyId, adminId, status, resolutionNote } = body as {
+    const { discrepancyId, status, resolutionNote } = body as {
       discrepancyId: string;
-      adminId: string;
       status: "investigating" | "resolved" | "dismissed";
       resolutionNote: string;
     };
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
 
-    if (!discrepancyId || !adminId || !status || !resolutionNote) {
+    if (!discrepancyId || !status || !resolutionNote) {
       return NextResponse.json(
-        { error: "discrepancyId, adminId, status, and resolutionNote are required" },
+        { error: "discrepancyId, status, and resolutionNote are required" },
         { status: 400 }
       );
     }

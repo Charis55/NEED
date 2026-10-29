@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +14,9 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
     const sessionId = searchParams.get("sessionId");

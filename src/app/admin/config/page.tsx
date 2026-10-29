@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { adminFetch } from "@/utils/adminClient";
 import { Settings, Save, CheckCircle, AlertTriangle } from "lucide-react";
 
 export default function AdminConfigPage() {
@@ -13,7 +14,7 @@ export default function AdminConfigPage() {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/config");
+      const res = await adminFetch("/api/admin/config");
       const data = await res.json();
       if (data.config) {
         setConfig(data.config);
@@ -34,7 +35,7 @@ export default function AdminConfigPage() {
     try {
       setSaving(true);
       setStatusMsg(null);
-      const res = await fetch("/api/admin/config", {
+      const res = await adminFetch("/api/admin/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

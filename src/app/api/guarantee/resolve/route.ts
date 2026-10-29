@@ -3,27 +3,30 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { writeJobEvent } from "@/lib/jobEvents";
 import { GuaranteeClaim, JobRequestData, Wallet } from "@/types/platform";
 import { resolveGuaranteeClaimPure, GuaranteeResolutionAction } from "@/lib/guarantee";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const body = await req.json();
     const {
       claimId,
-      adminId,
       resolution,
       notes,
       clawbackAmountKobo
     } = body as {
       claimId: string;
-      adminId: string;
       resolution: GuaranteeResolutionAction;
       notes: string;
       clawbackAmountKobo?: number;
     };
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
 
-    if (!claimId || !adminId || !resolution || !notes) {
+    if (!claimId || !resolution || !notes) {
       return NextResponse.json(
-        { error: "claimId, adminId, resolution, and notes are required" },
+        { error: "claimId, resolution, and notes are required" },
         { status: 400 }
       );
     }

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { Strike } from "@/types/platform";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") || "all";
 

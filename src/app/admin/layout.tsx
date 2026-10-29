@@ -1,12 +1,41 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ShieldAlert, BookOpen, Settings, BarChart2, DollarSign, Award, ArrowLeft, Scale, UserX } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+
+const ADMIN_EMAILS = ["obunezicharis@gmail.com"];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setIsAuthorized(false);
+        setLoading(false);
+        return;
+      }
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        const hasAdminClaim = tokenResult.claims.admin === true;
+        const isWhitelistedEmail = user.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+        setIsAuthorized(Boolean(hasAdminClaim || isWhitelistedEmail));
+      } catch (err) {
+        console.error("Failed to verify admin status:", err);
+        setIsAuthorized(false);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const navItems = [
     { label: "Dashboard", href: "/admin", icon: BarChart2 },
@@ -17,6 +46,37 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     { label: "Guarantee Claims", href: "/admin/guarantee", icon: Award },
     { label: "Platform Config", href: "/admin/config", icon: Settings },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-brutal-bg,#FFFDF0)] flex flex-col items-center justify-center p-6 text-black">
+        <div className="border-4 border-black bg-[var(--color-brutal-yellow,#FFD700)] p-8 shadow-[8px_8px_0_0_#000] flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+          <p className="font-black text-sm uppercase tracking-wider">Verifying Admin Authorization...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[var(--color-brutal-bg,#FFFDF0)] flex flex-col items-center justify-center p-6 text-black select-none">
+        <div className="border-4 border-black bg-[var(--color-brutal-red,#FF4D4D)] text-white p-8 shadow-[8px_8px_0_0_#000] flex flex-col items-center gap-4 max-w-md w-full text-center">
+          <ShieldAlert className="w-16 h-16 text-black stroke-[2.5]" />
+          <h2 className="text-3xl font-black uppercase text-black tracking-tight">ACCESS DENIED</h2>
+          <p className="font-bold text-sm text-black bg-white p-3 border-2 border-black">
+            You do not have administrative credentials to access the NEED Command Console.
+          </p>
+          <Link
+            href="/"
+            className="mt-4 px-6 py-3 bg-black text-white font-black text-sm uppercase border-2 border-white hover:bg-white hover:text-black hover:border-black transition-all shadow-[4px_4px_0_0_#000]"
+          >
+            Return to Application
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-mono text-black">

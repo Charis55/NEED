@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { adminFetch } from "@/utils/adminClient";
 import { 
   ShieldAlert, 
   ShieldCheck, 
@@ -78,7 +79,7 @@ export default function AdminBlacklistPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/blacklist");
+      const res = await adminFetch("/api/admin/blacklist");
       const data = await res.json();
       if (data.success) {
         setBlacklistedDocs(data.blacklistedDocuments || []);
@@ -114,7 +115,7 @@ export default function AdminBlacklistPage() {
 
     setProcessingFlag(true);
     try {
-      const res = await fetch("/api/admin/blacklist", {
+      const res = await adminFetch("/api/admin/blacklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -146,7 +147,7 @@ export default function AdminBlacklistPage() {
     if (!window.confirm(`Are you sure you want to remove ${key} from the blacklist?`)) return;
 
     try {
-      const res = await fetch(`/api/admin/blacklist?type=${type}&key=${encodeURIComponent(key)}`, {
+      const res = await adminFetch(`/api/admin/blacklist?type=${type}&key=${encodeURIComponent(key)}`, {
         method: "DELETE"
       });
       const data = await res.json();
@@ -166,7 +167,7 @@ export default function AdminBlacklistPage() {
     setInspectLoading(true);
     setInspectData(null);
     try {
-      const res = await fetch(`/api/admin/kyc?userId=${userId}`);
+      const res = await adminFetch(`/api/admin/kyc?userId=${userId}`);
       const data = await res.json();
       if (data.success) {
         setInspectData(data);

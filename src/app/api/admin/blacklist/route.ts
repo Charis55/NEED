@@ -4,6 +4,7 @@ import {
   blacklistDocumentManually, 
   removeDocumentFromBlacklist 
 } from "@/lib/strikes";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,9 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     // 1. Fetch blacklisted documents (passports, driver's licenses, ID cards)
     const [docsSnap, legacyNinSnap, custSnap, artisansSnap] = await Promise.all([
       adminDb.collection("blacklistedDocuments").orderBy("bannedAt", "desc").get(),
@@ -84,15 +88,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const body = await req.json();
     const { 
       type, // "document" | "customer_phone" | "customer_email"
       value, // document number, phone, or email
       documentType = "passport",
       userId,
-      reason,
-      adminId = "admin_console"
+      reason
     } = body;
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
 
     if (!value || !reason) {
       return NextResponse.json(
@@ -160,10 +167,13 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
+
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type"); // "document" | "customer"
     const key = searchParams.get("key");
-    const adminId = searchParams.get("adminId") || "admin_console";
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
 
     if (!key) {
       return NextResponse.json(

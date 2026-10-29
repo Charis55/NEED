@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reviewStrikeAppeal } from "@/lib/strikes";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { strikeId, adminId, decision, resolutionNote } = body;
+    const authCheck = await verifyAdminRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
 
-    if (!strikeId || !adminId || !decision) {
+    const body = await req.json();
+    const { strikeId, decision, resolutionNote } = body;
+    const adminId = authCheck.admin.email || authCheck.admin.uid;
+
+    if (!strikeId || !decision) {
       return NextResponse.json(
-        { error: "strikeId, adminId, and decision ('approved' | 'rejected') are required" },
+        { error: "strikeId and decision ('approved' | 'rejected') are required" },
         { status: 400 }
       );
     }
