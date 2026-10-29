@@ -32,9 +32,9 @@
   .safe-header-top {
     padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 2.75rem);
   }
-  @media (min-width: 640px) {
+  @media (min-width: 1024px) {
     .safe-header-top {
-      padding-top: 0.875rem;
+      padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 1rem);
     }
   }
 }
