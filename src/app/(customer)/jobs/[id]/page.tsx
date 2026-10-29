@@ -589,7 +589,7 @@ function JobsContent() {
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] pb-24 selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Top Header Bar */}
-      <div className="px-3.5 sm:px-6 py-2.5 sm:py-3.5 bg-[var(--color-brutal-teal)] border-b-4 border-black shadow-[0_4px_0_0_#000] sticky top-0 z-40">
+      <div className="px-3.5 sm:px-6 safe-header-top pb-2.5 sm:pb-3.5 bg-[var(--color-brutal-teal)] border-b-4 border-black shadow-[0_4px_0_0_#000] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
           <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
             <BackButton className="bg-white text-black brutal-border hover:-translate-y-0.5 active:translate-y-0 transition-all w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center p-0 shrink-0 shadow-[2px_2px_0_0_#000]" />

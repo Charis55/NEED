@@ -131,7 +131,7 @@ Thank you for using NEED.`;
   const date = `${dateStr} at ${timeStr}`;
 
   return (
-    <div className="min-h-screen bg-[#FFF0E5] pt-16 px-6 md:px-12 pb-20">
+    <div className="min-h-screen bg-[#FFF0E5] pt-[calc(max(env(safe-area-inset-top,0px),2.75rem)+1.5rem)] px-6 md:px-12 pb-20">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-8 print:hidden flex-wrap gap-4">
           <Link href="/jobs" className="inline-flex items-center gap-2 bg-white border-2 border-black px-4 py-2 font-black uppercase shadow-[4px_4px_0_0_#000] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_#000] transition-all">
