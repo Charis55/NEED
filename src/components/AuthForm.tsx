@@ -828,17 +828,17 @@ export default function AuthForm() {
         </div>
 
         {/* Mode Toggle Tabs: SIGN IN vs CREATE ACCOUNT */}
-        <div className="flex bg-[var(--color-brutal-bg)] p-1.5 brutal-border mb-6">
+        <div className="flex bg-[var(--color-brutal-bg)] p-1.5 brutal-border mb-6 gap-2">
           <button
             type="button"
             onClick={() => {
               setIsLogin(true);
               setError("");
             }}
-            className={`flex-1 py-3 text-sm font-black uppercase transition-all ${
+            className={`flex-1 py-2.5 sm:py-3 px-2 text-xs sm:text-sm font-black uppercase transition-all relative ${
               isLogin
-                ? "bg-[var(--color-brutal-teal)] brutal-border brutal-shadow-sm text-black -translate-x-0.5 -translate-y-0.5"
-                : "text-black/70 hover:text-black hover:bg-black/5"
+                ? "bg-[var(--color-brutal-teal)] border-4 border-black shadow-[3px_3px_0_0_#000] text-black -translate-x-0.5 -translate-y-0.5 z-10"
+                : "text-black/70 hover:text-black hover:bg-black/5 border-4 border-transparent z-0"
             }`}
           >
             SIGN IN
@@ -849,10 +849,10 @@ export default function AuthForm() {
               setIsLogin(false);
               setError("");
             }}
-            className={`flex-1 py-3 text-sm font-black uppercase transition-all ${
+            className={`flex-1 py-2.5 sm:py-3 px-2 text-xs sm:text-sm font-black uppercase transition-all relative ${
               !isLogin
-                ? "bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm text-black -translate-x-0.5 -translate-y-0.5"
-                : "text-black/70 hover:text-black hover:bg-black/5"
+                ? "bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[3px_3px_0_0_#000] text-black -translate-x-0.5 -translate-y-0.5 z-10"
+                : "text-black/70 hover:text-black hover:bg-black/5 border-4 border-transparent z-0"
             }`}
           >
             CREATE ACCOUNT
@@ -942,18 +942,26 @@ export default function AuthForm() {
           {!isLogin && (
             <>
               {!lockRole && (
-                <div className="flex bg-[var(--color-brutal-bg)] p-2 brutal-border mb-6 relative">
+                <div className="flex bg-[var(--color-brutal-bg)] p-1.5 sm:p-2 brutal-border mb-6 relative gap-2">
                   <button
                     type="button"
                     onClick={() => setRole("customer")}
-                    className={`flex-1 py-3 text-sm font-black uppercase transition-all z-10 ${role === "customer" ? "bg-[var(--color-brutal-blue)] brutal-border brutal-shadow-sm text-black translate-x-[-2px] translate-y-[-2px]" : "text-black hover:bg-gray-200 border-4 border-transparent"}`}
+                    className={`flex-1 py-2.5 sm:py-3 px-2 text-xs sm:text-sm font-black uppercase transition-all relative ${
+                      role === "customer"
+                        ? "bg-[var(--color-brutal-blue)] border-4 border-black shadow-[3px_3px_0_0_#000] text-black -translate-x-0.5 -translate-y-0.5 z-10"
+                        : "text-black/70 hover:text-black hover:bg-black/5 border-4 border-transparent z-0"
+                    }`}
                   >
                     CUSTOMER
                   </button>
                   <button
                     type="button"
                     onClick={() => setRole("artisan")}
-                    className={`flex-1 py-3 text-sm font-black uppercase transition-all z-10 ${role === "artisan" ? "bg-[var(--color-brutal-blue)] brutal-border brutal-shadow-sm text-black translate-x-[-2px] translate-y-[-2px]" : "text-black hover:bg-gray-200 border-4 border-transparent"}`}
+                    className={`flex-1 py-2.5 sm:py-3 px-2 text-xs sm:text-sm font-black uppercase transition-all relative ${
+                      role === "artisan"
+                        ? "bg-[var(--color-brutal-blue)] border-4 border-black shadow-[3px_3px_0_0_#000] text-black -translate-x-0.5 -translate-y-0.5 z-10"
+                        : "text-black/70 hover:text-black hover:bg-black/5 border-4 border-transparent z-0"
+                    }`}
                   >
                     TECHNICIAN
                   </button>
