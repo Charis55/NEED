@@ -1,0 +1,2 @@
+In-app Browser JS state was preserved. Completed actions were not rolled back; refresh stale UI handles and continue only the remaining work.
+OUTPUT_LIMIT: this output was not emitted. Save bounded results in state before output; print a smaller summary or continue in the next cell. Do not replay completed actions.

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { auth } from "@/lib/firebase";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -69,14 +69,20 @@ export default function ForgotPasswordPage() {
           </div>
 
           {error && (
-            <div className="bg-[var(--color-brutal-red)] text-black font-bold p-4 brutal-border brutal-shadow-sm mb-6 uppercase text-sm">
-              {error}
+            <div className="bg-[var(--color-brutal-red)] text-black font-bold p-3.5 sm:p-4 border-4 border-black shadow-[4px_4px_0_0_#000] mb-6 text-xs sm:text-sm break-words [overflow-wrap:anywhere] max-w-full overflow-hidden flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 stroke-[2.5] text-black shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span className="font-black uppercase tracking-wider block leading-snug">{error}</span>
+              </div>
             </div>
           )}
 
           {message && (
-            <div className="bg-[var(--color-brutal-green)] text-black font-bold p-4 brutal-border brutal-shadow-sm mb-6 uppercase text-sm">
-              {message}
+            <div className="bg-[var(--color-brutal-green)] text-black font-bold p-3.5 sm:p-4 border-4 border-black shadow-[4px_4px_0_0_#000] mb-6 text-xs sm:text-sm break-words [overflow-wrap:anywhere] max-w-full overflow-hidden flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 stroke-[2.5] text-black shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <span className="font-black uppercase tracking-wider block leading-snug">{message}</span>
+              </div>
             </div>
           )}
 

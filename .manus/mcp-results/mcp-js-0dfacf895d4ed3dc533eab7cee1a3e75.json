@@ -1,0 +1,498 @@
+In-app Browser JS state was preserved. Completed actions were not rolled back; refresh stale UI handles and continue only the remaining work.
+{"code":"INVALID_ARGUMENT","location":"at <anonymous> (in-app-browser.js:2:243)"}
+Expected a browser observation
+Browser tab: tab_5cc700cb-d9b8-4d42-acdd-d07064284002, Title: "Instagram", URL: "https://www.instagram.com/reel/DdyqycEINNe/?utm_source=ig_web_copy_link&vrfl=MzRlODBiNWFlZA%3D%3D&srtk=MzRlODBiNWFlZA%3D%3D".
+1 AXWebArea Instagram
+  2 element Log In Sign Up Never miss a post from adilet.fndr Sign up for Instagram to stay in the loop. Sign up Log in adilet.fndr • Follow Original audio adilet.fndr 4w Your vibe-coded app can get sued for $100K before it makes a single sale. 6 traps hiding in most AI-built apps: 1. Signup never asks for age → COPPA: up to $53K per child under 13 2. Google Fonts loaded from Google’s servers → a Munich court made a site pay €100 to ONE visitor for leaking their IP (GDPR) 3. Session replay on by default → recording keystrokes can count as wiretapping in California (CIPA): $5K per session 4. “We launched” email with no unsubscribe link or postal address → CAN-SPAM: up to $53K per email 5. Subscription checkout without renewal terms next to the button → in California, renewals can count as a gift you have to refund 6. No registered DMCA agent (it costs $6) → you lose safe harbor for user uploads: up to $150K per stolen image The word is PER. Per visitor. Per session. Per email. That’s how zero sales turns into a hundred grand. The fix: paste this into Claude 👇 “Audit my app for these 6 legal risks and fix them: add an age gate to signup, self-host my fonts, turn off session replay (or add consent + input masking), add an unsubscribe link and postal address to every marketing email, show renewal terms right next to the subscribe button, and walk me through registering a DMCA agent.” Save this before you launch. Following me is the cheapest co-founder you’ll ever hire. Not legal advice. Talk to a lawyer about your specific situation. #vibecoding #buildinpublic #indiehacker #saas #startup voltelix 1h Great reminder that compliance needs to be built in from day one, not patched on later. Like Reply _chipmunk_ai 1h 🔥🔥🔥 Like Reply preciousdeveloper 2h prompt Like Reply preciousdeveloper 2h Prompt Like Reply mayowathefirst 2h Prompt Like Reply dexterbrians 2h prompt Like Reply amurepinho 3h Prompt Like Reply prem_sanisetty 4h 🙌 Like Reply theo.saas1 6h It's a lot of sued 😢 Like Re, truncated: name, text
+    3 element •, truncated: text
+      7 generic
+        8 generic
+        9 generic
+          10 generic
+            12 link Instagram
+              15 image Instagram
+            17 generic
+              18 link Log In
+                19 text Log In
+              20 link Sign Up
+                21 text Sign Up
+          22 main
+            23 generic
+              24 generic
+              26 dialog
+                27 generic
+                  29 button Close
+                    30 image Close
+                  31 link adilet.fndr's profile picture
+                    32 image adilet.fndr's profile picture
+                  33 text Never miss a post from adilet.fndr
+                  34 text Sign up for Instagram to stay in the loop.
+                  35 link Sign up
+                    36 text Sign up
+                  37 link Log in
+                    38 text Log in
+            39 generic
+              41 element
+                44 generic
+              45 generic
+                46 link adilet.fndr's profile picture
+                  47 image adilet.fndr's profile picture
+                48 generic
+                  49 link adilet.fndr
+                    51 text adilet.fndr
+                  52 text •
+                  53 button Follow
+                    54 text Follow
+                  55 link Original audio
+                    56 text Original audio
+                57 button More options
+                  59 image More options
+                60 separator
+                62 generic
+                  63 link adilet.fndr's profile picture
+                    64 image adilet.fndr's profile picture
+                  65 link adilet.fndr
+                    67 text adilet.fndr
+                  68 text  
+                  69 time
+                    70 text 4w
+                  71 text Your vibe-coded app can get sued for $100K before it makes a single sale.
+                  72 LineBreak  
+                  73 LineBreak  
+                  74 text 6 traps hiding in most AI-built apps:
+                  75 LineBreak  
+                  76 LineBreak  
+                  77 text 1. Signup never asks for age → COPPA: up to $53K per child under 13
+                  78 LineBreak  
+                  79 text 2. Google Fonts loaded from Google’s servers → a Munich court made a site pay €100 to ONE visitor for leaking their IP (GDPR)
+                  80 LineBreak  
+                  81 text 3. Session replay on by default → recording keystrokes can count as wiretapping in California (CIPA): $5K per session
+                  82 LineBreak  
+                  83 text 4. “We launched” email with no unsubscribe link or postal address → CAN-SPAM: up to $53K per email
+                  84 LineBreak  
+                  85 text 5. Subscription checkout without renewal terms next to the button → in California, renewals can count as a gift you have to refund
+                  86 LineBreak  
+                  87 text 6. No registered DMCA agent (it costs $6) → you lose safe harbor for user uploads: up to $150K per stolen image
+                  88 LineBreak  
+                  89 LineBreak  
+                  90 text The word is PER. Per visitor. Per session. Per email.
+                  91 LineBreak  
+                  92 text That’s how zero sales turns into a hundred grand.
+                  93 LineBreak  
+                  94 LineBreak  
+                  95 text The fix: paste this into Claude 👇
+                  96 LineBreak  
+                  97 LineBreak  
+                  98 text “Audit my app for these 6 legal risks and fix them: add an age gate to signup, self-host my fonts, turn off session replay (or add consent + input masking), add an unsubscribe link and postal address to every marketing email, show renewal terms right next to the subscribe button, and walk me through registering a DMCA agent.”
+                  99 LineBreak  
+                  100 LineBreak  
+                  101 text Save this before you launch.
+                  102 LineBreak  
+                  103 text Following me is the cheapest co-founder you’ll ever hire.
+                  104 LineBreak  
+                  105 LineBreak  
+                  106 text Not legal advice. Talk to a lawyer about your specific situation.
+                  107 LineBreak  
+                  108 LineBreak  
+                  109 link #vibecoding
+                    110 text #vibecoding
+                  111 text  
+                  112 link #buildinpublic
+                    113 text #buildinpublic
+                  114 text  
+                  115 link #indiehacker
+                    116 text #indiehacker
+                  117 text  
+                  118 link #saas
+                    119 text #saas
+                  120 text  
+                  121 link #startup
+                    122 text #startup
+                  124 button Load more comments
+                    125 image Load more comments
+                  126 link voltelix's profile picture
+                    127 image voltelix's profile picture
+                  128 link voltelix
+                    130 text voltelix
+                  131 text  
+                  132 link 1h
+                    133 time
+                      134 text 1h
+                  135 text Great reminder that compliance needs to be built in from day one, not patched on later.
+                  136 button Like
+                    137 text Like
+                  138 button Reply
+                    139 text Reply
+                  140 link _chipmunk_ai's profile picture
+                    141 image _chipmunk_ai's profile picture
+                  142 link _chipmunk_ai
+                    144 text _chipmunk_ai
+                  145 text  
+                  146 link 1h
+                    147 time
+                      148 text 1h
+                  149 text 🔥🔥🔥
+                  150 button Like
+                    151 text Like
+                  152 button Reply
+                    153 text Reply
+                  154 link preciousdeveloper's profile picture
+                    155 image preciousdeveloper's profile picture
+                  156 link preciousdeveloper
+                    158 text preciousdeveloper
+                  159 text  
+                  160 link 2h
+                    161 time
+                      162 text 2h
+                  163 text prompt
+                  164 button Like
+                    165 text Like
+                  166 button Reply
+                    167 text Reply
+                  168 link preciousdeveloper's profile picture
+                    169 image preciousdeveloper's profile picture
+                  170 link preciousdeveloper
+                    172 text preciousdeveloper
+                  173 text  
+                  174 link 2h
+                    175 time
+                      176 text 2h
+                  177 text Prompt
+                  178 button Like
+                    179 text Like
+                  180 button Reply
+                    181 text Reply
+                  182 link mayowathefirst's profile picture
+                    183 image mayowathefirst's profile picture
+                  184 link mayowathefirst
+                    186 text mayowathefirst
+                  187 text  
+                  188 link 2h
+                    189 time
+                      190 text 2h
+                  191 text Prompt
+                  192 button Like
+                    193 text Like
+                  194 button Reply
+                    195 text Reply
+                  196 link dexterbrians's profile picture
+                    197 image dexterbrians's profile picture
+                  198 link dexterbrians
+                    200 text dexterbrians
+                  201 text  
+                  202 link 2h
+                    203 time
+                      204 text 2h
+                  205 text prompt
+                  206 button Like
+                    207 text Like
+                  208 button Reply
+                    209 text Reply
+                  210 link amurepinho's profile picture
+                    211 image amurepinho's profile picture
+                  212 link amurepinho Verified
+                    213 generic
+                      214 text amurepinho
+                      216 image Verified
+                  217 text  
+                  218 link 3h
+                    219 time
+                      220 text 3h
+                  221 text Prompt
+                  222 button Like
+                    223 text Like
+                  224 button Reply
+                    225 text Reply
+                  226 link prem_sanisetty's profile picture
+                    227 image prem_sanisetty's profile picture
+                  228 link prem_sanisetty
+                    230 text prem_sanisetty
+                  231 text  
+                  232 link 4h
+                    233 time
+                      234 text 4h
+                  235 text 🙌
+                  236 button Like
+                    237 text Like
+                  238 button Reply
+                    239 text Reply
+                  240 link theo.saas1's profile picture
+                    241 image theo.saas1's profile picture
+                  242 link theo.saas1
+                    244 text theo.saas1
+                  245 text  
+                  246 link 6h
+                    247 time
+                      248 text 6h
+                  249 text It's a lot of sued 😢
+                  250 button Like
+                    251 text Like
+                  252 button Reply
+                    253 text Reply
+                  254 link christopher_kroess's profile picture
+                    255 image christopher_kroess's profile picture
+                  256 link christopher_kroess
+                    258 text christopher_kroess
+                  259 text  
+                  260 link 7h
+                    261 time
+                      262 text 7h
+                  263 text 😮
+                  264 button Like
+                    265 text Like
+                  266 button Reply
+                    267 text Reply
+                  268 link hasan__mab's profile picture
+                    269 image hasan__mab's profile picture
+                  270 link hasan__mab
+                    272 text hasan__mab
+                  273 text  
+                  274 link 9h
+                    275 time
+                      276 text 9h
+                  277 text Prompt
+                  278 button Like
+                    279 text Like
+                  280 button Reply
+                    281 text Reply
+                  282 link enthukutlet's profile picture
+                    283 image enthukutlet's profile picture
+                  284 link enthukutlet Verified
+                    285 generic
+                      286 text enthukutlet
+                      288 image Verified
+                  289 text  
+                  290 link 10h
+                    291 time
+                      292 text 10h
+                  293 text Prompt
+                  294 button Like
+                    295 text Like
+                  296 button Reply
+                    297 text Reply
+                  298 link adreymuks's profile picture
+                    299 image adreymuks's profile picture
+                  300 link adreymuks
+                    302 text adreymuks
+                  303 text  
+                  304 link 11h
+                    305 time
+                      306 text 11h
+                  307 text Prompt
+                  308 button Like
+                    309 text Like
+                  310 button Reply
+                    311 text Reply
+                  312 link _tinomu's profile picture
+                    313 image _tinomu's profile picture
+                  314 link _tinomu
+                    316 text _tinomu
+                  317 text  
+                  318 link 12h
+                    319 time
+                      320 text 12h
+                  321 text Claude pliz fix
+                  322 button Like
+                    323 text Like
+                  324 button Reply
+                    325 text Reply
+                  326 link john_galt_sk's profile picture
+                    327 image john_galt_sk's profile picture
+                  328 link john_galt_sk
+                    330 text john_galt_sk
+                  331 text  
+                  332 link 13h
+                    333 time
+                      334 text 13h
+                  335 text The problem is California here.
+                  336 button Like
+                    337 text Like
+                  338 button Reply
+                    339 text Reply
+                  340 progressbar
+                    341 image Loading...
+                342 generic
+                  343 element
+                    344 button Like
+                      345 image Like
+                  346 button 32.6K
+                    347 text 32.6K
+                  348 button Comment
+                    349 image Comment
+                  350 button 6.3K
+                    351 text 6.3K
+                  352 button Share
+                    353 image Share
+                  354 button Save
+                    355 image Save
+                357 link September 27
+                  358 time
+                    359 text September 27
+                360 generic
+                  361 link Log in
+                    362 text Log in
+                  363 text  to like or comment.
+            365 separator
+            366 generic
+              368 generic
+                369 text More posts from 
+                370 link adilet.fndr
+                  371 text adilet.fndr
+              372 generic
+                373 generic
+                  375 link Clip
+                    376 generic
+                      377 generic
+                      378 generic
+                    381 image Clip
+                  383 link Clip
+                    384 generic
+                      385 generic
+                      386 generic
+                    389 image Clip
+                  391 link Clip
+                    392 generic
+                      393 generic
+                      394 generic
+                    397 image Clip
+                398 generic
+                  400 link Clip
+                    401 generic
+                      402 generic
+                      403 generic
+                    406 image Clip
+                  408 link Clip
+                    409 generic
+                      410 generic
+                      411 generic
+                    414 image Clip
+                  416 link Clip
+                    417 generic
+                      418 generic
+                      419 generic
+                    422 image Clip
+                423 generic
+                  425 link Clip
+                    426 generic
+                      427 generic
+                      428 generic
+                    431 image Clip
+                  433 link Clip
+                    434 generic
+                      435 generic
+                      436 generic
+                    439 image Clip
+                  441 link Clip
+                    442 generic
+                      443 generic
+                      444 generic
+                    447 image Clip
+              448 generic
+                450 link See more posts
+                  451 text See more posts
+                452 separator
+          453 contentinfo
+            454 generic
+              456 generic
+                458 link Meta
+                  459 text Meta
+                461 link About
+                  462 text About
+                464 link Blog
+                  465 text Blog
+                467 link Jobs
+                  468 text Jobs
+                470 link Help
+                  471 text Help
+                473 link API
+                  474 text API
+                476 link Privacy
+                  477 text Privacy
+                479 link Terms
+                  480 text Terms
+                482 link Locations
+                  483 text Locations
+                485 link Popular
+                  486 text Popular
+                488 link Instagram Lite
+                  489 text Instagram Lite
+                491 link Meta AI
+                  492 text Meta AI
+                494 link Muse
+                  495 text Muse
+                497 link Threads
+                  498 text Threads
+                500 link Contact Uploading & Non-Users
+                  501 text Contact Uploading & Non-Users
+                503 link Meta Verified
+                  504 text Meta Verified
+              505 generic
+                506 element English
+                  507 text English
+                  509 image Down chevron icon
+                  510 combo box Switch Display Language, Value: English, Secondary actions: Expand
+                    511 option Afrikaans
+                    512 option العربية
+                    513 option Čeština
+                    514 option Dansk
+                    515 option Deutsch
+                    516 option Ελληνικά
+                    517 option English, selected
+                    518 option English (UK)
+                    519 option Español (España)
+                    520 option Español
+                    521 option فارسی
+                    522 option Suomi
+                    523 option Français
+                    524 option עברית
+                    525 option Bahasa Indonesia
+                    526 option Italiano
+                    527 option 日本語
+                    528 option 한국어
+                    529 option Bahasa Melayu
+                    530 option Norsk
+                    531 option Nederlands
+                    532 option Polski
+                    533 option Português (Brasil)
+                    534 option Português (Portugal)
+                    535 option Русский
+                    536 option Svenska
+                    537 option ภาษาไทย
+                    538 option Filipino
+                    539 option Türkçe
+                    540 option 中文(简体)
+                    541 option 中文(台灣)
+                    542 option বাংলা
+                    543 option ગુજરાતી
+                    544 option हिन्दी
+                    545 option Hrvatski
+                    546 option Magyar
+                    547 option ಕನ್ನಡ
+                    548 option മലയാളം
+                    549 option मराठी
+                    550 option नेपाली
+                    551 option ਪੰਜਾਬੀ
+                    552 option සිංහල
+                    553 option Slovenčina
+                    554 option தமிழ்
+                    555 option తెలుగు
+                    556 option اردو
+                    557 option Tiếng Việt
+                    558 option 中文(香港)
+                    559 option Български
+                    560 option Français (Canada)
+                    561 option Română
+                    562 option Српски
+                    563 option Українська
+                565 text © 2026 Instagram from Meta
+    566 generic
+                    567 MenuListPopup
+                  571 group Video player
+                    573 generic
+                    574 slider Adjust volume
+                      576 generic
+                        578 button Audio is muted
+                        579 generic
+                          581 image Audio is muted
+                  582 Video
+{"capture":{"captureId":"capture_1e6be730-9f13-43c4-87d7-7db1d62e6b16","coordinateSpace":"css-pixel","height":712,"mimeType":"image/png","mode":"viewport","width":1265}}

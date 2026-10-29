@@ -1,0 +1,7 @@
+In-app Browser JS state was preserved. Completed actions were not rolled back; refresh stale UI handles and continue only the remaining work.
+{"code":"REF_NOT_INTERACTABLE","method":"browser_click","callIndex":2,"nextAction":"inspect_target"}
+ERROR REF_NOT_INTERACTABLE
+{"control":{"documentRevision":"rev_b21c2720-9ad1-4e73-b8b2-3d07861fef08","error":{"code":"REF_NOT_INTERACTABLE","retryable":true},"requiresSnapshot":true,"status":"error","tabId":"tab_5cc700cb-d9b8-4d42-acdd-d07064284002"},"kind":"error","schema":"manus.browser/v1"}
+Check the target and its supported actions first: a label is not its control. Reacquire the intended target from fresh context. If it supports the requested action, inspect current page evidence for a disabled, occluded or offscreen target. Use a fresh screenshot when geometry is needed; do not repeat unchanged input.
+ERROR REF_NOT_INTERACTABLE
+{"control":{"documentRevision":"rev_b21c2720-9ad1-4e73-b8b2-3d07861fef08","error":{"code":"REF_NOT_INTERACTABLE","retryable":true},"requiresSnapshot":true,"status":"error","tabId":"tab_5cc700cb-d9b8-4d42-acdd-d07064284002"},"kind":"error","schema":"manus.browser/v1"}

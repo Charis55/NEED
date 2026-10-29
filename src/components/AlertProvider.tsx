@@ -69,7 +69,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   return (
     <AlertContext.Provider value={{ showAlert }}>
       {children}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-4 max-w-sm w-full pointer-events-none">
+      <div className="fixed top-[max(calc(env(safe-area-inset-top)+0.5rem),1.25rem)] left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-[9999] flex flex-col gap-3 pointer-events-none">
         <AnimatePresence>
           {alerts.map((alert) => {
             const { bg, icon: Icon } = getAlertStyles(alert.type);
@@ -79,20 +79,20 @@ export function AlertProvider({ children }: { children: ReactNode }) {
                 initial={{ opacity: 0, x: 50, scale: 0.9 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 100, scale: 0.9 }}
-                className={`${bg} border-4 border-black p-4 brutal-shadow flex items-start justify-between pointer-events-auto ${alert.action ? "cursor-pointer hover:scale-[1.02] transition-transform" : ""}`}
+                className={`${bg} border-4 border-black p-3.5 sm:p-4 brutal-shadow flex items-start justify-between pointer-events-auto max-w-full overflow-hidden ${alert.action ? "cursor-pointer hover:scale-[1.02] transition-transform" : ""}`}
                 onClick={alert.action ? () => { alert.action?.onClick(); removeAlert(alert.id); } : undefined}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   {alert.avatarUrl ? (
                     <img src={alert.avatarUrl} alt="Avatar" className="w-10 h-10 border-2 border-black object-cover bg-white shrink-0" />
                   ) : (
-                    <Icon className="w-6 h-6 stroke-[3] text-black shrink-0" />
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3] text-black shrink-0" />
                   )}
-                  <p className="font-black uppercase text-black text-sm leading-tight">{alert.message}</p>
+                  <p className="font-black uppercase text-black text-xs sm:text-sm leading-tight break-words [overflow-wrap:anywhere] min-w-0">{alert.message}</p>
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); removeAlert(alert.id); }}
-                  className="w-6 h-6 bg-white border-2 border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors shrink-0 ml-4"
+                  className="w-6 h-6 bg-white border-2 border-black flex items-center justify-center hover:bg-black hover:text-white transition-colors shrink-0 ml-3"
                 >
                   <X className="w-4 h-4 stroke-[3]" />
                 </button>

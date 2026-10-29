@@ -1,0 +1,724 @@
+{
+    "operations":  [
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_4a3ef3dd94a04158",
+                                             "at":  {
+                                                        "seconds":  0
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_3d35f584c94640a7",
+                                             "at":  {
+                                                        "seconds":  0.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_89fabb31d30b4c7f",
+                                             "at":  {
+                                                        "seconds":  1
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ab2d50025ebf4c1e",
+                                             "at":  {
+                                                        "seconds":  1.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_357c393a99464a67",
+                                             "at":  {
+                                                        "seconds":  2
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_3a57cbbf665442ef",
+                                             "at":  {
+                                                        "seconds":  2.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_565e3557cfba4ab1",
+                                             "at":  {
+                                                        "seconds":  3
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ec5674090a1f4dd2",
+                                             "at":  {
+                                                        "seconds":  3.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_4f939b981ad24288",
+                                             "at":  {
+                                                        "seconds":  4
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_8a2dfd3d16674431",
+                                             "at":  {
+                                                        "seconds":  4.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ec6a257ae83f4d04",
+                                             "at":  {
+                                                        "seconds":  5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_e39e63ffa8a34cf2",
+                                             "at":  {
+                                                        "seconds":  5.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_c1455ba031d04e7f",
+                                             "at":  {
+                                                        "seconds":  6
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_97ecef1685e0475d",
+                                             "at":  {
+                                                        "seconds":  6.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_25ee5b51a69f4604",
+                                             "at":  {
+                                                        "seconds":  7
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_48c2243291524172",
+                                             "at":  {
+                                                        "seconds":  7.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_d03d8852860e47db",
+                                             "at":  {
+                                                        "seconds":  8
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ac6767587ac541d8",
+                                             "at":  {
+                                                        "seconds":  8.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_034d277769b041ec",
+                                             "at":  {
+                                                        "seconds":  9
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_7081b98cfc2f4979",
+                                             "at":  {
+                                                        "seconds":  9.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_9c7c3b79e2d0440e",
+                                             "at":  {
+                                                        "seconds":  10
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ec238e67b7474e4c",
+                                             "at":  {
+                                                        "seconds":  10.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_57c2a727279b4788",
+                                             "at":  {
+                                                        "seconds":  11
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_a263cdb801ee4539",
+                                             "at":  {
+                                                        "seconds":  11.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_5876be68c84d4133",
+                                             "at":  {
+                                                        "seconds":  12
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ba8d153266154dfc",
+                                             "at":  {
+                                                        "seconds":  12.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_06e675ed33b54a4d",
+                                             "at":  {
+                                                        "seconds":  13
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_b7d6b216fe8241e3",
+                                             "at":  {
+                                                        "seconds":  13.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_791f29a623064b69",
+                                             "at":  {
+                                                        "seconds":  14
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_47189e708cfb4810",
+                                             "at":  {
+                                                        "seconds":  14.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_9bcc38d3720641e5",
+                                             "at":  {
+                                                        "seconds":  15
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_c1dbbee54d6348b6",
+                                             "at":  {
+                                                        "seconds":  15.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_8496d887b94c46f2",
+                                             "at":  {
+                                                        "seconds":  16
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_6ad02d31ff71437e",
+                                             "at":  {
+                                                        "seconds":  16.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_c588a649925142c9",
+                                             "at":  {
+                                                        "seconds":  17
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_41ea47d3f39748ee",
+                                             "at":  {
+                                                        "seconds":  17.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_a61a92138de8468c",
+                                             "at":  {
+                                                        "seconds":  18
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_79efb4341a8a43b0",
+                                             "at":  {
+                                                        "seconds":  18.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_503f2224b92f4cc4",
+                                             "at":  {
+                                                        "seconds":  19
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_a1e458bd81274369",
+                                             "at":  {
+                                                        "seconds":  19.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_6f3cde340dc748fb",
+                                             "at":  {
+                                                        "seconds":  20
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_1aa7c3c2d730481b",
+                                             "at":  {
+                                                        "seconds":  20.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ac4d03ec98194be4",
+                                             "at":  {
+                                                        "seconds":  21
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_2762eac02abb49b9",
+                                             "at":  {
+                                                        "seconds":  21.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_4dcf33384f5547b4",
+                                             "at":  {
+                                                        "seconds":  22
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_dde617a32e0b4810",
+                                             "at":  {
+                                                        "seconds":  22.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_acf0a19349344d57",
+                                             "at":  {
+                                                        "seconds":  23
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_6ca548b9e9444469",
+                                             "at":  {
+                                                        "seconds":  23.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_afede3f3048e4baa",
+                                             "at":  {
+                                                        "seconds":  24
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_f4a2cb5398ee4579",
+                                             "at":  {
+                                                        "seconds":  24.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_777d20a31f684d06",
+                                             "at":  {
+                                                        "seconds":  25
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_0e06d25cd2e84d3a",
+                                             "at":  {
+                                                        "seconds":  25.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_b188de2871ce46b0",
+                                             "at":  {
+                                                        "seconds":  26
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_ca9ab2009eb74fef",
+                                             "at":  {
+                                                        "seconds":  26.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_7278f90a227548cc",
+                                             "at":  {
+                                                        "seconds":  27
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_3b0a974fc124425c",
+                                             "at":  {
+                                                        "seconds":  27.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_f3eb70980b8840d7",
+                                             "at":  {
+                                                        "seconds":  28
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_313e1e6bc64b4ab7",
+                                             "at":  {
+                                                        "seconds":  28.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_0c1da83fb4b340be",
+                                             "at":  {
+                                                        "seconds":  29
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       },
+                       {
+                           "op":  "add_clips",
+                           "clips":  [
+                                         {
+                                             "mediaId":  "media_61e2cd92b6c3412b",
+                                             "at":  {
+                                                        "seconds":  29.5
+                                                    },
+                                             "durationSeconds":  0.5
+                                         }
+                                     ]
+                       }
+                   ]
+}

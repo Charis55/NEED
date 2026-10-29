@@ -6,7 +6,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "fire
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { UserAccount } from "@/types";
-import { ArrowRight, Phone } from "lucide-react";
+import { ArrowRight, Phone, AlertTriangle } from "lucide-react";
 import { sendCustomOtp, verifyCustomOtp } from "@/app/actions/authActions";
 
 interface PhoneAuthProps {
@@ -126,8 +126,11 @@ export default function PhoneAuth({ role, onSuccess, isLogin = true }: PhoneAuth
   return (
     <div className="w-full">
       {error && (
-        <div className="bg-[var(--color-brutal-red)] text-white p-4 brutal-border mb-6 font-bold text-sm">
-          {error}
+        <div className="bg-[var(--color-brutal-red)] text-black font-bold p-3.5 sm:p-4 border-4 border-black shadow-[4px_4px_0_0_#000] mb-6 text-xs sm:text-sm break-words [overflow-wrap:anywhere] max-w-full overflow-hidden flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 stroke-[2.5] text-black shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="font-black uppercase tracking-wider block leading-snug">{error}</span>
+          </div>
         </div>
       )}
 

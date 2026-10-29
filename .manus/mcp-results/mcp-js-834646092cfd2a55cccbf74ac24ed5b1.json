@@ -1,0 +1,4 @@
+In-app Browser JS state was preserved. Completed actions were not rolled back; refresh stale UI handles and continue only the remaining work.
+{"code":"INVALID_ARGUMENT","location":"at <anonymous> (in-app-browser.js:2:19)"}
+Expected a browser observation
+{"capture":{"captureId":"capture_500bfa3f-7ca7-4b00-b52f-bd880ad37fcd","coordinateSpace":"css-pixel","height":712,"mimeType":"image/png","mode":"viewport","width":1265}}
