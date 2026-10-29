@@ -2,15 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { getConfig } from "@/lib/platformConfig";
 import { writeJobEvent } from "@/lib/jobEvents";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { GuaranteeClaim, JobRequestData } from "@/types/platform";
 import { validateGuaranteeClaimEligibility } from "@/lib/guarantee";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { jobId, customerId, description, photos = [] } = body;
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
 
-    if (!jobId || !customerId || !description) {
+    const body = await req.json();
+    const { jobId, description, photos = [] } = body;
+    const customerId = authCheck.user.uid;
+
+    if (!jobId || !description) {
       return NextResponse.json({ error: "Missing required claim details" }, { status: 400 });
     }
 

@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordManualArrival } from "@/lib/locationTracker";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
+
     const { id: jobId } = await params;
     const body = await req.json();
-    const { artisanId, lat, lng } = body;
+    const { lat, lng } = body;
+    const artisanId = authCheck.user.uid;
 
-    if (!jobId || !artisanId) {
-      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
+    if (!jobId) {
+      return NextResponse.json({ error: "Missing required jobId parameter" }, { status: 400 });
     }
 
     const result = await recordManualArrival({ jobId, artisanId, lat, lng });

@@ -8,6 +8,7 @@ import { doc, onSnapshot, writeBatch } from "firebase/firestore";
 import { JobRequest } from "@/types";
 import { Wallet as WalletType } from "@/types/platform";
 import { useAlert } from "./AlertProvider";
+import { apiFetch } from "@/utils/apiBase";
 
 interface PayCommissionModalProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export default function PayCommissionModal({
     setError("");
 
     try {
-      const res = await fetch("/api/wallet/pay-commission", {
+      const res = await apiFetch("/api/wallet/pay-commission", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { paymentProvider } from "@/lib/paystack";
 import { BankAccount } from "@/types/platform";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,9 +16,23 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, accountNumber, bankCode, bankName } = await req.json();
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
 
-    if (!userId || !accountNumber || !bankCode || !bankName) {
+    const { userId: bodyUserId, accountNumber, bankCode, bankName } = await req.json();
+
+    // Enforce that caller can only modify their own bank account (prevent IDOR)
+    const authenticatedUid = authCheck.user.uid;
+    if (bodyUserId && bodyUserId !== authenticatedUid) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot register bank account for another user" },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    const userId = authenticatedUid;
+
+    if (!accountNumber || !bankCode || !bankName) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 

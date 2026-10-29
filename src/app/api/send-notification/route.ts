@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminApp_ } from "@/lib/firebaseAdmin";
 import { getMessaging } from "firebase-admin/messaging";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
+    const internalSecret = req.headers.get("x-internal-secret");
+    const isInternal = Boolean(process.env.CRON_SECRET && internalSecret === process.env.CRON_SECRET);
+
+    let senderUid: string | null = null;
+    if (!isInternal) {
+      const authCheck = await verifyUserRequest(req);
+      if (authCheck.errorResponse) {
+        return authCheck.errorResponse;
+      }
+      senderUid = authCheck.user.uid;
+    }
+
     const { userId, title, body, data } = await req.json();
 
     if (!userId || !title || !body) {
@@ -15,6 +28,7 @@ export async function POST(req: NextRequest) {
     const notifPayload = {
       id: notifRef.id,
       userId,
+      senderId: senderUid || "system",
       title,
       body,
       data: data || {},

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Strike } from "@/types/platform";
+import { apiFetch } from "@/utils/apiBase";
 import StrikeAppealModal from "./StrikeAppealModal";
 import { 
   ShieldCheck, 
@@ -33,7 +34,7 @@ export default function AccountStrikesSection({
     if (!userId) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/strikes/my-strikes?userId=${userId}`);
+      const res = await apiFetch(`/api/strikes/my-strikes?userId=${userId}`);
       const data = await res.json();
       if (data.strikes) {
         setStrikes(data.strikes);

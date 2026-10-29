@@ -1,24 +1,34 @@
-import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
-import TechnicianApprovedEmail from '@/emails/TechnicianApprovedEmail';
-import AccountDeletedEmail from '@/emails/AccountDeletedEmail';
-import WelcomeCustomerEmail from '@/emails/WelcomeCustomerEmail';
-import WelcomeTechnicianEmail from '@/emails/WelcomeTechnicianEmail';
-import NewJobRequestEmail from '@/emails/NewJobRequestEmail';
-import JobCompletedEmail from '@/emails/JobCompletedEmail';
+import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
+import TechnicianApprovedEmail from "@/emails/TechnicianApprovedEmail";
+import AccountDeletedEmail from "@/emails/AccountDeletedEmail";
+import WelcomeCustomerEmail from "@/emails/WelcomeCustomerEmail";
+import WelcomeTechnicianEmail from "@/emails/WelcomeTechnicianEmail";
+import NewJobRequestEmail from "@/emails/NewJobRequestEmail";
+import JobCompletedEmail from "@/emails/JobCompletedEmail";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Endpoint disabled in production" }, { status: 404 });
+  }
+
+  const adminCheck = await verifyAdminRequest(req);
+  if (adminCheck.errorResponse) {
+    return adminCheck.errorResponse;
+  }
+
   try {
     const toEmail = "obunezicharis@gmail.com";
-    const fromAddress = 'NEED App <onboarding@resend.dev>';
+    const fromAddress = "NEED App <onboarding@resend.dev>";
 
     // 1. Technician Approved
     await resend.emails.send({
       from: fromAddress,
       to: [toEmail],
-      subject: '[TEST] Technician Approved',
+      subject: "[TEST] Technician Approved",
       react: TechnicianApprovedEmail({ technicianName: "Charis" }),
     });
 
@@ -26,7 +36,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: fromAddress,
       to: [toEmail],
-      subject: '[TEST] Account Deleted',
+      subject: "[TEST] Account Deleted",
       react: AccountDeletedEmail({ userName: "Charis" }),
     });
 
@@ -34,7 +44,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: fromAddress,
       to: [toEmail],
-      subject: '[TEST] Welcome Customer',
+      subject: "[TEST] Welcome Customer",
       react: WelcomeCustomerEmail({ userName: "Charis" }),
     });
 
@@ -42,7 +52,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: fromAddress,
       to: [toEmail],
-      subject: '[TEST] Welcome Technician',
+      subject: "[TEST] Welcome Technician",
       react: WelcomeTechnicianEmail({ technicianName: "Charis" }),
     });
 
@@ -50,7 +60,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: fromAddress,
       to: [toEmail],
-      subject: '[TEST] New Job Request',
+      subject: "[TEST] New Job Request",
       react: NewJobRequestEmail({ 
         technicianName: "Charis", 
         customerName: "John Doe",
@@ -64,7 +74,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: fromAddress,
       to: [toEmail],
-      subject: '[TEST] Job Completed (Receipt)',
+      subject: "[TEST] Job Completed (Receipt)",
       react: JobCompletedEmail({ 
         customerName: "John Doe",
         technicianName: "Charis",
@@ -75,7 +85,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, message: "All 6 emails sent!" });
   } catch (error: any) {
-    console.error('Error sending test emails:', error);
+    console.error("Error sending test emails:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

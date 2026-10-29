@@ -13,6 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import BookingTermsCheckbox from "@/components/BookingTermsCheckbox";
 import { to12HourFormat } from "@/utils/formatTime";
+import { apiFetch } from "@/utils/apiBase";
 
 export default function MultiServiceBroadcastJobPage({ 
   params,
@@ -126,7 +127,7 @@ export default function MultiServiceBroadcastJobPage({
     const formData = new FormData();
     formData.append("file", file, file.name);
 
-    const res = await fetch('/api/upload-direct', {
+    const res = await apiFetch('/api/upload-direct', {
       method: 'POST',
       body: formData
     });

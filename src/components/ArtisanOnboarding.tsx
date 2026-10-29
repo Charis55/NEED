@@ -13,6 +13,7 @@ import { reverseGeocode } from "@/utils/location";
 import { ShieldCheck, AlertTriangle, CheckCircle, Loader2, Camera, ExternalLink, UserCheck, Lock, Clock, MapPin } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { pickNativePhoto, pickNativePhotos } from "@/utils/nativeCamera";
+import { apiFetch } from "@/utils/apiBase";
 
 const tradeCategories = Object.values(servicesData);
 
@@ -151,7 +152,7 @@ export default function ArtisanOnboarding() {
       if (!user) throw new Error("Not authenticated");
 
       // 1. Create a verification session on our backend
-      const res = await fetch("/api/verify", {
+      const res = await apiFetch("/api/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.uid }),
@@ -347,7 +348,7 @@ export default function ArtisanOnboarding() {
       const uploadFileToR2 = async (file: File) => {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
+        const res = await apiFetch('/api/upload-direct', { method: 'POST', body: formData });
         if (!res.ok) throw new Error("Failed to upload file");
         const { publicUrl } = await res.json();
         return publicUrl;
@@ -485,7 +486,7 @@ export default function ArtisanOnboarding() {
       });
 
       // Trigger Welcome Technician Email
-      fetch('/api/emails/welcome-technician', {
+      apiFetch('/api/emails/welcome-technician', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ artisanId: user.uid }),

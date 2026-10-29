@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Strike } from "@/types/platform";
 import { compressImage } from "@/utils/imageCompression";
+import { apiFetch } from "@/utils/apiBase";
 import { 
   X, 
   Upload, 
@@ -63,7 +64,7 @@ export default function StrikeAppealModal({
         const formData = new FormData();
         formData.append("file", fileToUpload);
 
-        const res = await fetch("/api/upload-direct", {
+        const res = await apiFetch("/api/upload-direct", {
           method: "POST",
           body: formData
         });
@@ -103,7 +104,7 @@ export default function StrikeAppealModal({
     setErrorMsg(null);
 
     try {
-      const res = await fetch("/api/strikes/appeal", {
+      const res = await apiFetch("/api/strikes/appeal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

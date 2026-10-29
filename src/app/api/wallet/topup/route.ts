@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { paymentProvider } from "@/lib/paystack";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,17 +14,23 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { userId, amount, email: clientEmail, source, callbackUrl: clientCallbackUrl } = body; // amount in kobo
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
 
-    if (!userId || !amount || amount < 10000) { // Min N100
+    const body = await req.json();
+    const { amount, email: clientEmail, source, callbackUrl: clientCallbackUrl } = body; // amount in kobo
+    const userId = authCheck.user.uid;
+
+    if (!amount || amount < 10000) { // Min N100
       return NextResponse.json(
         { error: "Invalid topup parameters (minimum ₦100)" },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    let email = clientEmail;
+    let email = clientEmail || authCheck.user.email;
     if (!email) {
       try {
         const { adminDb } = await import("@/lib/firebaseAdmin");

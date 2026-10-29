@@ -763,7 +763,7 @@ export default function GlobalCallManager() {
         "activeCall.bothConnectedAt": timestamp,
       });
       // Notify server transition endpoint to record joined state and sync in-memory registry
-      fetch("/api/calls/transition", {
+      apiFetch("/api/calls/transition", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

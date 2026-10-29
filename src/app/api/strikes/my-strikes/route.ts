@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { Strike } from "@/types/platform";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") || req.headers.get("x-user-id");
-
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
     }
+
+    const { searchParams } = new URL(req.url);
+    const requestedUserId = searchParams.get("userId");
+
+    const isAdmin = authCheck.user.email === "obunezicharis@gmail.com";
+    const effectiveUserId = isAdmin && requestedUserId ? requestedUserId : authCheck.user.uid;
 
     const strikesSnap = await adminDb
       .collection("strikes")
-      .where("userId", "==", userId)
+      .where("userId", "==", effectiveUserId)
       .get();
 
     const strikes: Strike[] = strikesSnap.docs.map((doc) => {

@@ -18,6 +18,7 @@ import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, Help
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
 import { isNativeApp } from "@/utils/platform";
+import { apiFetch } from "@/utils/apiBase";
 
 interface SharedSettingsProps {
   isArtisan?: boolean;
@@ -212,7 +213,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
         const uploadFileToR2 = async (file: File) => {
           const formData = new FormData();
           formData.append("file", file);
-          const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
+          const res = await apiFetch('/api/upload-direct', { method: 'POST', body: formData });
           if (!res.ok) throw new Error("Failed to upload file");
           const { publicUrl } = await res.json();
           return publicUrl;
@@ -332,7 +333,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       const formData = new FormData();
       formData.append("file", compressed, `${user.uid}_${Date.now()}.jpg`);
-      const res = await fetch('/api/upload-direct', { method: 'POST', body: formData });
+      const res = await apiFetch('/api/upload-direct', { method: 'POST', body: formData });
       if (!res.ok) throw new Error("Failed to upload profile picture");
       const { publicUrl } = await res.json();
 
@@ -355,7 +356,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       showAlert("Profile picture updated!", "success");
 
       if (oldPhotoURL && !oldPhotoURL.includes("firebasestorage.googleapis.com")) {
-        fetch('/api/delete-file', {
+        apiFetch('/api/delete-file', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: oldPhotoURL })
@@ -483,7 +484,7 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       const idToken = await authUser.getIdToken();
 
-      const res = await fetch("/api/delete-account", {
+      const res = await apiFetch("/api/delete-account", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${idToken}`,

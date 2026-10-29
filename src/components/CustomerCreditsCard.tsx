@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
+import { apiFetch } from "@/utils/apiBase";
 import { CustomerCredit } from "@/types/platform";
 import { 
   Gift, 
@@ -40,7 +41,7 @@ export default function CustomerCreditsCard({
 
     try {
       setLoading(true);
-      const res = await fetch(`/api/credits/my-credits?customerId=${targetId}`);
+      const res = await apiFetch(`/api/credits/my-credits?customerId=${targetId}`);
       const data = await res.json();
       if (data.success) {
         setAvailableBalanceKobo(data.availableBalanceKobo || 0);

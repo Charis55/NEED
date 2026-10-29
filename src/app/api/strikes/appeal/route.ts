@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { submitStrikeAppeal } from "@/lib/strikes";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { strikeId, userId, appealNote, appealEvidencePhotos } = body;
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
 
-    if (!strikeId || !userId || !appealNote?.trim()) {
+    const body = await req.json();
+    const { strikeId, appealNote, appealEvidencePhotos } = body;
+    const userId = authCheck.user.uid;
+
+    if (!strikeId || !appealNote?.trim()) {
       return NextResponse.json(
-        { error: "strikeId, userId, and appealNote are required" },
+        { error: "strikeId and appealNote are required" },
         { status: 400 }
       );
     }

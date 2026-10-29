@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { writeJobEvent } from "@/lib/jobEvents";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { JobRequestData, QuoteRevision } from "@/types/platform";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
+
     const { id: jobId } = await params;
     const body = await req.json();
-    const { artisanId, additionalAmount, reason, photos = [] } = body;
+    const { additionalAmount, reason, photos = [] } = body;
+    const artisanId = authCheck.user.uid;
 
-    if (!jobId || !artisanId || !additionalAmount || !reason) {
+    if (!jobId || !additionalAmount || !reason) {
       return NextResponse.json({ error: "Missing required revision fields" }, { status: 400 });
     }
 
@@ -58,11 +65,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
+
     const { id: jobId } = await params;
     const body = await req.json();
-    const { revisionId, customerId, action } = body; // action: "approve" | "reject"
+    const { revisionId, action } = body; // action: "approve" | "reject"
+    const customerId = authCheck.user.uid;
 
-    if (!jobId || !revisionId || !customerId || !action) {
+    if (!jobId || !revisionId || !action) {
       return NextResponse.json({ error: "Missing required resolution fields" }, { status: 400 });
     }
 

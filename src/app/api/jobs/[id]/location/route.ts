@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordLocationPing } from "@/lib/locationTracker";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
+
     const { id: jobId } = await params;
     const body = await req.json();
-    const { artisanId, lat, lng } = body;
+    const { lat, lng } = body;
+    const artisanId = authCheck.user.uid;
 
-    if (!jobId || !artisanId || typeof lat !== "number" || typeof lng !== "number") {
+    if (!jobId || typeof lat !== "number" || typeof lng !== "number") {
       return NextResponse.json({ error: "Missing required location parameters" }, { status: 400 });
     }
 

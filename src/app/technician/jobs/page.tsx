@@ -12,6 +12,7 @@ import { AlertTriangle, Mailbox, MapPin, Clock, Map as MapIcon, MessageSquare, C
 import { useAlert } from "@/components/AlertProvider";
 import { Capacitor } from "@capacitor/core";
 import { formatDateTime12Hour } from "@/utils/formatTime";
+import { apiFetch } from "@/utils/apiBase";
 
 export default function ArtisanDashboard() {
   const { showAlert } = useAlert();
@@ -188,7 +189,7 @@ export default function ArtisanDashboard() {
       // Send push notification to customer
       if (job.customerId) {
         const requiresDeposit = !job.depositPaid || job.depositStatus !== "held";
-        fetch("/api/send-notification", {
+        apiFetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -238,7 +239,7 @@ export default function ArtisanDashboard() {
 
       // Send push notification to customer
       if (job.customerId) {
-        fetch("/api/send-notification", {
+        apiFetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -349,7 +350,7 @@ export default function ArtisanDashboard() {
       
       // Trigger Job Completed (Receipt) Email if marked as completed
       if ((newStatus === "completed" || newStatus === "payment_pending") && req && user) {
-        fetch('/api/emails/job-completed', {
+        apiFetch('/api/emails/job-completed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -379,7 +380,7 @@ export default function ArtisanDashboard() {
         }
         
         if (["accepted", "en_route", "arrived", "in_progress", "completed", "payment_pending"].includes(newStatus)) {
-          fetch("/api/send-notification", {
+          apiFetch("/api/send-notification", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

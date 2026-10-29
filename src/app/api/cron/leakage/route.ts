@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { expireUnpaidDeposits, autoConfirmCompletions, reconcileLedger } from "@/lib/settlement";
 import { runNightlyLeakageDetection } from "@/lib/leakage";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     const secret = process.env.CRON_SECRET;
-    if (secret && authHeader !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const isCronAuthorized = Boolean(secret && authHeader === `Bearer ${secret}`);
+
+    if (!isCronAuthorized) {
+      const adminCheck = await verifyAdminRequest(req);
+      if (adminCheck.errorResponse) {
+        return NextResponse.json({ error: "Unauthorized cron trigger" }, { status: 401 });
+      }
     }
 
     const { task = "all" } = await req.json().catch(() => ({ task: "all" }));

@@ -1,29 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebaseAdminAuth";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { getCustomerCreditSummary } from "@/lib/customerCredits";
 
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
+
     const searchParams = req.nextUrl.searchParams;
-    let customerId = searchParams.get("customerId");
+    const requestedCustomerId = searchParams.get("customerId");
 
-    // Also support Bearer token if query param is not supplied
-    if (!customerId) {
-      const authHeader = req.headers.get("authorization");
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        try {
-          const idToken = authHeader.split("Bearer ")[1];
-          const decoded = await adminAuth.verifyIdToken(idToken);
-          customerId = decoded.uid;
-        } catch {
-          // Token invalid, customerId remains undefined
-        }
-      }
-    }
-
-    if (!customerId) {
-      return NextResponse.json({ error: "Missing customerId parameter or valid auth token" }, { status: 400 });
-    }
+    const isAdmin = authCheck.user.email === "obunezicharis@gmail.com";
+    const customerId = (isAdmin && requestedCustomerId) ? requestedCustomerId : authCheck.user.uid;
 
     const summary = await getCustomerCreditSummary(customerId);
 

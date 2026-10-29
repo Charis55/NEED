@@ -49,9 +49,12 @@ export async function POST(req: Request) {
 
   const webhookSecret = process.env.DIDIT_WEBHOOK_SECRET;
 
-  // If no webhook secret is configured, log the event but skip signature verification
-  // This allows the integration to work during development before webhook is configured
+  // If no webhook secret is configured, reject in production to prevent unauthorized KYC approvals
   if (!webhookSecret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("Didit webhook error: DIDIT_WEBHOOK_SECRET is missing in production environment. Rejecting webhook.");
+      return new Response("Webhook unconfigured", { status: 500 });
+    }
     console.warn("DIDIT_WEBHOOK_SECRET not set — skipping signature verification (DEV ONLY)");
     const parsed = JSON.parse(raw);
     await handleEvent(parsed);

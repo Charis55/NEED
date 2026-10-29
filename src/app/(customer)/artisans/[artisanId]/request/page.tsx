@@ -14,6 +14,7 @@ import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import BookingTermsCheckbox from "@/components/BookingTermsCheckbox";
 import { to12HourFormat } from "@/utils/formatTime";
+import { apiFetch } from "@/utils/apiBase";
 
 export default function RequestArtisanPage({ params }: { params: Promise<{ artisanId: string }> }) {
   const unwrappedParams = use(params);
@@ -108,7 +109,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        fetch(`/api/credits/my-credits?customerId=${user.uid}`)
+        apiFetch(`/api/credits/my-credits?customerId=${user.uid}`)
           .then((res) => res.json())
           .then((data) => {
             if (data.success) {
@@ -117,7 +118,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
           })
           .catch(console.error);
 
-        fetch(`/api/pairs/status?customerId=${user.uid}&artisanId=${unwrappedParams.artisanId}`)
+        apiFetch(`/api/pairs/status?customerId=${user.uid}&artisanId=${unwrappedParams.artisanId}`)
           .then((res) => res.json())
           .then((data) => {
             if (data.success) {
@@ -182,7 +183,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
     const formData = new FormData();
     formData.append("file", file, file.name);
 
-    const res = await fetch('/api/upload-direct', {
+    const res = await apiFetch('/api/upload-direct', {
       method: 'POST',
       body: formData
     });
@@ -268,7 +269,7 @@ export default function RequestArtisanPage({ params }: { params: Promise<{ artis
 
       const selectedServices = selectedServiceIndices.map(idx => artisan.services?.[idx] || { trade: artisan.trade, subcategory: artisan.subcategory });
       
-      const checkoutRes = await fetch("/api/checkout/initialize", {
+      const checkoutRes = await apiFetch("/api/checkout/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

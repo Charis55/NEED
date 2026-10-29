@@ -25,6 +25,7 @@ import { pickNativePhoto } from "@/utils/nativeCamera";
 import { triggerHaptic } from "@/utils/haptics";
 import { ImpactStyle } from "@capacitor/haptics";
 import { isNativeApp } from "@/utils/platform";
+import { apiFetch } from "@/utils/apiBase";
 
 
 export default function AuthForm() {
@@ -109,8 +110,12 @@ export default function AuthForm() {
           const formData = new FormData();
           formData.append("file", compressedFile);
 
-          const res = await fetch('/api/upload-direct', {
+          const token = await user.getIdToken();
+          const res = await apiFetch('/api/upload-direct', {
             method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
             body: formData
           });
           
@@ -239,7 +244,7 @@ export default function AuthForm() {
         if (chosenRole === "artisan") {
           window.location.assign("/onboarding");
         } else {
-          fetch('/api/emails/welcome-customer', {
+          apiFetch('/api/emails/welcome-customer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: user.uid }),

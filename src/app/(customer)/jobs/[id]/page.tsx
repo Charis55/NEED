@@ -233,7 +233,7 @@ function JobsContent() {
     }
     setPayingDeposit(true);
     try {
-      const res = await fetch("/api/checkout/initialize", {
+      const res = await apiFetch("/api/checkout/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -375,7 +375,7 @@ function JobsContent() {
 
     setSubmittingGuarantee(true);
     try {
-      const res = await fetch("/api/guarantee/claim", {
+      const res = await apiFetch("/api/guarantee/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

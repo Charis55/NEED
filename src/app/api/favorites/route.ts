@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { ArtisanProfile } from "@/types";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -7,12 +8,16 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
     }
+
+    const { searchParams } = new URL(req.url);
+    const requestedUserId = searchParams.get("userId");
+
+    const isAdmin = authCheck.user.email === "obunezicharis@gmail.com";
+    const userId = (isAdmin && requestedUserId) ? requestedUserId : authCheck.user.uid;
 
     // 1. Fetch user document to get savedArtisans array
     const userDocRef = adminDb.collection("users").doc(userId);
@@ -85,17 +90,22 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, artisanId, action } = await req.json();
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
 
-    if (!userId || !artisanId) {
+    const { artisanId, action } = await req.json();
+    const userId = authCheck.user.uid;
+
+    if (!artisanId) {
       return NextResponse.json(
-        { error: "userId and artisanId are required" },
+        { error: "artisanId is required" },
         { status: 400 }
       );
     }
 
     const userDocRef = adminDb.collection("users").doc(userId);
-    const userSnap = await userDocRef.get();
 
     if (action === "remove") {
       await userDocRef.set(

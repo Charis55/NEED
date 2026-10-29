@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { postLedgerEntry } from "@/lib/ledger";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { Wallet } from "@/types/platform";
 
 const corsHeaders = {
@@ -15,11 +16,17 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, amount, jobIds = [] } = await req.json();
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
 
-    if (!userId || typeof amount !== "number" || amount <= 0) {
+    const { amount, jobIds = [] } = await req.json();
+    const userId = authCheck.user.uid;
+
+    if (typeof amount !== "number" || amount <= 0) {
       return NextResponse.json(
-        { error: "Invalid parameters: userId and valid amount required" },
+        { error: "Invalid parameters: valid positive amount required" },
         { status: 400, headers: corsHeaders }
       );
     }

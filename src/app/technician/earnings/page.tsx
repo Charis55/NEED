@@ -34,6 +34,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import dynamicImport from "next/dynamic";
 import WalletCard from "@/components/WalletCard";
+import { apiFetch } from "@/utils/apiBase";
 
 const PaymentModal = dynamicImport(() => import("@/components/PaymentModal"), { ssr: false });
 
@@ -380,7 +381,7 @@ function EarningsContent() {
   const fetchWalletTx = async (userId: string) => {
     try {
       setLoadingTx(true);
-      const res = await fetch(`/api/wallet/transactions?userId=${userId}`);
+      const res = await apiFetch(`/api/wallet/transactions?userId=${userId}`);
       const data = await res.json();
       if (data.transactions) {
         setWalletTransactions(data.transactions);

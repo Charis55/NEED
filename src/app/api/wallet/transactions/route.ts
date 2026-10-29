@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { WalletTransaction, Payout } from "@/types/platform";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +34,17 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400, headers: corsHeaders });
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
     }
+
+    const { searchParams } = new URL(req.url);
+    const requestedUserId = searchParams.get("userId");
+
+    // Only administrators can view transactions belonging to another user
+    const isAdmin = authCheck.user.email === "obunezicharis@gmail.com";
+    const userId = (isAdmin && requestedUserId) ? requestedUserId : authCheck.user.uid;
 
     // 1. Fetch wallet transactions for user
     const txSnap = await adminDb

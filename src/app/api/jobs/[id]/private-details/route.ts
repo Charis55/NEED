@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { JobRequestData, JobPrivateDetails } from "@/types/platform";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id: jobId } = await params;
-    const userId = req.headers.get("x-user-id");
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
 
-    if (!jobId || !userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id: jobId } = await params;
+    const userId = authCheck.user.uid;
+
+    if (!jobId) {
+      return NextResponse.json({ error: "Missing jobId" }, { status: 400 });
     }
 
     const jobRef = adminDb.collection("jobRequests").doc(jobId);
@@ -26,7 +32,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Check user record for admin claim/role
     const userSnap = await adminDb.collection("users").doc(userId).get();
-    const isAdmin = userSnap.exists && (userSnap.data()?.isAdmin || userSnap.data()?.role === "admin");
+    const isAdmin =
+      authCheck.user.email === "obunezicharis@gmail.com" ||
+      (userSnap.exists && (userSnap.data()?.isAdmin || userSnap.data()?.role === "admin"));
 
     if (!isCustomer && !isArtisan && !isAdmin) {
       return NextResponse.json({ error: "Forbidden: Not a participant" }, { status: 403 });

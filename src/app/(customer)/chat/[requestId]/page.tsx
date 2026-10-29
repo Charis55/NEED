@@ -540,7 +540,7 @@ export default function ChatPage() {
     const fileObj = file instanceof File ? file : new File([file], name, { type: file.type || "application/octet-stream" });
     formData.append("file", fileObj, name);
 
-    const res = await fetch('/api/upload-direct', {
+    const res = await apiFetch('/api/upload-direct', {
       method: 'POST',
       body: formData
     });

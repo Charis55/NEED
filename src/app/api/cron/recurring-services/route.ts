@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { verifyAdminRequest } from "@/lib/adminAuthGuard";
 import { RecurringService } from "@/types/platform";
 
 export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get("authorization");
+    const secret = process.env.CRON_SECRET;
+    const isCronAuthorized = Boolean(secret && authHeader === `Bearer ${secret}`);
+
+    if (!isCronAuthorized) {
+      const adminCheck = await verifyAdminRequest(req);
+      if (adminCheck.errorResponse) {
+        return NextResponse.json({ error: "Unauthorized cron trigger" }, { status: 401 });
+      }
+    }
+
     const now = Date.now();
     const query = adminDb
       .collection("recurringServices")

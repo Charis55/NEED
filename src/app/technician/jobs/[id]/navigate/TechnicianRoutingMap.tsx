@@ -9,6 +9,7 @@ import { Navigation } from 'lucide-react';
 import { enableKeepAwake, disableKeepAwake } from '@/utils/keepAwake';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+import { apiFetch } from '@/utils/apiBase';
 
 // Helper function to calculate distance between two coordinates in meters
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -115,7 +116,7 @@ export default function TechnicianRoutingMap({
 
             // Server authoritative location trail & geofence arrival check
             if (currentUserId) {
-              fetch(`/api/jobs/${jobId}/location`, {
+              apiFetch(`/api/jobs/${jobId}/location`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

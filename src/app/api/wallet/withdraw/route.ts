@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { paymentProvider } from "@/lib/paystack";
 import { postLedgerEntry } from "@/lib/ledger";
 import { Payout, UserPrivate, Wallet } from "@/types/platform";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,9 +17,23 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, amount } = await req.json();
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) return authCheck.errorResponse;
 
-    if (!userId || !amount) {
+    const { userId: bodyUserId, amount } = await req.json();
+
+    // Enforce that caller can only withdraw from their own wallet (prevent IDOR)
+    const authenticatedUid = authCheck.user.uid;
+    if (bodyUserId && bodyUserId !== authenticatedUid) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot initiate withdrawals for another user" },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
+    const userId = authenticatedUid;
+
+    if (!amount) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 

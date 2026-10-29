@@ -98,7 +98,7 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
       if (!currentUser) return;
 
       const techLoc = job.technicianLocation;
-      const res = await fetch(`/api/jobs/${job.requestId}/manual-arrival`, {
+      const res = await apiFetch(`/api/jobs/${job.requestId}/manual-arrival`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -126,7 +126,7 @@ export default function TechnicianRoutingWrapper({ jobId }: { jobId: string }) {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
-      const res = await fetch("/api/jobs/transition", {
+      const res = await apiFetch("/api/jobs/transition", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

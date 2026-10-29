@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { isValidTransition, ActorRole, TransitionGuard } from "@/lib/jobStateMachine";
 import { writeJobEvent } from "@/lib/jobEvents";
+import { verifyUserRequest } from "@/lib/userAuthGuard";
 import { JobRequestData, JobState } from "@/types/platform";
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyUserRequest(req);
+    if (authCheck.errorResponse) {
+      return authCheck.errorResponse;
+    }
+
     const body = await req.json();
-    const { jobId, toState, actorId, actorRole, guard, payload } = body;
+    const { jobId, toState, actorRole, guard, payload } = body;
+
+    const isAdmin = authCheck.user.email === "obunezicharis@gmail.com";
+    const actorId = isAdmin && body.actorId ? body.actorId : authCheck.user.uid;
 
     if (!jobId || !toState || !actorId || !actorRole) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -25,10 +34,10 @@ export async function POST(req: NextRequest) {
       const fromState = job.state;
 
       // Ensure the actor is authorized for this job
-      if (actorRole === "customer" && job.customerId !== actorId) {
+      if (actorRole === "customer" && job.customerId !== actorId && !isAdmin) {
          throw new Error("Unauthorized: Not the customer for this job");
       }
-      if (actorRole === "artisan" && job.artisanId !== actorId) {
+      if (actorRole === "artisan" && job.artisanId !== actorId && !isAdmin) {
          throw new Error("Unauthorized: Not the artisan for this job");
       }
 

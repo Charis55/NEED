@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { ShieldAlert, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Activity, DollarSign } from "lucide-react";
+import { adminFetch } from "@/utils/adminClient";
 
 export default function AdminDashboardPage() {
   const [metrics, setMetrics] = useState({
@@ -78,7 +79,7 @@ export default function AdminDashboardPage() {
     try {
       setCronRunning(true);
       setCronStatus("Running automated leakage detection & reconciliation...");
-      const res = await fetch("/api/cron/leakage", {
+      const res = await adminFetch("/api/cron/leakage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: "all" })

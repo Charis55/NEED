@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { apiFetch } from "@/utils/apiBase";
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
@@ -26,7 +27,7 @@ function CheckoutSuccessContent() {
     }
 
     // Verify transaction with server
-    fetch("/api/checkout/verify", {
+    apiFetch("/api/checkout/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 

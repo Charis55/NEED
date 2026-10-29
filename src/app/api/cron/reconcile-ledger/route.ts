@@ -18,8 +18,9 @@ async function handleReconciliation(req: NextRequest) {
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
-    // If CRON_SECRET is configured, enforce token authorization or admin authentication
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const isCronAuthorized = Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);
+
+    if (!isCronAuthorized) {
       const adminCheck = await verifyAdminRequest(req);
       if (adminCheck.errorResponse) {
         return NextResponse.json({ error: "Unauthorized cron trigger" }, { status: 401 });
