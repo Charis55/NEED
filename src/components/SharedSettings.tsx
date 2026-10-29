@@ -17,6 +17,7 @@ import CustomerCreditsCard from "@/components/CustomerCreditsCard";
 import { Camera, FileText, Building2, Info, User as UserIcon, ExternalLink, HelpCircle, Pencil, ArrowLeft, ChevronRight, Wrench, ShieldCheck, Coins } from "lucide-react";
 import { compressImage } from "@/utils/imageCompression";
 import { servicesData } from "@/data/services";
+import { isNativeApp } from "@/utils/platform";
 
 interface SharedSettingsProps {
   isArtisan?: boolean;
@@ -153,7 +154,11 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
           console.error("Error fetching user data", e);
         }
       } else {
-        router.push("/");
+        if (isNativeApp()) {
+          router.push("/login");
+        } else {
+          router.push("/");
+        }
       }
     });
     return () => unsubscribe();
@@ -261,7 +266,11 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       if (emailChanged) {
         showAlert("Email updated successfully. Please sign in again for security.", "success");
         await auth.signOut();
-        router.push("/");
+        if (isNativeApp()) {
+          router.push("/login");
+        } else {
+          router.push("/");
+        }
         return;
       }
 
@@ -487,7 +496,11 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       await authUser.delete();
 
       await auth.signOut();
-      router.push("/");
+      if (isNativeApp()) {
+        router.push("/login");
+      } else {
+        router.push("/");
+      }
     } catch (error: unknown) {
       const err = error as Error & { code?: string };
       if (err.code === "auth/requires-recent-login") {

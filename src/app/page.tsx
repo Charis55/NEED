@@ -25,6 +25,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
+import { isNativeApp } from "@/utils/platform";
 
 export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
@@ -42,6 +43,13 @@ export default function LandingPage() {
         return;
       } else if (cachedRole === "customer") {
         router.replace("/explore");
+        return;
+      }
+
+      // Mobile app rule: Native iOS & Android apps do not have landing pages.
+      // If unauthenticated on mobile, redirect straight to sign-in page.
+      if (isNativeApp() && !localStorage.getItem("need_current_user_id")) {
+        router.replace("/login");
         return;
       }
     }
@@ -93,6 +101,12 @@ export default function LandingPage() {
       } else {
         if (typeof window !== "undefined") {
           localStorage.removeItem("need_user_role");
+          localStorage.removeItem("need_current_user_id");
+        }
+        // Native mobile apps (iOS & Android) must go straight to /login, never landing page
+        if (isNativeApp()) {
+          router.replace("/login");
+          return;
         }
         setCheckingAuth(false);
       }
@@ -101,7 +115,8 @@ export default function LandingPage() {
     return () => unsubscribe();
   }, [router]);
 
-  if (checkingAuth) {
+  // On native mobile apps, never render the landing page under any circumstances
+  if (isNativeApp() || checkingAuth) {
     return (
       <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col items-center justify-center p-6 text-black select-none">
         <div className="border-4 border-black bg-[var(--color-brutal-yellow)] p-8 shadow-[8px_8px_0_0_#000] flex flex-col items-center gap-4 max-w-sm w-full">
@@ -111,7 +126,7 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3 mt-2">
             <div className="w-5 h-5 border-4 border-black border-t-transparent rounded-full animate-spin" />
-            <p className="font-bold text-xs uppercase tracking-wider text-black/80">Loading your profile...</p>
+            <p className="font-bold text-xs uppercase tracking-wider text-black/80">Loading...</p>
           </div>
         </div>
       </div>

@@ -1193,7 +1193,13 @@ final class WebViewModel: ObservableObject {
         showError = false
         isLoading = true
         errorMessage = ""
-        if let url = URL(string: "https://need-chi.vercel.app") {
+        let targetUrlStr: String
+        if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
+            targetUrlStr = "https://need-chi.vercel.app"
+        } else {
+            targetUrlStr = "https://need-chi.vercel.app/login"
+        }
+        if let url = URL(string: targetUrlStr) {
             var request = URLRequest(url: url)
             request.cachePolicy = .useProtocolCachePolicy
             request.timeoutInterval = 30.0
@@ -1243,7 +1249,13 @@ struct WebView: UIViewRepresentable {
         viewModel.webView = webView
         NativeCallKitManager.shared.webView = webView
 
-        if let url = URL(string: "https://need-chi.vercel.app") {
+        let initialUrlStr: String
+        if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
+            initialUrlStr = "https://need-chi.vercel.app"
+        } else {
+            initialUrlStr = "https://need-chi.vercel.app/login"
+        }
+        if let url = URL(string: initialUrlStr) {
             var request = URLRequest(url: url)
             request.cachePolicy = .useProtocolCachePolicy
             request.timeoutInterval = 30.0

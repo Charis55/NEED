@@ -203,48 +203,62 @@ export async function POST(req: NextRequest) {
       }
     }
 
-          // Second: if caller cancelled or timed out without receiver answering, send missed call notification
-          if (
-            (finalReason === "timeout" || finalReason === "cancelled") &&
-            !wasConnected
-          ) {
-            const callerDisplayName = activeCall?.callerName || "Someone";
+    // 5. If caller cancelled or timed out without receiver answering, send missed call notification
+    if (
+      (finalReason === "timeout" || finalReason === "cancelled") &&
+      !wasConnected &&
+      receiverId
+    ) {
+      try {
+        let receiverFcmToken: string | undefined;
+        const [uDoc, aDoc] = await Promise.all([
+          adminDb.collection("users").doc(receiverId).get().catch(() => null),
+          adminDb.collection("artisans").doc(receiverId).get().catch(() => null),
+        ]);
 
-            await getMessaging(adminApp_).send({
-              token: receiverFcmToken,
+        if (uDoc && uDoc.exists) {
+          receiverFcmToken = uDoc.data()?.fcmToken;
+        }
+        if (!receiverFcmToken && aDoc && aDoc.exists) {
+          receiverFcmToken = aDoc.data()?.fcmToken;
+        }
+
+        if (receiverFcmToken) {
+          const callerDisplayName = activeCall?.callerName || "Someone";
+          await getMessaging(adminApp_).send({
+            token: receiverFcmToken,
+            notification: {
+              title: "Missed Call",
+              body: `Missed ${isVideo ? "video" : "voice"} call from ${callerDisplayName}`,
+            },
+            data: {
+              type: "missed_call",
+              requestId: targetJobId,
+              title: "Missed Call",
+              body: `Missed ${isVideo ? "video" : "voice"} call from ${callerDisplayName}`,
+            },
+            android: {
+              priority: "high",
               notification: {
-                title: "Missed Call",
-                body: `Missed ${isVideo ? "video" : "voice"} call from ${callerDisplayName}`,
+                sound: "default",
+                channelId: "high_priority_alerts",
               },
-              data: {
-                type: "missed_call",
-                requestId: targetJobId,
-                title: "Missed Call",
-                body: `Missed ${isVideo ? "video" : "voice"} call from ${callerDisplayName}`,
-              },
-              android: {
-                priority: "high",
-                notification: {
-                  sound: "default",
-                  channelId: "high_priority_alerts",
-                },
-              },
-              apns: {
-                payload: {
-                  aps: {
-                    alert: {
-                      title: "Missed Call",
-                      body: `Missed ${isVideo ? "video" : "voice"} call from ${callerDisplayName}`,
-                    },
-                    sound: "default",
+            },
+            apns: {
+              payload: {
+                aps: {
+                  alert: {
+                    title: "Missed Call",
+                    body: `Missed ${isVideo ? "video" : "voice"} call from ${callerDisplayName}`,
                   },
+                  sound: "default",
                 },
               },
-            });
-          }
+            },
+          });
         }
       } catch (fcmErr: any) {
-        console.warn("[calls/end] FCM call end push warning:", fcmErr?.message);
+        console.warn("[calls/end] FCM missed call push warning:", fcmErr?.message);
       }
     }
 
