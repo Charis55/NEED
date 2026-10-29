@@ -23,14 +23,11 @@ export default function GlobalNotificationListener() {
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
 
-      try {
-        const { notifyNativeCall } = await import("@/utils/device");
-        notifyNativeCall("setUserId", { uid: user.uid });
-      } catch (e) {}
-
       // Check if user has notifications enabled
+      let userRole = "customer";
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
+        userRole = userDoc.data()?.role || "customer";
         const prefs = userDoc.data()?.preferences;
         if (prefs && prefs.inAppNotifications === false) {
           return; // In-app alerts disabled by user preference
@@ -44,7 +41,13 @@ export default function GlobalNotificationListener() {
       try {
         const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
         isArtisan = artisanDoc.exists();
+        if (isArtisan) userRole = "artisan";
       } catch (artErr) {}
+
+      try {
+        const { notifyNativeCall } = await import("@/utils/device");
+        notifyNativeCall("setUserId", { uid: user.uid, role: userRole });
+      } catch (e) {}
 
       // 1. Direct listener to users/{uid}/notifications collection
       // Catches all push/in-app notifications created by /api/send-notification

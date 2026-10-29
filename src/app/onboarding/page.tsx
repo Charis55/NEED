@@ -1,14 +1,18 @@
+"use client";
+
 import ArtisanOnboarding from "@/components/ArtisanOnboarding";
 import Link from "next/link";
+import { isNativeApp } from "@/utils/platform";
 
 export default function OnboardingPage() {
+  const homeHref = isNativeApp() ? "/technician/dashboard" : "/";
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden text-black selection:bg-[var(--color-brutal-pink)] selection:text-black">
       {/* Grid Pattern Background */}
       <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-8 text-center relative z-10">
-        <Link href="/" className="flex items-center justify-center">
+        <Link href={homeHref} className="flex items-center justify-center">
           <div className="flex items-center">
             <img src="/LOGO.png" alt="N Logo" className="h-14 w-auto" />
             <span className="text-[52px] font-semibold text-black leading-none tracking-tighter -ml-2.5">EED</span>

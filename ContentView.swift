@@ -1195,7 +1195,14 @@ final class WebViewModel: ObservableObject {
         errorMessage = ""
         let targetUrlStr: String
         if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
-            targetUrlStr = "https://need-chi.vercel.app"
+            let role = UserDefaults.standard.string(forKey: "need_user_role")
+            if role == "artisan" {
+                targetUrlStr = "https://need-chi.vercel.app/technician/dashboard"
+            } else if role == "customer" {
+                targetUrlStr = "https://need-chi.vercel.app/explore"
+            } else {
+                targetUrlStr = "https://need-chi.vercel.app"
+            }
         } else {
             targetUrlStr = "https://need-chi.vercel.app/login"
         }
@@ -1251,7 +1258,14 @@ struct WebView: UIViewRepresentable {
 
         let initialUrlStr: String
         if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
-            initialUrlStr = "https://need-chi.vercel.app"
+            let role = UserDefaults.standard.string(forKey: "need_user_role")
+            if role == "artisan" {
+                initialUrlStr = "https://need-chi.vercel.app/technician/dashboard"
+            } else if role == "customer" {
+                initialUrlStr = "https://need-chi.vercel.app/explore"
+            } else {
+                initialUrlStr = "https://need-chi.vercel.app"
+            }
         } else {
             initialUrlStr = "https://need-chi.vercel.app/login"
         }
@@ -1317,10 +1331,19 @@ struct WebView: UIViewRepresentable {
                 NativeCallKitManager.shared.setAudioMode(mode: mode)
             } else if action == "setUserId" {
                 let uid = dict["uid"] as? String
+                let role = dict["role"] as? String
+                UserDefaults.standard.set(uid, forKey: "need_current_user_id")
+                if let role = role, !role.isEmpty {
+                    UserDefaults.standard.set(role, forKey: "need_user_role")
+                }
                 BackgroundSyncGateway.shared.setUserId(uid)
                 if let uid = uid, !uid.isEmpty, let token = WebViewModel.shared.apnsToken ?? UserDefaults.standard.string(forKey: "need_native_apns_token") {
                     WebViewModel.shared.syncTokenToBackend(uid: uid, token: token)
                 }
+            } else if action == "signOut" {
+                UserDefaults.standard.removeObject(forKey: "need_current_user_id")
+                UserDefaults.standard.removeObject(forKey: "need_user_role")
+                BackgroundSyncGateway.shared.setUserId(nil)
             } else if action == "getPushToken" {
                 let token = WebViewModel.shared.apnsToken ?? UserDefaults.standard.string(forKey: "need_native_apns_token")
                 if let token = token {

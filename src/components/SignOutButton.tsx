@@ -14,6 +14,10 @@ export default function SignOutButton({ className, children = "Sign Out" }: { cl
         localStorage.removeItem("need_user_role");
         localStorage.removeItem("need_current_user_id");
       }
+      try {
+        const { notifyNativeCall } = await import("@/utils/device");
+        notifyNativeCall("signOut");
+      } catch (e) {}
       await signOut(auth);
       if (isNativeApp()) {
         router.push("/login");

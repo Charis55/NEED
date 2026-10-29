@@ -188,6 +188,10 @@ public class MainActivity extends BridgeActivity {
             if (settings != null) {
                 // Allow WebRTC audio/video to play automatically without requiring a user gesture on each incoming track
                 settings.setMediaPlaybackRequiresUserGesture(false);
+                String defaultUa = settings.getUserAgentString();
+                if (defaultUa != null && !defaultUa.contains("NeedApp")) {
+                    settings.setUserAgentString(defaultUa + " NeedApp");
+                }
             }
 
             this.bridge.getWebView().setWebChromeClient(new BridgeWebChromeClient(this.bridge) {

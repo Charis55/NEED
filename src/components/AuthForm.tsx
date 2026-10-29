@@ -24,6 +24,7 @@ import { useBackButton } from "@/hooks/useBackButton";
 import { pickNativePhoto } from "@/utils/nativeCamera";
 import { triggerHaptic } from "@/utils/haptics";
 import { ImpactStyle } from "@capacitor/haptics";
+import { isNativeApp } from "@/utils/platform";
 
 
 export default function AuthForm() {
@@ -64,6 +65,18 @@ export default function AuthForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("mode") === "signup") {
+        setIsLogin(false);
+      }
+      if (params.get("role") === "artisan" || params.get("role") === "technician") {
+        setRole("artisan");
+      }
+    }
+  }, []);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -490,15 +503,23 @@ export default function AuthForm() {
           <div className="flex items-center gap-3 mb-8 border-b-4 border-black pb-4">
             <button 
               type="button" 
-              onClick={() => router.back()} 
+              onClick={() => setStep("auth")} 
               className="w-10 h-10 bg-white brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none mr-2"
+              aria-label="Back to step 1"
             >
               <ArrowLeft className="w-6 h-6 text-black stroke-[3]" />
             </button>
-            <div className="flex items-center">
-              <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
-              <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
-            </div>
+            {isNativeApp() ? (
+              <div className="flex items-center select-none cursor-default">
+                <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+                <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+              </div>
+            ) : (
+              <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+                <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+                <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+              </Link>
+            )}
           </div>
           
           <form onSubmit={handleCompleteProfile}>
@@ -635,18 +656,65 @@ export default function AuthForm() {
           <span className="font-black text-black text-xl">#1</span>
         </div>
 
-        <div className="flex items-center gap-3 mb-8 border-b-4 border-black pb-4">
+        <div className="flex items-center gap-3 mb-6 border-b-4 border-black pb-4">
           <button 
             type="button" 
-            onClick={() => router.back()} 
-            className="w-10 h-10 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none mr-2"
+            onClick={() => {
+              if (!isLogin) {
+                setIsLogin(true);
+                setError("");
+              } else if (!isNativeApp()) {
+                router.back();
+              }
+            }} 
+            className={`w-10 h-10 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none mr-2 ${isNativeApp() && isLogin ? "invisible pointer-events-none" : ""}`}
+            aria-label="Back"
           >
             <ArrowLeft className="w-6 h-6 text-black stroke-[3]" />
           </button>
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
-            <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
-          </Link>
+          {isNativeApp() ? (
+            <div className="flex items-center select-none cursor-default">
+              <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+              <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+            </div>
+          ) : (
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+              <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+            </Link>
+          )}
+        </div>
+
+        {/* Mode Toggle Tabs: SIGN IN vs CREATE ACCOUNT */}
+        <div className="flex bg-[var(--color-brutal-bg)] p-1.5 brutal-border mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setIsLogin(true);
+              setError("");
+            }}
+            className={`flex-1 py-3 text-sm font-black uppercase transition-all ${
+              isLogin
+                ? "bg-[var(--color-brutal-teal)] brutal-border brutal-shadow-sm text-black -translate-x-0.5 -translate-y-0.5"
+                : "text-black/70 hover:text-black hover:bg-black/5"
+            }`}
+          >
+            SIGN IN
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsLogin(false);
+              setError("");
+            }}
+            className={`flex-1 py-3 text-sm font-black uppercase transition-all ${
+              !isLogin
+                ? "bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm text-black -translate-x-0.5 -translate-y-0.5"
+                : "text-black/70 hover:text-black hover:bg-black/5"
+            }`}
+          >
+            CREATE ACCOUNT
+          </button>
         </div>
         
         <h2 className="text-4xl font-black mb-2 text-black uppercase leading-none">

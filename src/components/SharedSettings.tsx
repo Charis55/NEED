@@ -265,6 +265,10 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
 
       if (emailChanged) {
         showAlert("Email updated successfully. Please sign in again for security.", "success");
+        try {
+          const { notifyNativeCall } = await import("@/utils/device");
+          notifyNativeCall("signOut");
+        } catch (e) {}
         await auth.signOut();
         if (isNativeApp()) {
           router.push("/login");
@@ -495,6 +499,10 @@ export default function SharedSettings({ isArtisan = false }: SharedSettingsProp
       // Delete the user from Firebase Auth on the client side
       await authUser.delete();
 
+      try {
+        const { notifyNativeCall } = await import("@/utils/device");
+        notifyNativeCall("signOut");
+      } catch (e) {}
       await auth.signOut();
       if (isNativeApp()) {
         router.push("/login");
