@@ -194,10 +194,45 @@ export default function TermsPage() {
           {/* Section 9 */}
           <section className="bg-white brutal-border p-6 md:p-8 shadow-[4px_4px_0_0_#000]">
             <h2 className="text-2xl font-black uppercase tracking-tight mb-3 border-b-3 border-black pb-2">
-              9. Contact & Legal Inquiries
+              9. Age Requirement & COPPA / Minor Protection Policy
+            </h2>
+            <p className="mb-3 text-sm">
+              The Platform is strictly reserved for individuals who are at least <strong>18 years of age</strong> (or the age of legal majority in their jurisdiction) and capable of forming legally binding contracts under applicable law.
+            </p>
+            <p className="text-sm">
+              In compliance with COPPA (Children&apos;s Online Privacy Protection Act), NDPA, and international data protection standards, NEED does not knowingly solicit or collect personal information from individuals under the age of 18. If we obtain actual knowledge that an account was created by or belongs to a minor, we will immediately deactivate the account and delete associated personal information.
+            </p>
+          </section>
+
+          {/* Section 10 */}
+          <section className="bg-white brutal-border p-6 md:p-8 shadow-[4px_4px_0_0_#000]">
+            <h2 className="text-2xl font-black uppercase tracking-tight mb-3 border-b-3 border-black pb-2">
+              10. User-Generated Content & DMCA / Copyright Infringement Policy
+            </h2>
+            <p className="mb-3 text-sm">
+              Users may upload profile pictures, trade certifications, portfolio photographs, review photos, and descriptions (&ldquo;User Content&rdquo;). You represent and warrant that you own or have obtained all necessary licenses, copyrights, and intellectual property rights to any content you transmit.
+            </p>
+            <p className="mb-3 text-sm">
+              <strong>DMCA Safe Harbor & Copyright Agent:</strong> NEED respects intellectual property rights and adheres to the safe harbor provisions of the Digital Millennium Copyright Act (17 U.S.C. § 512) and international copyright standards. If you believe your copyrighted work has been copied or posted on the Platform in an infringing manner, send a written Notice of Infringement to our designated agent:
+            </p>
+            <div className="bg-[var(--color-brutal-bg)] p-4 border-2 border-black text-xs font-mono mb-3">
+              <p className="font-bold uppercase">Designated Copyright / DMCA Agent:</p>
+              <p>NEED Technologies Legal & Compliance Dept.</p>
+              <p>Email: copyright@need.app (or legal@need.app)</p>
+              <p>Notice Requirements: Identification of copyrighted work, URL/link of infringing material, your physical/electronic signature, and statement under penalty of perjury that you are the copyright owner or authorized agent.</p>
+            </div>
+            <p className="text-sm">
+              <strong>Repeat Infringer Policy:</strong> In accordance with statutory safe harbor guidelines, NEED maintains an enforcement policy that will terminate account access and privileges for any user determined to be a repeat copyright infringer.
+            </p>
+          </section>
+
+          {/* Section 11 */}
+          <section className="bg-white brutal-border p-6 md:p-8 shadow-[4px_4px_0_0_#000]">
+            <h2 className="text-2xl font-black uppercase tracking-tight mb-3 border-b-3 border-black pb-2">
+              11. Contact & Legal Inquiries
             </h2>
             <p className="text-sm">
-              For legal inquiries, dispute arbitration, or questions regarding escrow deposits and platform policies, contact our compliance team at <strong>legal@need.app</strong> or through in-app support.
+              For legal inquiries, dispute arbitration, or questions regarding escrow deposits and platform policies, contact our compliance team at <strong>legal@need.app</strong> or through in-app support. Physical correspondence: NEED Technologies Ltd., Lagos, Nigeria.
             </p>
           </section>
 

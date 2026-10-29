@@ -55,8 +55,18 @@ export default function TermsDisclaimer({ role, onClose }: TermsDisclaimerProps)
                 By utilizing NEED, you consent to the collection and transmission of your personal data—including but not limited to your precise location data, phone number, and name—to Technicians for the sole purpose of fulfilling your job requests. You acknowledge that providing inaccurate location data may result in the inability to receive services or accurate pricing.
               </p>
 
+              <p className="bg-[var(--color-brutal-yellow)] p-3 border-2 border-black font-bold">
+                5. Age Requirement & Eligibility (18+)
+                You explicitly represent and warrant that you are at least 18 years of age (or the legal age of majority in your jurisdiction) and possess full legal authority and mental capacity to enter into these binding Terms and authorize home service visits. Individuals under 18 years old are strictly prohibited from creating accounts or using the platform.
+              </p>
+
+              <p className="border-l-4 border-black pl-4 text-xs text-gray-800">
+                6. Intellectual Property & Uploaded Content
+                You warrant that you own or have obtained all necessary licenses, copyrights, and permissions for any profile pictures, job media, or reviews you upload to NEED. You agree to indemnify NEED against any copyright infringement claims arising from your submissions.
+              </p>
+
               <p>
-                By proceeding, you confirm that you have read, fully understand, and unconditionally accept these terms.
+                By proceeding, you confirm that you are at least 18 years old, have read, fully understand, and unconditionally accept these terms.
               </p>
             </div>
           ) : (
@@ -92,8 +102,18 @@ export default function TermsDisclaimer({ role, onClose }: TermsDisclaimerProps)
                 You consent to NEED displaying your profile, certifications, ratings, and location data to customers to facilitate job matching. You agree to utilize customer data (such as phone numbers and addresses) strictly for the purpose of completing the assigned job and not for external marketing or harassment.
               </p>
 
+              <p className="bg-[var(--color-brutal-blue)] p-3 border-2 border-black font-bold">
+                6. Age Requirement & Legal Qualification (18+)
+                You certify that you are at least 18 years of age and legally permitted to operate as a self-employed trade professional. You confirm that all business registrations, tax documentation, and licenses submitted are authentic and legally held in your name.
+              </p>
+
+              <p className="border-l-4 border-black pl-4 text-xs text-gray-800">
+                7. Content Ownership & Portfolios
+                All portfolio photos, logos, and work samples uploaded to your profile must be original work created by you. Plagiarism, stock imagery masqueraded as original work, or copyright infringement will result in immediate permanent account termination and forfeiture of verified status.
+              </p>
+
               <p>
-                By proceeding, you confirm that you have read, fully understand, and unconditionally accept these terms.
+                By proceeding, you confirm that you are at least 18 years old, have read, fully understand, and unconditionally accept these terms.
               </p>
             </div>
           )}

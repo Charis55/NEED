@@ -361,7 +361,7 @@ export default function AuthForm() {
         }
 
         if (!termsAccepted) {
-          throw new Error("You must accept the Security Disclaimer & Terms to continue.");
+          throw new Error("You must confirm you are at least 18 years old and accept the Terms to continue.");
         }
         fullName = `${firstName} ${lastName}`.trim();
         result = await createUserWithEmailAndPassword(auth, email, password);
@@ -605,7 +605,7 @@ export default function AuthForm() {
               </div>
               <div>
                 <p className="text-black font-bold uppercase text-sm leading-tight">
-                  I have read and unconditionally agree to the{" "}
+                  I confirm I am at least 18 years old, and have read and unconditionally agree to the{" "}
                   <button type="button" onClick={() => setShowTerms(true)} className="text-[var(--color-brutal-red)] underline decoration-2 underline-offset-2 hover:bg-black hover:text-white transition-colors">
                     Security Disclaimer & Terms of Service
                   </button>.
@@ -972,7 +972,7 @@ export default function AuthForm() {
               </div>
               <div>
                 <p className="text-black font-bold uppercase text-sm leading-tight">
-                  I have read and unconditionally agree to the{" "}
+                  I confirm I am at least 18 years old, and have read and unconditionally agree to the{" "}
                   <button type="button" onClick={() => setShowTerms(true)} className="text-[var(--color-brutal-red)] underline decoration-2 underline-offset-2 hover:bg-black hover:text-white transition-colors">
                     Security Disclaimer & Terms of Service
                   </button>.

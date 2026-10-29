@@ -86,9 +86,15 @@ export const WelcomeCustomerEmail = ({
               </Button>
             </Section>
 
-            <Text className="text-gray-500 text-[12px] font-bold mt-8 mb-0">
-              Need help? Reply to this email or contact support.
-            </Text>
+            <Section className="border-t-2 border-black/20 pt-4 mt-8">
+              <Text className="text-gray-600 text-[11px] leading-[16px] m-0">
+                NEED Technologies Ltd. &bull; Victoria Island, Lagos, Nigeria<br />
+                You received this email because you signed up for an account on NEED.<br />
+                <a href={`${baseUrl}/settings`} style={{ color: "#000", textDecoration: "underline", fontWeight: "bold" }}>
+                  Notification Preferences &amp; Account Settings
+                </a>
+              </Text>
+            </Section>
           </Container>
         </Body>
       </Tailwind>
