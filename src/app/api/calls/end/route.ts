@@ -157,26 +157,32 @@ export async function POST(req: NextRequest) {
       });
     } catch {}
 
-    // 4. Send silent FCM push to counterparty to immediately dismiss ringing on Android & iOS
-    if (receiverId) {
+    // 4. Send silent FCM push to all participants to immediately dismiss ringing/ongoing modal on Android & iOS
+    const participantIds = new Set<string>();
+    if (job?.customerId) participantIds.add(job.customerId);
+    if (job?.artisanId) participantIds.add(job.artisanId);
+    if (activeCall?.callerId) participantIds.add(activeCall.callerId);
+    if (activeCall?.receiverId) participantIds.add(activeCall.receiverId);
+    if (receiverId) participantIds.add(receiverId);
+
+    for (const pId of participantIds) {
       try {
-        let receiverFcmToken: string | undefined;
-        const [receiverUserDoc, receiverArtisanDoc] = await Promise.all([
-          adminDb.collection("users").doc(receiverId).get().catch(() => null),
-          adminDb.collection("artisans").doc(receiverId).get().catch(() => null),
+        let pFcmToken: string | undefined;
+        const [uDoc, aDoc] = await Promise.all([
+          adminDb.collection("users").doc(pId).get().catch(() => null),
+          adminDb.collection("artisans").doc(pId).get().catch(() => null),
         ]);
 
-        if (receiverUserDoc && receiverUserDoc.exists) {
-          receiverFcmToken = receiverUserDoc.data()?.fcmToken;
+        if (uDoc && uDoc.exists) {
+          pFcmToken = uDoc.data()?.fcmToken;
         }
-        if (!receiverFcmToken && receiverArtisanDoc && receiverArtisanDoc.exists) {
-          receiverFcmToken = receiverArtisanDoc.data()?.fcmToken;
+        if (!pFcmToken && aDoc && aDoc.exists) {
+          pFcmToken = aDoc.data()?.fcmToken;
         }
 
-        if (receiverFcmToken) {
-          // First: silent cancel push (wakes app immediately to cancel notification and dismiss modal)
+        if (pFcmToken) {
           await getMessaging(adminApp_).send({
-            token: receiverFcmToken,
+            token: pFcmToken,
             data: {
               type: "cancel_call",
               requestId: targetJobId,
@@ -190,7 +196,12 @@ export async function POST(req: NextRequest) {
               headers: { "apns-priority": "10" },
               payload: { aps: { contentAvailable: true } },
             },
-          });
+          }).catch((err) => console.warn(`[calls/end] Push failed for participant ${pId}:`, err?.message));
+        }
+      } catch (pErr) {
+        console.warn(`[calls/end] Failed retrieving token for ${pId}:`, pErr);
+      }
+    }
 
           // Second: if caller cancelled or timed out without receiver answering, send missed call notification
           if (

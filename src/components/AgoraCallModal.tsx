@@ -391,7 +391,13 @@ export default function AgoraCallModal({
         client.on("user-left", (user, reason) => {
           console.log(`[Agora] Remote user ${user.uid} left with reason: ${reason}`);
           setRemoteUsers([...client.remoteUsers]);
-          if (reason === "Quit") {
+          // In a 1-to-1 call, if the partner leaves for any reason (Quit, ServerTimeOut), end call immediately
+          leaveCallRef.current();
+        });
+
+        client.on("connection-state-change", (curState, revState, reason) => {
+          console.log(`[Agora] Connection state changed: ${revState} -> ${curState} (${reason})`);
+          if (curState === "DISCONNECTED" && hasJoinedRef.current) {
             leaveCallRef.current();
           }
         });

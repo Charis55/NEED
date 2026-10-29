@@ -71,7 +71,7 @@ extension WebView.Coordinator: WKUIDelegate {
         requestMediaCapturePermissionFor origin: WKSecurityOrigin,
         initiatedByFrame frame: WKFrameInfo,
         type: WKMediaCaptureType,
-        decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
         print("[WebKit] Media capture permission granted for type: \(type.rawValue)")
         decisionHandler(.grant)
@@ -82,7 +82,7 @@ extension WebView.Coordinator: WKUIDelegate {
         _ webView: WKWebView,
         requestDeviceOrientationAndMotionPermissionFor origin: WKSecurityOrigin,
         initiatedByFrame frame: WKFrameInfo,
-        decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
     ) {
         decisionHandler(.grant)
     }
