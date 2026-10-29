@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { auth, db, storage } from "@/lib/firebase";
 import { 
-  GoogleAuthProvider, signInWithPopup, getRedirectResult, signInWithRedirect,
+  GoogleAuthProvider, OAuthProvider, signInWithPopup, getRedirectResult, signInWithRedirect,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   updateProfile, setPersistence, browserLocalPersistence, browserSessionPersistence, User,
   sendEmailVerification, signOut, signInWithCredential
@@ -277,6 +277,49 @@ export default function AuthForm() {
         const credential = GoogleAuthProvider.credential(result.credential.idToken);
         const authResult = await signInWithCredential(auth, credential);
         user = authResult.user;
+      } else if (typeof window !== "undefined" && (window as any).webkit?.messageHandlers?.needNative) {
+        // iOS Native App: Route through ASWebAuthenticationSession (shares Safari's signed-in Google session!)
+        await new Promise<void>((resolve, reject) => {
+          const onSuccess = async (e: any) => {
+            cleanup();
+            try {
+              const { idToken, accessToken } = e.detail || {};
+              if (!idToken) throw new Error("Missing ID Token from Google");
+              const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
+              const authResult = await signInWithCredential(auth, credential);
+              if (authResult.user) {
+                await handlePostLogin(authResult.user, undefined, role, !isLogin);
+              }
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          };
+
+          const onError = (e: any) => {
+            cleanup();
+            reject(new Error(e.detail?.error || "Google Sign-In failed"));
+          };
+
+          const onCancel = () => {
+            cleanup();
+            setLoading(false);
+            resolve();
+          };
+
+          const cleanup = () => {
+            window.removeEventListener("need:googleSignInSuccess", onSuccess);
+            window.removeEventListener("need:googleSignInError", onError);
+            window.removeEventListener("need:googleSignInCancel", onCancel);
+          };
+
+          window.addEventListener("need:googleSignInSuccess", onSuccess);
+          window.addEventListener("need:googleSignInError", onError);
+          window.addEventListener("need:googleSignInCancel", onCancel);
+
+          (window as any).webkit.messageHandlers.needNative.postMessage({ action: "googleSignIn" });
+        });
+        return;
       } else {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const provider = new GoogleAuthProvider();
@@ -334,6 +377,86 @@ export default function AuthForm() {
       } else {
         setError(err.message || "Google Sign-In failed.");
       }
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    triggerHaptic(ImpactStyle.Heavy);
+    setError("");
+    setLoading(true);
+    try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
+      if (typeof window !== "undefined" && (window as any).webkit?.messageHandlers?.needNative) {
+        // Native iOS Apple Sign-In with Face ID!
+        await new Promise<void>((resolve, reject) => {
+          const onSuccess = async (e: any) => {
+            cleanup();
+            try {
+              const { idToken, rawNonce, displayName } = e.detail || {};
+              if (!idToken) throw new Error("Missing ID Token from Apple");
+              const provider = new OAuthProvider("apple.com");
+              const credential = provider.credential({
+                idToken,
+                rawNonce: rawNonce || undefined,
+              });
+              const authResult = await signInWithCredential(auth, credential);
+              if (authResult.user) {
+                await handlePostLogin(authResult.user, displayName || undefined, role, !isLogin);
+              }
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          };
+
+          const onError = (e: any) => {
+            cleanup();
+            reject(new Error(e.detail?.error || "Apple Sign-In failed"));
+          };
+
+          const onCancel = () => {
+            cleanup();
+            setLoading(false);
+            resolve();
+          };
+
+          const cleanup = () => {
+            window.removeEventListener("need:appleSignInSuccess", onSuccess);
+            window.removeEventListener("need:appleSignInError", onError);
+            window.removeEventListener("need:appleSignInCancel", onCancel);
+          };
+
+          window.addEventListener("need:appleSignInSuccess", onSuccess);
+          window.addEventListener("need:appleSignInError", onError);
+          window.addEventListener("need:appleSignInCancel", onCancel);
+
+          (window as any).webkit.messageHandlers.needNative.postMessage({ action: "appleSignIn" });
+        });
+        return;
+      } else {
+        // Web Browser (Desktop / Safari Web)
+        const provider = new OAuthProvider("apple.com");
+        provider.addScope("email");
+        provider.addScope("name");
+        const result = await signInWithPopup(auth, provider);
+        if (result.user) {
+          await handlePostLogin(result.user, undefined, role, !isLogin);
+        }
+      }
+    } catch (error: unknown) {
+      const err = error as Error & { code?: string };
+      console.warn("Apple Sign-In error:", err);
+      const code = err?.code || "";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        setError("");
+      } else if (code === "auth/operation-not-allowed") {
+        setError("Sign in with Apple is not yet enabled in Firebase Console. Please enable Apple in Firebase Console > Authentication > Sign-in method.");
+      } else {
+        setError(err.message || "Failed to sign in with Apple.");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -740,7 +863,7 @@ export default function AuthForm() {
         {/* Social Buttons (Only for Login) */}
         {isLogin && (
           <>
-            <div className="mb-8">
+            <div className="mb-8 space-y-3">
               <button
                 onClick={handleGoogleSignIn}
                 disabled={loading}
@@ -760,6 +883,26 @@ export default function AuthForm() {
                       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
                     GOOGLE SIGN IN
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleAppleSignIn}
+                disabled={loading}
+                className="w-full bg-black text-white text-xl py-3 px-4 brutal-btn flex items-center justify-center relative overflow-hidden border-4 border-black shadow-[4px_4px_0_0_#000]"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span className="font-black uppercase tracking-widest animate-pulse text-white">Authenticating...</span>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6 mr-3 fill-current text-white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.85c.66-.82 1.11-1.96.99-3.1-.96.04-2.12.64-2.8 1.44-.59.69-1.12 1.83-.98 2.95 1.07.08 2.14-.56 2.79-1.29z"/>
+                    </svg>
+                    SIGN IN WITH APPLE
                   </>
                 )}
               </button>
