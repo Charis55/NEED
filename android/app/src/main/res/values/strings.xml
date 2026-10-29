@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">NEED</string>
-    <string name="title_activity_main">NEED</string>
+    <string name="app_name">Need</string>
+    <string name="title_activity_main">Need</string>
     <string name="package_name">com.need.app</string>
     <string name="custom_url_scheme">com.need.app</string>
     <string name="default_web_client_id">48438248184-m6qlpkvufo044ia8mpo9d9e8cv5rfhbk.apps.googleusercontent.com</string>

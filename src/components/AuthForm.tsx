@@ -18,6 +18,7 @@ import Link from "next/link";
 import { UserAccount } from "@/types";
 import ImageCropper from "@/components/ImageCropper";
 import { Eye, EyeOff, ArrowLeft, Upload, X, Check, Mail, Phone as PhoneIcon, AlertTriangle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import TermsDisclaimer from "@/components/TermsDisclaimer";
 import { useBackButton } from "@/hooks/useBackButton";
 
@@ -798,33 +799,52 @@ export default function AuthForm() {
           <span className="font-black text-black text-xl">#1</span>
         </div>
 
-        <div className="flex items-center gap-3 mb-6 border-b-4 border-black pb-4">
-          <button 
-            type="button" 
-            onClick={() => {
-              if (!isLogin) {
-                setIsLogin(true);
-                setError("");
-              } else if (!isNativeApp()) {
-                router.back();
-              }
-            }} 
-            className={`w-10 h-10 bg-[var(--color-brutal-yellow)] brutal-border brutal-shadow-sm flex items-center justify-center hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#000] transition active:translate-x-0 active:translate-y-0 active:shadow-none mr-2 ${isNativeApp() && isLogin ? "invisible pointer-events-none" : ""}`}
-            aria-label="Back"
+        <div className="flex items-center mb-6 border-b-4 border-black pb-4 overflow-hidden min-h-[56px]">
+          <AnimatePresence initial={false}>
+            {(!isLogin || !isNativeApp()) && (
+              <motion.div
+                key="auth-back-wrapper"
+                initial={{ width: 0, opacity: 0, scale: 0.7, marginRight: 0 }}
+                animate={{ width: 44, opacity: 1, scale: 1, marginRight: 12 }}
+                exit={{ width: 0, opacity: 0, scale: 0.7, marginRight: 0 }}
+                transition={{ type: "spring", stiffness: 450, damping: 30 }}
+                className="overflow-hidden shrink-0 flex items-center justify-start py-1"
+              >
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    if (!isLogin) {
+                      setIsLogin(true);
+                      setError("");
+                    } else if (!isNativeApp()) {
+                      router.back();
+                    }
+                  }} 
+                  className="w-10 h-10 bg-[var(--color-brutal-yellow)] border-4 border-black shadow-[3px_3px_0_0_#000] flex items-center justify-center shrink-0 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none hover:-translate-x-0.5 hover:-translate-y-0.5 transition-transform"
+                  aria-label="Back"
+                >
+                  <ArrowLeft className="w-5 h-5 text-black stroke-[3]" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <motion.div 
+            layout 
+            transition={{ type: "spring", stiffness: 450, damping: 30 }}
+            className="flex items-center select-none"
           >
-            <ArrowLeft className="w-6 h-6 text-black stroke-[3]" />
-          </button>
-          {isNativeApp() ? (
-            <div className="flex items-center select-none cursor-default">
-              <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
-              <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
-            </div>
-          ) : (
-            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-              <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
-              <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
-            </Link>
-          )}
+            {isNativeApp() ? (
+              <div className="flex items-center select-none cursor-default">
+                <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+                <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+              </div>
+            ) : (
+              <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+                <img src="/LOGO.png" alt="N Logo" className="h-10 w-auto" />
+                <span className="text-[36px] font-bold text-black leading-none tracking-tighter -ml-1.5">EED</span>
+              </Link>
+            )}
+          </motion.div>
         </div>
 
         {/* Mode Toggle Tabs: SIGN IN vs CREATE ACCOUNT */}
