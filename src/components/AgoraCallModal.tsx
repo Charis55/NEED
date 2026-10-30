@@ -353,6 +353,14 @@ export default function AgoraCallModal({
       if (isJoiningRef.current || hasJoinedRef.current) return;
       isJoiningRef.current = true;
       try {
+        // Pre-notify native iOS/Android to pause keepalive audio and activate audio recording hardware
+        if (typeof window !== "undefined") {
+          notifyNativeCall("prepareCallMedia", { isVideo });
+          if (isCaller) {
+            notifyNativeCall("startCall", { partnerName, isVideo, jobId: jobId || channelName, uid });
+          }
+        }
+
         // Listeners for remote users
         client.on("user-joined", () => {
           setRemoteUsers([...client.remoteUsers]);
