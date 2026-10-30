@@ -5,6 +5,7 @@ import { auth } from "@/lib/firebase";
 
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle, CheckCircle } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -39,7 +40,12 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center p-4 selection:bg-[var(--color-brutal-pink)] selection:text-black">
-      <div className="w-full max-w-md md:max-w-4xl mx-auto md:flex brutal-card bg-white relative">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.985, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 450, damping: 30 }}
+        className="w-full max-w-md md:max-w-4xl mx-auto md:flex brutal-card bg-white relative"
+      >
         {/* Left side: Form */}
         <div className="w-full md:w-1/2 p-6 md:p-10 border-b-4 md:border-b-0 md:border-r-4 border-black relative">
           <div className="absolute -top-4 -left-4 w-12 h-12 bg-[var(--color-brutal-pink)] brutal-border flex items-center justify-center rotate-6 z-10">
@@ -120,7 +126,7 @@ export default function ForgotPasswordPage() {
             Happens to the best of us!
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

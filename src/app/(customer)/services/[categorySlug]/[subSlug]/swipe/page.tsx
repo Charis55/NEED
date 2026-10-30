@@ -79,7 +79,7 @@ function SwipeCard({
       onDragEnd={handleDragEnd}
       whileTap={isFront ? { cursor: "grabbing" } : {}}
       animate={!isFront ? { y: 20, scale: 0.95 } : { y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      transition={{ type: "spring", stiffness: 450, damping: 30 }}
     >
       <div className="p-6 flex-1 flex flex-col">
         <div 

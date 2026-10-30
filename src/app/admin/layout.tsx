@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ShieldAlert, BookOpen, Settings, BarChart2, DollarSign, Award, ArrowLeft, Scale, UserX } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { motion } from "framer-motion";
 
 const ADMIN_EMAILS = ["obunezicharis@gmail.com"];
 
@@ -120,7 +121,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       {/* Admin Content Area */}
       <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
-        {children}
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, scale: 0.985, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 450, damping: 30 }}
+          className="w-full"
+        >
+          {children}
+        </motion.div>
       </main>
     </div>
   );
