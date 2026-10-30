@@ -24,10 +24,6 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     pathname.includes("/track") || 
     pathname.includes("/navigate");
 
-  if (isFullScreenPage) {
-    return <>{children}</>;
-  }
-
   const [dragOffset, setDragOffset] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
 
@@ -218,6 +214,10 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
 
   const windowWidth = typeof window !== "undefined" ? window.innerWidth : 400;
   const dragFraction = Math.min(1, Math.abs(dragOffset) / windowWidth);
+
+  if (isFullScreenPage) {
+    return <>{children}</>;
+  }
 
   return (
     <motion.div
