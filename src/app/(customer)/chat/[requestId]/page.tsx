@@ -14,11 +14,14 @@ import VoiceNotePlayer from "@/components/VoiceNotePlayer";
 import { compressImage } from "@/utils/imageCompression";
 import { getSessionId } from "@/utils/sessionId";
 import { apiFetch } from "@/utils/apiBase";
+import { notifyNativeCall } from "@/utils/device";
 import AdUnit from "@/components/AdUnit";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { pickNativePhoto, pickNativePhotos } from "@/utils/nativeCamera";
 import PublicProfileModal from "@/components/PublicProfileModal";
+
+const partnerCache = new Map<string, { name: string; photoURL: string | null; role: string }>();
 
 interface Message {
   id: string;
@@ -41,6 +44,24 @@ export default function ChatPage() {
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [artisanUser, setArtisanUser] = useState<any>(null);
   const [customer, setCustomer] = useState<any>(null);
+  const [serverPartner, setServerPartner] = useState<{ name?: string; photoURL?: string | null; role?: string } | null>(() => {
+    if (typeof window === "undefined") return null;
+    const mem = partnerCache.get(requestId);
+    if (mem) return mem;
+    try {
+      const s = sessionStorage.getItem(`need_partner_${requestId}`);
+      if (s) return JSON.parse(s);
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    // Disable native swipe-to-back gesture on chat screen for iOS
+    notifyNativeCall("setSwipeBack", { enabled: false });
+    return () => {
+      notifyNativeCall("setSwipeBack", { enabled: true });
+    };
+  }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -304,6 +325,20 @@ export default function ChatPage() {
     let artisanFetched = false;
     let customerFetched = false;
 
+    // Fetch server partner details concurrently (bypasses iOS client Firestore latency/auth delays)
+    apiFetch(`/api/chat/partner-details?requestId=${requestId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success && data?.partner?.name) {
+          setServerPartner(data.partner);
+          partnerCache.set(requestId, data.partner);
+          try {
+            sessionStorage.setItem(`need_partner_${requestId}`, JSON.stringify(data.partner));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
     const jobUnsubscribe = onSnapshot(doc(db, "jobRequests", requestId), async (jobDoc) => {
       try {
         if (jobDoc.exists()) {
@@ -314,20 +349,18 @@ export default function ChatPage() {
             artisanFetched = true;
             getDoc(doc(db, "artisans", jobData.artisanId)).then(artDoc => {
               if (artDoc.exists()) setArtisan(artDoc.data() as ArtisanProfile);
-            });
+            }).catch(() => {});
             getDoc(doc(db, "users", jobData.artisanId)).then(artUserDoc => {
               if (artUserDoc.exists()) setArtisanUser(artUserDoc.data());
-            });
+            }).catch(() => {});
           }
           
           if (jobData.customerId && !customerFetched) {
             customerFetched = true;
             getDoc(doc(db, "users", jobData.customerId)).then(custDoc => {
               if (custDoc.exists()) setCustomer(custDoc.data());
-            });
+            }).catch(() => {});
           }
-
-          // Incoming call checking moved to a separate useEffect
         }
       } catch (err) {
         console.error("Error in job snapshot", err);
@@ -692,10 +725,55 @@ export default function ChatPage() {
     );
   }
 
-  const isCustomerViewing = currentUser?.uid === job?.customerId;
-  const chatPartnerName = isCustomerViewing 
-    ? (artisan?.businessName || artisan?.name || artisanUser?.displayName || (artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null) || "Technician") 
-    : (customer?.displayName || (customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null) || "Customer");
+  const isCustomerViewing = currentUser ? currentUser.uid === job?.customerId : true;
+
+  const isGeneric = (name?: string | null) => {
+    if (!name) return true;
+    const lower = name.trim().toLowerCase();
+    return (
+      lower === "caller" ||
+      lower === "user" ||
+      lower === "someone" ||
+      lower === "technician" ||
+      lower === "customer" ||
+      lower === "artisan"
+    );
+  };
+
+  const getCleanChatPartnerName = () => {
+    if (isCustomerViewing) {
+      const candidates = [
+        serverPartner?.name,
+        artisan?.businessName,
+        artisan?.name,
+        artisanUser?.displayName,
+        artisanUser?.firstName ? `${artisanUser.firstName} ${artisanUser.lastName || ''}`.trim() : null,
+        (job as any)?.artisanName,
+        (job as any)?.artisanBusinessName,
+      ];
+      for (const cand of candidates) {
+        if (cand && !isGeneric(cand)) return cand;
+      }
+      return "Technician";
+    } else {
+      const candidates = [
+        serverPartner?.name,
+        customer?.displayName,
+        customer?.name,
+        customer?.firstName ? `${customer.firstName} ${customer.lastName || ''}`.trim() : null,
+        (job as any)?.customerName,
+      ];
+      for (const cand of candidates) {
+        if (cand && !isGeneric(cand)) return cand;
+      }
+      return "Customer";
+    }
+  };
+
+  const chatPartnerName = getCleanChatPartnerName();
+  const chatPartnerPhoto = serverPartner?.photoURL || (isCustomerViewing 
+    ? (artisan?.profilePictureUrl || artisanUser?.photoURL || (job as any)?.artisanPhoto) 
+    : (customer?.photoURL || (job as any)?.customerPhoto)) || null;
 
   const startCall = async (type: "audio" | "video") => {
     if (!job || !currentUser) {
@@ -731,7 +809,7 @@ export default function ChatPage() {
           callerPhoto: currentUser.photoURL || null,
           partnerId: isCustomerViewing ? job.artisanId : job.customerId,
           receiverName: chatPartnerName || (isCustomerViewing ? "Technician" : "Customer"),
-          receiverPhoto: (isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL) || null,
+          receiverPhoto: chatPartnerPhoto || null,
         }),
       });
       const data = await res.json();
@@ -785,11 +863,10 @@ export default function ChatPage() {
         <div 
           className="w-10 h-10 md:w-14 md:h-14 rounded-full border-3 md:border-4 border-black overflow-hidden bg-[var(--color-brutal-yellow)] shrink-0 mr-2 md:mr-4 cursor-pointer hover:scale-105 transition-transform"
           onClick={() => {
-            const picUrl = isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL;
-            if (picUrl) setEnlargedImage(picUrl);
+            if (chatPartnerPhoto) setEnlargedImage(chatPartnerPhoto);
           }}
         >
-          <UserAvatar photoURL={isCustomerViewing ? (artisan?.profilePictureUrl || artisanUser?.photoURL) : customer?.photoURL} name={chatPartnerName} className="w-full h-full text-lg md:text-2xl font-black text-black pointer-events-none" />
+          <UserAvatar photoURL={chatPartnerPhoto} name={chatPartnerName} className="w-full h-full text-lg md:text-2xl font-black text-black pointer-events-none" />
         </div>
         
         <div className="flex-1 min-w-0 flex flex-col items-start justify-center">

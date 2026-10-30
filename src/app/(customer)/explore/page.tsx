@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -35,10 +36,18 @@ const GENERATED_IMAGE_IDS = [
 type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortType>("Most Available");
+
+  const handleCategoryClick = (e: React.MouseEvent, categoryId: string) => {
+    if (!user) {
+      e.preventDefault();
+      router.push(`/login?role=customer&returnUrl=${encodeURIComponent(`/services/${categoryId}`)}`);
+    }
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("exploreSortBy");
@@ -235,7 +244,13 @@ export default function Dashboard() {
             const hasImage = GENERATED_IMAGE_IDS.includes(category.id);
             
             return (
-              <Link key={category.id} href={`/services/${category.id}`} className="block" prefetch={false}>
+              <Link 
+                key={category.id} 
+                href={`/services/${category.id}`} 
+                onClick={(e) => handleCategoryClick(e, category.id)}
+                className="block" 
+                prefetch={false}
+              >
                 <div 
                   className={`${hasImage ? 'text-white' : style.bg + ' ' + style.text} relative p-3 md:p-4 border-4 ${hasImage ? 'border-black' : style.border} shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] min-h-[140px] md:h-40 flex flex-col justify-end hover:-translate-y-1 transition-transform overflow-hidden`}
                   style={hasImage ? { backgroundImage: `url(/categories/${category.id}.jpg)`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}

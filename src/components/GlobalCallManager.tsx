@@ -433,6 +433,11 @@ export default function GlobalCallManager() {
 
     const handleNativeDecline = (e: any) => {
       console.log("[GlobalCallManager] Native decline received from Dynamic Island / CallKit / Notification:", e?.detail);
+      const incomingJobId = e?.detail?.jobId;
+      if (incomingJobId && activeJobRef.current?.requestId && incomingJobId !== activeJobRef.current.requestId) {
+        console.warn("[GlobalCallManager] Discarding stale decline event for job:", incomingJobId, "current:", activeJobRef.current.requestId);
+        return;
+      }
       endCallWithLog("declined");
     };
 

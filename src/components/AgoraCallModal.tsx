@@ -80,17 +80,27 @@ function VideoTrackPlayer({
       };
 
       fixVideo();
-      setTimeout(fixVideo, 80);
-      setTimeout(fixVideo, 300);
+      const t1 = setTimeout(fixVideo, 50);
+      const t2 = setTimeout(fixVideo, 150);
+      const t3 = setTimeout(fixVideo, 400);
+
+      const unlockPlay = () => fixVideo();
+      window.addEventListener("touchstart", unlockPlay, { passive: true });
+      window.addEventListener("click", unlockPlay, { passive: true });
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        window.removeEventListener("touchstart", unlockPlay);
+        window.removeEventListener("click", unlockPlay);
+        try {
+          track.stop();
+        } catch (e) {}
+      };
     } catch (err) {
       console.warn("[Agora VideoTrackPlayer] Play error:", err);
     }
-
-    return () => {
-      try {
-        track.stop();
-      } catch (e) {}
-    };
   }, [track, isLocal]);
 
   return (
@@ -345,8 +355,8 @@ export default function AgoraCallModal({
     let localV: ICameraVideoTrack;
     let connectionPromise: Promise<void> | null = null;
     
-    // Create a fresh client with vp8 for universal Android and iOS WebRTC support
-    const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    // Create a fresh client with h264 for hardware-accelerated iOS WebKit and universal WebRTC video support
+    const client = AgoraRTC.createClient({ mode: "rtc", codec: "h264" });
     clientRef.current = client;
 
     const initCall = async () => {

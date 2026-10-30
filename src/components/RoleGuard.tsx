@@ -22,7 +22,7 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
     }
     // Allow guest browsing on non-protected customer pages immediately
     if (requiredRole === "customer" && !currentUid) {
-      const isProtected = pathname.startsWith("/chat") || pathname.startsWith("/inbox") || pathname.startsWith("/profile") || pathname.startsWith("/payment");
+      const isProtected = pathname.startsWith("/chat") || pathname.startsWith("/services") || pathname.startsWith("/profile") || pathname.startsWith("/payment");
       if (!isProtected) return true;
     }
     return false;
@@ -54,8 +54,8 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
           router.push("/login?role=artisan");
         } else {
           // If a customer tries to access protected routes, force them to login
-          if (pathname.startsWith("/chat") || pathname.startsWith("/inbox") || pathname.startsWith("/profile") || pathname.startsWith("/payment")) {
-            router.push("/login?role=customer");
+          if (pathname.startsWith("/chat") || pathname.startsWith("/services") || pathname.startsWith("/profile") || pathname.startsWith("/payment")) {
+            router.push(`/login?role=customer&returnUrl=${encodeURIComponent(pathname)}`);
           } else {
             setAuthorized(true);
           }
