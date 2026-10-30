@@ -764,7 +764,7 @@ export default function ChatPage() {
 
   return (
     <div 
-      className="fixed inset-0 flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100]"
+      className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] flex flex-col bg-[var(--color-brutal-bg)] selection:bg-[var(--color-brutal-pink)] selection:text-black z-[100] overflow-hidden"
       onClick={() => setDeletingMsgId(null)}
     >
       {/* Header */}
@@ -912,7 +912,7 @@ export default function ChatPage() {
       )}
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 relative z-0 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4 relative z-0 pb-6">
         {job?.proofOfPaymentUrl && (
           <div className="absolute inset-x-0 bottom-4 pointer-events-none flex justify-center z-[0] opacity-20 mix-blend-multiply px-4 md:px-8">
             <img 
@@ -1032,7 +1032,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t-4 md:border-t-8 border-black p-2.5 md:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-[calc(1rem+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative">
+      <div className="bg-white border-t-4 md:border-t-8 border-black p-2.5 md:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-[calc(1rem+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_0_0_#000] z-10 relative mt-auto">
         {isRecording || isRecordingFinished ? (
           <div className="flex gap-2 items-center">
             <button

@@ -17,6 +17,17 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
   const isDockRoute = routes.includes(pathname);
   const currentIndex = routes.indexOf(pathname);
 
+  // Full-screen fixed / immersive pages (chat, tracking, routing) must not have transform ancestors
+  // which break `position: fixed; inset: 0;` viewport containment
+  const isFullScreenPage = 
+    pathname.startsWith("/chat") || 
+    pathname.includes("/track") || 
+    pathname.includes("/navigate");
+
+  if (isFullScreenPage) {
+    return <>{children}</>;
+  }
+
   const [dragOffset, setDragOffset] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
 

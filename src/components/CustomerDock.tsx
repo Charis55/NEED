@@ -17,6 +17,16 @@ const navItems = [
 export default function CustomerDock() {
   const pathname = usePathname();
 
+  // Hide dock on dedicated full-screen pages like Chat or live tracking
+  const isHidden = 
+    pathname.startsWith("/chat") ||
+    pathname.includes("/track") ||
+    pathname.includes("/navigate");
+
+  if (isHidden) {
+    return null;
+  }
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center justify-center pointer-events-none px-2 sm:px-4 pb-[env(safe-area-inset-bottom,0.5rem)]">
       <nav className="bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] px-4 sm:px-6 py-3 flex items-center gap-4 sm:gap-8 pointer-events-auto max-w-[calc(100vw-1rem)] overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
