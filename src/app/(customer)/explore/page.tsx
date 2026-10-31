@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
@@ -38,8 +39,30 @@ type SortType = "A-Z" | "Z-A" | "Most Available" | "Most Specific Services";
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string>("");
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("need_cached_user_profile");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.photoURL) return parsed.photoURL;
+        }
+      } catch {}
+    }
+    return null;
+  });
+  const [displayName, setDisplayName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("need_cached_user_profile");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.displayName) return parsed.displayName;
+        }
+      } catch {}
+    }
+    return "";
+  });
   const [sortBy, setSortBy] = useState<SortType>("Most Available");
 
   const handleCategoryClick = (e: React.MouseEvent, categoryId: string) => {
@@ -82,26 +105,43 @@ export default function Dashboard() {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        setDisplayName(currentUser.displayName || "");
-        setProfilePhoto(currentUser.photoURL || null);
+        let name = currentUser.displayName || "";
+        let photo = currentUser.photoURL || null;
+        if (currentUser.displayName) setDisplayName(currentUser.displayName);
+        if (currentUser.photoURL) setProfilePhoto(currentUser.photoURL);
 
         try {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
             const uData = userDoc.data();
-            if (uData.photoURL) setProfilePhoto(uData.photoURL);
-            if (uData.displayName || uData.name || uData.firstName) {
-              setDisplayName(uData.displayName || uData.name || `${uData.firstName || ''} ${uData.lastName || ''}`.trim());
+            if (uData.photoURL) {
+              photo = uData.photoURL;
+              setProfilePhoto(photo);
+            }
+            const fetchedName = uData.displayName || uData.name || `${uData.firstName || ''} ${uData.lastName || ''}`.trim();
+            if (fetchedName) {
+              name = fetchedName;
+              setDisplayName(name);
             }
           }
 
           const artisanDoc = await getDoc(doc(db, "artisans", currentUser.uid));
           if (artisanDoc.exists()) {
             const aData = artisanDoc.data();
-            if (aData.profilePictureUrl) setProfilePhoto(aData.profilePictureUrl);
-            if (!displayName && (aData.name || aData.businessName)) {
-              setDisplayName(aData.name || aData.businessName);
+            if (aData.profilePictureUrl) {
+              photo = aData.profilePictureUrl;
+              setProfilePhoto(photo);
             }
+            if (!name && (aData.name || aData.businessName)) {
+              name = aData.name || aData.businessName;
+              setDisplayName(name);
+            }
+          }
+
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("need_cached_user_profile", JSON.stringify({ displayName: name, photoURL: photo }));
+            } catch {}
           }
         } catch (e) {
           console.warn("Could not fetch user profile details:", e);
@@ -109,6 +149,9 @@ export default function Dashboard() {
       } else {
         setProfilePhoto(null);
         setDisplayName("");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("need_cached_user_profile");
+        }
       }
     });
     return () => unsubscribe();
@@ -253,10 +296,20 @@ export default function Dashboard() {
               >
                 <div 
                   className={`${hasImage ? 'text-white' : style.bg + ' ' + style.text} relative p-3 md:p-4 border-4 ${hasImage ? 'border-black' : style.border} shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] min-h-[140px] md:h-40 flex flex-col justify-end hover:-translate-y-1 transition-transform overflow-hidden`}
-                  style={hasImage ? { backgroundImage: `url(/categories/${category.id}.jpg)`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                 >
                   {hasImage && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 z-0"></div>
+                    <>
+                      <Image
+                        src={`/categories/${category.id}.jpg`}
+                        alt={category.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        priority={index < 4}
+                        loading={index < 4 ? "eager" : "lazy"}
+                        className="object-cover z-0"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 z-[1]"></div>
+                    </>
                   )}
                   <div className="relative z-10">
                     <h3 className={`text-[15px] md:text-lg leading-tight font-black mb-1.5 uppercase tracking-tighter ${hasImage ? 'text-white' : style.text} break-words`}>

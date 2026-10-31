@@ -151,8 +151,35 @@ export default function GlobalCallManager() {
           if (!syncStartTime || syncStartTime <= 0) return false;
 
           const ongoingAge = now - syncStartTime;
-          // Maximum ongoing call age 4 hours (guard against orphaned calls)
-          if (ongoingAge > 4 * 60 * 60 * 1000 || ongoingAge < -10 * 1000) return false;
+
+          // Prevent phantom ghost calls on fresh login or app start:
+          // An ongoing call must only be mounted if this tab/device was actively engaged in it
+          // OR if the call was connected very recently (within 45s).
+          const callId = (data.activeCall as any)?.callId;
+          const isLocallyEngaged =
+            activeJobRef.current?.requestId === data.requestId ||
+            safeGetSession("need_my_answered_call") === data.requestId ||
+            (Boolean(callId) && safeGetSession("need_my_answered_call_id") === callId) ||
+            (Boolean(callId) && safeGetSession("need_active_outgoing_call_id") === callId);
+
+          if (!isLocallyEngaged && ongoingAge > 45 * 1000) {
+            // Stale orphaned call from earlier: silently clean it up in the database so it never haunts login
+            if (ongoingAge > 90 * 1000) {
+              apiFetch("/api/calls/end", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  jobId: data.requestId,
+                  requestId: data.requestId,
+                  callId,
+                  reason: "ended",
+                }),
+              }).catch(() => {});
+            }
+            return false;
+          }
+
+          if (ongoingAge > 3 * 60 * 60 * 1000 || ongoingAge < -10 * 1000) return false;
 
           return true;
         }

@@ -45,6 +45,11 @@
   }
 }
 
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--color-brutal-bg);
   color: #000000;
