@@ -25,8 +25,25 @@ import {
   notifyNativeCall,
 } from "@/utils/device";
 
+let lastEndSoundPlayedAt = 0;
+let lastPickupSoundPlayedAt = 0;
+
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
+    const now = Date.now();
+    if (type === "end") {
+      // Debounce: strictly prevent overlapping or repeated call end tones
+      if (now - lastEndSoundPlayedAt < 2500) {
+        return;
+      }
+      lastEndSoundPlayedAt = now;
+    } else if (type === "pickup") {
+      if (now - lastPickupSoundPlayedAt < 2000) {
+        return;
+      }
+      lastPickupSoundPlayedAt = now;
+    }
+
     // In-memory synthetic audio blip: 0 network latency, 0 external buffer delay,
     // and instantly primes WebKit AudioContext without hijacking AVAudioSession category.
     try {
@@ -85,6 +102,7 @@ export default function GlobalCallManager() {
   activeJobRef.current = activeJob;
   const terminalStateRef = useRef<typeof terminalState>(null);
   terminalStateRef.current = terminalState;
+  const isEndingCallRef = useRef(false);
   const lastHandledUrlRef = useRef<{ url: string; time: number } | null>(null);
 
   const clearCallNotification = async () => {
@@ -182,7 +200,9 @@ export default function GlobalCallManager() {
           if (activeJobRef.current?.requestId === foundJob.requestId) {
             notifyNativeCall("endCall");
             clearCallNotification();
-            playCallSound("end");
+            if (!terminalStateRef.current && !isEndingCallRef.current) {
+              playCallSound("end");
+            }
             clearActiveOutgoingCallId();
             safeRemoveSession("need_active_outgoing_call_id");
             safeRemoveSession("need_active_outgoing_call_job");
@@ -626,7 +646,8 @@ export default function GlobalCallManager() {
     reason?: "cancelled" | "declined" | "timeout" | "ended",
     explicitDurationSec?: number
   ) => {
-    if (!activeJob || !activeJob.activeCall || !userUid) return;
+    if (!activeJob || !activeJob.activeCall || !userUid || isEndingCallRef.current) return;
+    isEndingCallRef.current = true;
 
     playCallSound("end");
     notifyNativeCall("endCall");
@@ -657,6 +678,9 @@ export default function GlobalCallManager() {
 
     // Dismiss overlay immediately on initiator tap
     setActiveJob(null);
+    setTimeout(() => {
+      isEndingCallRef.current = false;
+    }, 1500);
 
     // Call server to update Firestore & in-memory registry, and send cancel FCM pushes
     const endpoint = finalReason === "declined" ? "/api/calls/decline" : "/api/calls/end";
@@ -750,7 +774,9 @@ export default function GlobalCallManager() {
           const endedReason = data.endedReason || "ended";
           notifyNativeCall("endCall");
           clearCallNotification();
-          playCallSound("end");
+          if (!terminalStateRef.current && !isEndingCallRef.current) {
+            playCallSound("end");
+          }
           clearActiveOutgoingCallId();
           safeRemoveSession("need_active_outgoing_call_id");
           safeRemoveSession("need_active_outgoing_call_job");

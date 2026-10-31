@@ -498,12 +498,10 @@ export default function AgoraCallModal({
         };
 
         // 1. Create local tracks: combined on video calls for single-query mobile stability
-        // Note: ANS and AGC are disabled in software because iOS hardware VoiceProcessingIO already does them.
-        // Running software ANS on hardware-processed audio causes the speech signal to be filtered as noise.
         if (isVideo) {
           try {
             const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
-              { AEC: true, ANS: false, AGC: false },
+              { AEC: true, ANS: true, AGC: true },
               { facingMode: "user" }
             );
             localA = audioTrack;
@@ -511,7 +509,7 @@ export default function AgoraCallModal({
           } catch (combinedErr) {
             console.warn("[Agora] Combined tracks creation failed, creating tracks individually:", combinedErr);
             try {
-              localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: false, AGC: false });
+              localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
             } catch (aErr) {
               localA = await AgoraRTC.createMicrophoneAudioTrack();
             }
@@ -551,12 +549,26 @@ export default function AgoraCallModal({
           try {
             localA = await AgoraRTC.createMicrophoneAudioTrack({
               AEC: true,
-              ANS: false,
-              AGC: false,
+              ANS: true,
+              AGC: true,
             });
           } catch (audioConstraintErr) {
             console.warn("[Agora] createMicrophoneAudioTrack with constraints failed, retrying default:", audioConstraintErr);
             localA = await AgoraRTC.createMicrophoneAudioTrack();
+          }
+        }
+
+        if (localA) {
+          try {
+            localA.setMuted(false);
+            localA.setVolume(100);
+            const aMst = localA.getMediaStreamTrack();
+            if (aMst) {
+              aMst.enabled = true;
+              console.log(`[Agora] Local mic MediaStreamTrack ready: state=${aMst.readyState}, muted=${aMst.muted}`);
+            }
+          } catch (e) {
+            console.warn("[Agora] Error verifying localAudioTrack:", e);
           }
         }
 
@@ -714,31 +726,44 @@ export default function AgoraCallModal({
     if (!localVideoTrack || isSwitchingCameraRef.current) return;
     isSwitchingCameraRef.current = true;
     try {
-      const nextFacing = isBackCamera ? "user" : "environment";
+      const targetFacing = isBackCamera ? "user" : "environment";
       const cameras = await AgoraRTC.getCameras().catch(() => []);
 
-      // If multiple cameras enumerated (e.g. front and rear), try device cycle
-      if (cameras && cameras.length > 1) {
-        const currentLabel = localVideoTrack.getTrackLabel();
-        const currentIndex = cameras.findIndex(
-          (c) => c.label === currentLabel || c.deviceId === (localVideoTrack as any)._deviceId
-        );
-        const nextCam = cameras[(currentIndex + 1) % cameras.length];
-        if (nextCam && nextCam.deviceId) {
-          try {
-            await localVideoTrack.setDevice(nextCam.deviceId);
-            setIsBackCamera((prev) => !prev);
-            isSwitchingCameraRef.current = false;
-            return;
-          } catch (e) {
-            console.warn("[Agora] setDevice failed, falling back to track re-creation:", e);
-          }
+      let targetCam: any = null;
+      if (cameras && cameras.length > 0) {
+        if (targetFacing === "user") {
+          targetCam = cameras.find((c) => {
+            const l = (c.label || "").toLowerCase();
+            return l.includes("front") || l.includes("user") || l.includes("facetime") || l.includes("selfie");
+          });
+        } else {
+          // Select PRIMARY back camera, specifically filtering out ultra-wide, telephoto, and macro auxiliary lenses
+          const backCams = cameras.filter((c) => {
+            const l = (c.label || "").toLowerCase();
+            return l.includes("back") || l.includes("rear") || l.includes("environment");
+          });
+          targetCam =
+            backCams.find((c) => {
+              const l = (c.label || "").toLowerCase();
+              return !l.includes("ultra") && !l.includes("tele") && !l.includes("0.5") && !l.includes("zoom") && !l.includes("macro") && !l.includes("depth");
+            }) || backCams[0];
         }
       }
 
-      // Recreate track with opposite facingMode (guaranteed on iOS & Android WebViews)
+      if (targetCam && targetCam.deviceId) {
+        try {
+          await localVideoTrack.setDevice(targetCam.deviceId);
+          setIsBackCamera(!isBackCamera);
+          isSwitchingCameraRef.current = false;
+          return;
+        } catch (e) {
+          console.warn("[Agora] setDevice failed, falling back to track re-creation:", e);
+        }
+      }
+
+      // Recreate track with target facingMode ("user" for selfie or "environment" for main back)
       const newVideoTrack = await AgoraRTC.createCameraVideoTrack({
-        facingMode: nextFacing,
+        facingMode: targetFacing,
       });
 
       if (clientRef.current) {
@@ -768,27 +793,6 @@ export default function AgoraCallModal({
           console.warn("AudioToggle reset failed in leaveCall:", e)
         );
       }
-    }
-    if (typeof window !== "undefined") {
-      try {
-        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          const ctx = (window as any).__needAudioCtx || new AudioCtx();
-          if (ctx.state !== "closed") {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(440, ctx.currentTime);
-            osc.frequency.linearRampToValueAtTime(220, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.12, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.1);
-          }
-        }
-      } catch (e) {}
     }
     if (localAudioTrack) {
       localAudioTrack.stop();
@@ -957,7 +961,7 @@ export default function AgoraCallModal({
               >
                 <VideoTrackPlayer track={localVideoTrack} isLocal={!isBackCamera} />
                 <div className="absolute bottom-2 left-2 z-10 bg-white text-black border-2 border-black px-2 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000]">
-                  You {isBackCamera ? "(Rear)" : ""}
+                  You
                 </div>
               </div>
             )}

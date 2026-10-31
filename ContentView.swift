@@ -224,13 +224,22 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
 
     func pauseForCall() {
         self.isCallActive = true
-        audioPlayer?.pause()
+        if let player = audioPlayer, player.isPlaying {
+            player.stop()
+        }
+        audioPlayer = nil
         isRunning = false
-        print("[SilentGateway] Paused for active CallKit call")
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("[SilentGateway] Deactivate audio session error:", error)
+        }
+        print("[SilentGateway] Audio player completely stopped and hardware released for call")
     }
 
     func resumeAfterCall() {
         self.isCallActive = false
+        setupAudioPlayer()
         ensureActive()
     }
 }
@@ -487,7 +496,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         isAudioConfiguredForCall = true
         let session = AVAudioSession.sharedInstance()
         do {
-            var options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP, .allowBluetoothA2DP]
+            var options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP, .allowBluetoothA2DP, .mixWithOthers]
             if isSpeaker {
                 options.insert(.defaultToSpeaker)
             }
@@ -809,7 +818,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         Task { @MainActor in
             let session = audioSession
             do {
-                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP, .allowBluetoothA2DP, .mixWithOthers, .defaultToSpeaker])
                 try session.setActive(true)
                 try session.overrideOutputAudioPort(.speaker)
                 print("[CallKit] Audio session activated by CallKit and configured for voiceChat")

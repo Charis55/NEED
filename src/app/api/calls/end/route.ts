@@ -57,6 +57,22 @@ export async function POST(req: NextRequest) {
       const jobSnap = await jobRef.get();
       if (jobSnap.exists) {
         job = jobSnap.data()!;
+        if (job.activeCall?.status === "ended" && job.activeCall?.endedAt) {
+          // Idempotency guard: Call has already been ended and logged by counterparty/event
+          if (activeCall?.callId || callId) {
+            const cleanId = activeCall?.callId || callId;
+            if (job.customerId) {
+              adminDb.collection("users").doc(job.customerId).collection("callInbox").doc(cleanId).delete().catch(() => {});
+            }
+            if (job.artisanId) {
+              adminDb.collection("users").doc(job.artisanId).collection("callInbox").doc(cleanId).delete().catch(() => {});
+            }
+          }
+          return NextResponse.json(
+            { success: true, alreadyEnded: true },
+            { headers: corsHeaders }
+          );
+        }
         if (job.activeCall) {
           activeCall = { ...inMemoryCall, ...job.activeCall };
         }
