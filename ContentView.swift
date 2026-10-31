@@ -1006,21 +1006,105 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Official NEED Android-Style Load-Up Screen
+// MARK: - Official NEED Brutalist Load-Up Screen
 struct AndroidStyleSplashScreen: View {
     var body: some View {
         ZStack {
-            Color.white
+            // Authentic Brutalist cream background (#FFF9E6)
+            Color(red: 255.0 / 255.0, green: 249.0 / 255.0, blue: 230.0 / 255.0)
                 .ignoresSafeArea()
 
             VStack {
-                if let logo = loadNeedLogo() {
-                    Image(uiImage: logo)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 150, height: 150)
+                // Brutalist card container
+                VStack(spacing: 14) {
+                    if let logo = loadNeedLogo() {
+                        ZStack {
+                            // Yellow brutalist logo tile (#FFE66D)
+                            Color(red: 255.0 / 255.0, green: 230.0 / 255.0, blue: 109.0 / 255.0)
+
+                            Image(uiImage: logo)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 76, height: 76)
+                        }
+                        .frame(width: 96, height: 96)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.black, lineWidth: 4)
+                        )
+                        .shadow(color: Color.black, radius: 0, x: 4, y: 4)
+                        .rotationEffect(.degrees(-1))
+                        .padding(.top, 4)
+                    }
+
+                    // Brand header
+                    HStack(spacing: 8) {
+                        Text("NEED")
+                            .font(.system(size: 32, weight: .black))
+                            .tracking(-1)
+                            .foregroundColor(.black)
+
+                        Rectangle()
+                            .fill(Color.black)
+                            .frame(width: 10, height: 10)
+                    }
+
+                    // Status badge (#FF9CEE)
+                    Text("AUTHENTICATING")
+                        .font(.system(size: 10, weight: .black))
+                        .tracking(1.2)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color(red: 255.0 / 255.0, green: 156.0 / 255.0, blue: 238.0 / 255.0))
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                        .shadow(color: Color.black, radius: 0, x: 2, y: 2)
+                        .rotationEffect(.degrees(1))
+
+                    // Brutalist progress bar
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color(white: 0.95))
+                            .frame(width: 160, height: 12)
+                            .overlay(
+                                Rectangle()
+                                    .stroke(Color.black, lineWidth: 2)
+                            )
+                            .shadow(color: Color.black, radius: 0, x: 2, y: 2)
+
+                        Rectangle()
+                            .fill(Color(red: 46.0 / 255.0, green: 213.0 / 255.0, blue: 115.0 / 255.0))
+                            .frame(width: 95, height: 8)
+                            .padding(.leading, 2)
+                    }
+                    .padding(.vertical, 2)
+
+                    // Text
+                    VStack(spacing: 4) {
+                        Text("LOADING PROFILE...")
+                            .font(.system(size: 12, weight: .black))
+                            .tracking(1)
+                            .foregroundColor(.black)
+
+                        Text("Syncing your workspace & profile")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color.black.opacity(0.6))
+                    }
+                    .padding(.bottom, 4)
                 }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .background(Color.white)
+                .overlay(
+                    Rectangle()
+                        .stroke(Color.black, lineWidth: 4)
+                )
+                .shadow(color: Color.black, radius: 0, x: 8, y: 8)
             }
+            .padding(24)
         }
     }
 

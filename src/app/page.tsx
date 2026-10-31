@@ -26,6 +26,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
 import { isNativeApp } from "@/utils/platform";
+import StartupLoadingScreen from "@/components/StartupLoadingScreen";
 
 export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
@@ -118,18 +119,11 @@ export default function LandingPage() {
   // On native mobile apps, never render the landing page under any circumstances
   if (isNativeApp() || checkingAuth) {
     return (
-      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex flex-col items-center justify-center p-6 text-black select-none">
-        <div className="border-4 border-black bg-[var(--color-brutal-yellow)] p-8 shadow-[8px_8px_0_0_#000] flex flex-col items-center gap-4 max-w-sm w-full">
-          <div className="flex items-center gap-2">
-            <span className="font-black text-4xl tracking-tighter uppercase">NEED</span>
-            <div className="w-3.5 h-3.5 bg-black animate-pulse" />
-          </div>
-          <div className="flex items-center gap-3 mt-2">
-            <div className="w-5 h-5 border-4 border-black border-t-transparent rounded-full animate-spin" />
-            <p className="font-bold text-xs uppercase tracking-wider text-black/80">Loading...</p>
-          </div>
-        </div>
-      </div>
+      <StartupLoadingScreen
+        text="LOADING PROFILE..."
+        subtext="Initializing your NEED session"
+        badge="STARTING UP"
+      />
     );
   }
 

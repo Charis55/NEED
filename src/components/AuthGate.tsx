@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Lock, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import GlobalSpinner from "@/components/GlobalSpinner";
+import StartupLoadingScreen from "@/components/StartupLoadingScreen";
 
 /**
  * AuthGate — Wraps pages that require authentication.
@@ -24,9 +25,11 @@ export default function AuthGate({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center">
-        <GlobalSpinner text="LOADING" />
-      </div>
+      <StartupLoadingScreen 
+        text="LOADING PROFILE..."
+        subtext="Verifying credentials"
+        badge="NEED"
+      />
     );
   }
 

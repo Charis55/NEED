@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import GlobalSpinner from "@/components/GlobalSpinner";
+import StartupLoadingScreen from "@/components/StartupLoadingScreen";
 
 const verifiedRolesCache = new Map<string, "artisan" | "customer">();
 
@@ -125,9 +125,11 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
 
   if (!authorized) {
     return (
-      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex items-center justify-center">
-        <GlobalSpinner text="VERIFYING ACCESS" />
-      </div>
+      <StartupLoadingScreen 
+        text="LOADING PROFILE..."
+        subtext="Verifying access & permissions"
+        badge="AUTHENTICATING"
+      />
     );
   }
 

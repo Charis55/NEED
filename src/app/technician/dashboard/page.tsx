@@ -6,6 +6,7 @@ import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import Link from "next/link";
 import { ClipboardList, Star, TrendingUp, CheckCircle, AlertTriangle, Power, PowerOff, Navigation, ArrowRight, MapPin, Zap, Clock, Target, BarChart3, Flame, ThumbsUp, Snail } from "lucide-react";
 import GlobalSpinner from "@/components/GlobalSpinner";
+import StartupLoadingScreen from "@/components/StartupLoadingScreen";
 import { JobRequest, Review } from "@/types";
 import { useAlert } from "@/components/AlertProvider";
 import WalletCard from "@/components/WalletCard";
@@ -298,9 +299,11 @@ export default function ArtisanDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--color-brutal-bg)] flex justify-center items-center">
-        <GlobalSpinner size="lg" text="LOADING DASHBOARD" color="bg-[var(--color-brutal-blue)]" />
-      </div>
+      <StartupLoadingScreen
+        text="LOADING DASHBOARD..."
+        subtext="Fetching jobs & performance data"
+        badge="TECHNICIAN"
+      />
     );
   }
 
