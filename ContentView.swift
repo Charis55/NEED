@@ -5,6 +5,8 @@ import CoreLocation
 import Photos
 import UserNotifications
 import CallKit
+import AuthenticationServices
+import CryptoKit
 
 // MARK: - Native Notification Delegate (Foreground banners & action button handling)
 @MainActor
@@ -63,42 +65,7 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
-// MARK: - WKUIDelegate Extension (Guarantees protocol witness matching in Swift)
-extension WebView.Coordinator: WKUIDelegate {
-    @available(iOS 15.0, *)
-    func webView(
-        _ webView: WKWebView,
-        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
-        initiatedByFrame frame: WKFrameInfo,
-        type: WKMediaCaptureType,
-        decisionHandler: @escaping (WKPermissionDecision) -> Void
-    ) {
-        print("[WebKit] Media capture permission granted for type: \(type.rawValue)")
-        decisionHandler(.grant)
-    }
 
-    @available(iOS 15.0, *)
-    func webView(
-        _ webView: WKWebView,
-        requestDeviceOrientationAndMotionPermissionFor origin: WKSecurityOrigin,
-        initiatedByFrame frame: WKFrameInfo,
-        decisionHandler: @escaping (WKPermissionDecision) -> Void
-    ) {
-        decisionHandler(.grant)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
-        for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
-    ) -> WKWebView? {
-        if navigationAction.targetFrame == nil {
-            webView.load(navigationAction.request)
-        }
-        return nil
-    }
-}
 
 
 // MARK: - Silent Background Audio Gateway
@@ -217,7 +184,7 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     }
 
     @objc private func handleRouteChange(_ notification: Notification) {
-        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected {
+        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected || NativeCallKitManager.shared.isMediaCaptureActive {
             print("[SilentGateway] Route changed during call, preserving call audio")
             return
         }
@@ -225,7 +192,7 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     }
 
     @objc private func handleAppLifecycle(_ notification: Notification) {
-        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected {
+        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected || NativeCallKitManager.shared.isMediaCaptureActive {
             return
         }
         ensureActive()
@@ -236,7 +203,7 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     }
 
     func ensureActive() {
-        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected {
+        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected || NativeCallKitManager.shared.isMediaCaptureActive {
             print("[SilentGateway] Call active, skipping keepalive audio activation")
             return
         }
@@ -455,6 +422,9 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     private let callController = CXCallController()
     private(set) var activeCallUUID: UUID?
     var isCallConnected: Bool = false
+    var isCallAnsweredNatively: Bool = false
+    var isMediaCaptureActive: Bool = false
+    var isProgrammaticEnd: Bool = false
 
     weak var webView: WKWebView?
     var currentJobId: String?
@@ -527,17 +497,27 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
     func activateCallAudio(isSpeaker: Bool = true) {
         self.isCallConnected = true
+        self.isMediaCaptureActive = true
         SilentAudioGateway.shared.pauseForCall()
         configureAudioSession(isSpeaker: isSpeaker)
     }
 
     func answerActiveCall() {
-        print("[CallKit] Answering active CallKit call from in-app overlay")
+        print("[CallKit] Answering active CallKit call from in-app overlay (alreadyAnswered=\(self.isCallAnsweredNatively), isConnected=\(self.isCallConnected))")
         self.isCallConnected = true
+        self.isMediaCaptureActive = true
         SilentAudioGateway.shared.pauseForCall()
         configureAudioSession(isSpeaker: true)
 
+        // If the call was already answered natively (e.g. from CallKit screen / Dynamic Island / notification action),
+        // DO NOT request another redundant CXAnswerCallAction transaction on the already answered call!
+        if self.isCallAnsweredNatively {
+            print("[CallKit] Call was already answered natively, skipping redundant CXAnswerCallAction transaction")
+            return
+        }
+
         if let uuid = activeCallUUID {
+            self.isCallAnsweredNatively = true
             let answerAction = CXAnswerCallAction(call: uuid)
             let transaction = CXTransaction(action: answerAction)
             callController.request(transaction) { error in
@@ -617,6 +597,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         self.currentJobId = nil
         self.currentCallerId = nil
         self.isCallConnected = false
+        self.isCallAnsweredNatively = false
+        self.isMediaCaptureActive = false
         UIDevice.current.isProximityMonitoringEnabled = false
         SilentAudioGateway.shared.resumeAfterCall()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
@@ -625,6 +607,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
     func endCall() {
         print("[CallKit] Ending all CallKit calls")
+        self.isProgrammaticEnd = true
         self.isCallConnected = false
 
         if let uuid = activeCallUUID {
@@ -655,6 +638,9 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     func onNativeAnswerRequested() {
+        self.isCallConnected = true
+        self.isCallAnsweredNatively = true
+        self.isMediaCaptureActive = true
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         UIApplication.shared.applicationIconBadgeNumber = 0
         activateCallAudio(isSpeaker: true)
@@ -701,27 +687,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
             }
         }
 
-        // 3. Fallback direct HTTP POST to server
-        let endpoint = wasConnected ? "https://need-chi.vercel.app/api/calls/end" : "https://need-chi.vercel.app/api/calls/decline"
-        if let jobId = savedJobId, !jobId.isEmpty, let url = URL(string: endpoint) {
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let payload: [String: Any] = wasConnected ? [
-                "jobId": jobId,
-                "callerId": savedCallerId ?? "",
-                "reason": "ended"
-            ] : [
-                "jobId": jobId,
-                "requestId": jobId,
-                "callerId": savedCallerId ?? "",
-                "reason": "declined"
-            ]
-            request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
-            URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
-        }
-
-        // 4. Reset audio session
+        // 3. Reset audio session
         let session = AVAudioSession.sharedInstance()
         try? session.overrideOutputAudioPort(.none)
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
@@ -735,7 +701,8 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     // MARK: - CXProviderDelegate
     nonisolated func providerDidReset(_ provider: CXProvider) {
         Task { @MainActor in
-            NativeCallKitManager.shared.onNativeEndRequested()
+            NativeCallKitManager.shared.resetCallState()
+            print("[CallKit] providerDidReset: local state reset without dispatching decline")
         }
     }
 
@@ -754,6 +721,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         action.fulfill()
         Task { @MainActor in
             NativeCallKitManager.shared.isCallConnected = true
+            NativeCallKitManager.shared.isCallAnsweredNatively = true
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
             UIApplication.shared.applicationIconBadgeNumber = 0
             NativeCallKitManager.shared.onNativeAnswerRequested()
@@ -764,11 +732,19 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     nonisolated func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         action.fulfill()
         Task { @MainActor in
+            let wasConnected = NativeCallKitManager.shared.isCallConnected
             NativeCallKitManager.shared.isCallConnected = false
+            NativeCallKitManager.shared.isCallAnsweredNatively = false
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
             UIApplication.shared.applicationIconBadgeNumber = 0
-            NativeCallKitManager.shared.onNativeEndRequested()
-            print("[CallKit] CXEndCallAction fulfilled successfully from Dynamic Island / CallKit")
+            if NativeCallKitManager.shared.isProgrammaticEnd {
+                NativeCallKitManager.shared.isProgrammaticEnd = false
+                NativeCallKitManager.shared.resetCallState()
+                print("[CallKit] CXEndCallAction programmatic end fulfilled without decline")
+            } else {
+                NativeCallKitManager.shared.onNativeEndRequested()
+                print("[CallKit] CXEndCallAction user tap fulfilled from Dynamic Island / CallKit (wasConnected=\(wasConnected))")
+            }
         }
     }
 
@@ -969,6 +945,15 @@ struct ContentView: View {
         .onAppear {
             SilentAudioGateway.shared.start()
             BackgroundSyncGateway.shared.startMonitoring()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if !webViewModel.hasLoadedOnce {
+                    print("[NeedApp] OnAppear watchdog fired: dismissing splash screen")
+                    withAnimation {
+                        webViewModel.isLoading = false
+                        webViewModel.hasLoadedOnce = true
+                    }
+                }
+            }
         }
     }
 }
@@ -1149,6 +1134,275 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
+// MARK: - Native Google Sign-In Manager (ASWebAuthenticationSession - Shares Safari Google Session)
+@MainActor
+final class NativeGoogleSignInManager: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = NativeGoogleSignInManager()
+    
+    private var authSession: ASWebAuthenticationSession?
+    weak var webView: WKWebView?
+    
+    private let clientID = "48438248184-s8lro7cq49u9r3f1no68e412av09gdro.apps.googleusercontent.com"
+    private let callbackScheme = "com.googleusercontent.apps.48438248184-s8lro7cq49u9r3f1no68e412av09gdro"
+    
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+            return window
+        }
+        return UIWindow()
+    }
+    
+    func startSignIn(webView: WKWebView) {
+        self.webView = webView
+        let codeVerifier = generateCodeVerifier()
+        let codeChallenge = generateCodeChallenge(from: codeVerifier)
+        let state = UUID().uuidString
+        
+        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "redirect_uri", value: "\(callbackScheme):/oauth2redirect"),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "openid email profile"),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "prompt", value: "select_account")
+        ]
+        
+        guard let authURL = components.url else {
+            notifyError("Invalid Google Auth URL")
+            return
+        }
+        
+        let session = ASWebAuthenticationSession(
+            url: authURL,
+            callbackURLScheme: callbackScheme
+        ) { [weak self] callbackURL, error in
+            Task { @MainActor in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    let nsError = error as NSError
+                    if nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                        let js = "window.dispatchEvent(new CustomEvent('need:googleSignInCancel'));"
+                        self.webView?.evaluateJavaScript(js, completionHandler: nil)
+                        return
+                    }
+                    self.notifyError(error.localizedDescription)
+                    return
+                }
+                
+                guard let callbackURL = callbackURL,
+                      let urlComponents = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+                      let code = urlComponents.queryItems?.first(where: { $0.name == "code" })?.value else {
+                    self.notifyError("Failed to extract authorization code from Google")
+                    return
+                }
+                
+                self.exchangeCodeForTokens(code: code, codeVerifier: codeVerifier)
+            }
+        }
+        
+        session.presentationContextProvider = self
+        // CRITICAL: false shares Safari's signed-in Google session so accounts are automatically detected!
+        session.prefersEphemeralWebBrowserSession = false
+        self.authSession = session
+        session.start()
+    }
+    
+    private func exchangeCodeForTokens(code: String, codeVerifier: String) {
+        guard let tokenURL = URL(string: "https://oauth2.googleapis.com/token") else {
+            notifyError("Invalid token URL")
+            return
+        }
+        
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let params = [
+            "client_id": clientID,
+            "code": code,
+            "code_verifier": codeVerifier,
+            "grant_type": "authorization_code",
+            "redirect_uri": "\(callbackScheme):/oauth2redirect"
+        ]
+        
+        let bodyString = params.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.value)" }.joined(separator: "&")
+        request.httpBody = bodyString.data(using: .utf8)
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            Task { @MainActor in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    self.notifyError(error.localizedDescription)
+                    return
+                }
+                
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    self.notifyError("Failed to parse Google token response")
+                    return
+                }
+                
+                if let errorMsg = json["error_description"] as? String ?? json["error"] as? String {
+                    self.notifyError(errorMsg)
+                    return
+                }
+                
+                guard let idToken = json["id_token"] as? String else {
+                    self.notifyError("Missing id_token in Google response")
+                    return
+                }
+                
+                let accessToken = json["access_token"] as? String ?? ""
+                
+                let js = """
+                window.dispatchEvent(new CustomEvent('need:googleSignInSuccess', {
+                    detail: {
+                        idToken: '\(idToken)',
+                        accessToken: '\(accessToken)'
+                    }
+                }));
+                """
+                self.webView?.evaluateJavaScript(js, completionHandler: nil)
+            }
+        }.resume()
+    }
+    
+    private func notifyError(_ msg: String) {
+        let escaped = msg.replacingOccurrences(of: "'", with: "\\'")
+        let js = "window.dispatchEvent(new CustomEvent('need:googleSignInError', { detail: { error: '\(escaped)' } }));"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+    }
+    
+    private func generateCodeVerifier() -> String {
+        var buffer = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, buffer.count, &buffer)
+        return Data(buffer).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+            .trimmingCharacters(in: .whitespaces)
+    }
+    
+    private func generateCodeChallenge(from verifier: String) -> String {
+        let data = Data(verifier.utf8)
+        let hashed = SHA256.hash(data: data)
+        return Data(hashed).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+            .trimmingCharacters(in: .whitespaces)
+    }
+}
+
+// MARK: - Native Apple Sign-In Manager (AuthenticationServices Face ID)
+@MainActor
+final class NativeAppleSignInManager: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    static let shared = NativeAppleSignInManager()
+    
+    private var currentNonce: String?
+    weak var webView: WKWebView?
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+            return window
+        }
+        return UIWindow()
+    }
+    
+    func startSignIn(webView: WKWebView) {
+        self.webView = webView
+        let nonce = randomNonceString()
+        currentNonce = nonce
+        
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        let request = appleIDProvider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+        
+        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
+        authorizationController.performRequests()
+    }
+    
+    nonisolated func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        Task { @MainActor in
+            guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                self.notifyError("Failed to extract Apple ID credential")
+                return
+            }
+            guard let identityTokenData = appleIDCredential.identityToken,
+                  let idTokenString = String(data: identityTokenData, encoding: .utf8) else {
+                self.notifyError("Failed to serialize identity token from Apple")
+                return
+            }
+            
+            let rawNonce = self.currentNonce ?? ""
+            let email = appleIDCredential.email ?? ""
+            let givenName = appleIDCredential.fullName?.givenName ?? ""
+            let familyName = appleIDCredential.fullName?.familyName ?? ""
+            let displayName = [givenName, familyName].filter { !$0.isEmpty }.joined(separator: " ")
+            
+            let js = """
+            window.dispatchEvent(new CustomEvent('need:appleSignInSuccess', {
+                detail: {
+                    idToken: '\(idTokenString)',
+                    rawNonce: '\(rawNonce)',
+                    email: '\(email)',
+                    displayName: '\(displayName)'
+                }
+            }));
+            """
+            self.webView?.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    nonisolated func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        Task { @MainActor in
+            let nsError = error as NSError
+            if nsError.code == ASAuthorizationError.canceled.rawValue {
+                let js = "window.dispatchEvent(new CustomEvent('need:appleSignInCancel'));"
+                self.webView?.evaluateJavaScript(js, completionHandler: nil)
+                return
+            }
+            self.notifyError(error.localizedDescription)
+        }
+    }
+    
+    private func notifyError(_ msg: String) {
+        let escaped = msg.replacingOccurrences(of: "'", with: "\\'")
+        let js = "window.dispatchEvent(new CustomEvent('need:appleSignInError', { detail: { error: '\(escaped)' } }));"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+    }
+    
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        var randomBytes = [UInt8](repeating: 0, count: length)
+        let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        if errorCode != errSecSuccess {
+            fatalError("Unable to generate nonce")
+        }
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        let nonce = randomBytes.map { byte in
+            charset[Int(byte) % charset.count]
+        }
+        return String(nonce)
+    }
+    
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashed = SHA256.hash(data: inputData)
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
+
 // MARK: - WebViewModel
 @MainActor
 final class WebViewModel: ObservableObject {
@@ -1255,6 +1509,8 @@ struct WebView: UIViewRepresentable {
 
         viewModel.webView = webView
         NativeCallKitManager.shared.webView = webView
+        NativeAppleSignInManager.shared.webView = webView
+        NativeGoogleSignInManager.shared.webView = webView
 
         let initialUrlStr: String
         if let uid = UserDefaults.standard.string(forKey: "need_current_user_id"), !uid.isEmpty {
@@ -1269,6 +1525,18 @@ struct WebView: UIViewRepresentable {
         } else {
             initialUrlStr = "https://need-chi.vercel.app/login"
         }
+        // Infallible watchdog: guarantee splash screen is dismissed smoothly within 2.0s even on slow connections or client redirects
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak viewModel] in
+            guard let vm = viewModel else { return }
+            if !vm.hasLoadedOnce {
+                print("[WebKit] Watchdog timer fired: dismissing splash screen")
+                withAnimation {
+                    vm.isLoading = false
+                    vm.hasLoadedOnce = true
+                }
+            }
+        }
+
         if let url = URL(string: initialUrlStr) {
             var request = URLRequest(url: url)
             request.cachePolicy = .useProtocolCachePolicy
@@ -1282,11 +1550,51 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         var viewModel: WebViewModel
 
         init(viewModel: WebViewModel) {
             self.viewModel = viewModel
+        }
+
+        // MARK: - WKUIDelegate (Native In-App Auto-Grant for Camera & Mic, Bypassing URL Prompts)
+        @available(iOS 15.0, *)
+        func webView(
+            _ webView: WKWebView,
+            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            type: WKMediaCaptureType,
+            decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+        ) {
+            print("[WebKit] Media capture permission auto-granted natively for origin: \(origin.host), type: \(type.rawValue)")
+            NativeCallKitManager.shared.isMediaCaptureActive = true
+            SilentAudioGateway.shared.pauseForCall()
+            NativeCallKitManager.shared.configureAudioSession(isSpeaker: true)
+            decisionHandler(.grant)
+        }
+
+        @available(iOS 15.0, *)
+        func webView(
+            _ webView: WKWebView,
+            requestDeviceOrientationAndMotionPermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void
+        ) {
+            decisionHandler(.grant)
+        }
+
+        nonisolated func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            if navigationAction.targetFrame == nil {
+                Task { @MainActor in
+                    webView.load(navigationAction.request)
+                }
+            }
+            return nil
         }
 
         // MARK: - WKScriptMessageHandler (Bridge for CallKit, Haptics & Dynamic Island)
@@ -1311,13 +1619,19 @@ struct WebView: UIViewRepresentable {
                 let jobId = dict["jobId"] as? String
                 let uid = dict["uid"] as? String
                 NativeCallKitManager.shared.reportIncomingCall(partnerName: partnerName, isVideo: isVideo, jobId: jobId, uid: uid)
+            } else if action == "prepareCallMedia" {
+                NativeCallKitManager.shared.isMediaCaptureActive = true
+                SilentAudioGateway.shared.pauseForCall()
+                NativeCallKitManager.shared.configureAudioSession(isSpeaker: true)
             } else if action == "startCall" {
+                NativeCallKitManager.shared.isMediaCaptureActive = true
                 let partnerName = dict["partnerName"] as? String ?? "Technician"
                 let isVideo = dict["isVideo"] as? Bool ?? false
                 let jobId = dict["jobId"] as? String
                 let uid = dict["uid"] as? String
                 NativeCallKitManager.shared.startCall(partnerName: partnerName, isVideo: isVideo, jobId: jobId, uid: uid)
             } else if action == "answerCall" {
+                NativeCallKitManager.shared.isMediaCaptureActive = true
                 NativeCallKitManager.shared.answerActiveCall()
             } else if action == "endCall" {
                 NativeCallKitManager.shared.endCall()
@@ -1326,6 +1640,11 @@ struct WebView: UIViewRepresentable {
             } else if action == "clearDeliveredNotifications" {
                 UNUserNotificationCenter.current().removeAllDeliveredNotifications()
                 UIApplication.shared.applicationIconBadgeNumber = 0
+            } else if action == "setSwipeBack" {
+                let enabled = dict["enabled"] as? Bool ?? true
+                DispatchQueue.main.async {
+                    self.viewModel.webView?.allowsBackForwardNavigationGestures = enabled
+                }
             } else if action == "setAudioMode" {
                 let mode = dict["mode"] as? String ?? "speaker"
                 NativeCallKitManager.shared.setAudioMode(mode: mode)
@@ -1351,6 +1670,14 @@ struct WebView: UIViewRepresentable {
                 }
             } else if action == "requestAllPermissions" {
                 PermissionManager.shared.requestAllPermissions()
+            } else if action == "appleSignIn" {
+                if let wv = self.viewModel.webView {
+                    NativeAppleSignInManager.shared.startSignIn(webView: wv)
+                }
+            } else if action == "googleSignIn" {
+                if let wv = self.viewModel.webView {
+                    NativeGoogleSignInManager.shared.startSignIn(webView: wv)
+                }
             }
         }
 
@@ -1363,11 +1690,34 @@ struct WebView: UIViewRepresentable {
             }
         }
 
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            viewModel.isLoading = false
+            viewModel.hasLoadedOnce = true
+            viewModel.showError = false
+
+            if let currentUrl = webView.url?.absoluteString {
+                if currentUrl.contains("/chat/") {
+                    webView.allowsBackForwardNavigationGestures = false
+                } else {
+                    webView.allowsBackForwardNavigationGestures = true
+                }
+            }
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             webView.scrollView.refreshControl?.endRefreshing()
             viewModel.isLoading = false
             viewModel.hasLoadedOnce = true
             viewModel.showError = false
+
+            if let currentUrl = webView.url?.absoluteString {
+                if currentUrl.contains("/chat/") {
+                    webView.allowsBackForwardNavigationGestures = false
+                } else {
+                    webView.allowsBackForwardNavigationGestures = true
+                }
+            }
+
             let token = WebViewModel.shared.apnsToken ?? UserDefaults.standard.string(forKey: "need_native_apns_token")
             if let token = token {
                 WebViewModel.shared.bridgeDeviceToken(token: token)
