@@ -408,6 +408,12 @@ export default function AgoraCallModal({
             } catch (playErr) {
               console.warn("Agora audioTrack play error:", playErr);
             }
+            setTimeout(() => {
+              document.querySelectorAll("audio").forEach(a => {
+                a.muted = false;
+                a.play().catch(() => {});
+              });
+            }, 30);
             if (typeof window !== "undefined") {
               if (Capacitor.isNativePlatform()) {
                 AudioToggle.setAudioMode({ mode: speakerOnRef.current ? "speaker" : "earpiece" }).catch(console.warn);
@@ -435,23 +441,38 @@ export default function AgoraCallModal({
           }
         });
 
-        // Ensure browser Web Audio Context is active and not suspended
-        if (typeof window !== "undefined") {
-          const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
-          if (AudioCtx) {
+        // Ensure browser Web Audio Context is active and prime WebKit CoreAudio
+        const unlockAudio = () => {
+          if (typeof window !== "undefined") {
             try {
-              const testCtx = new AudioCtx();
-              if (testCtx.state === "suspended") {
-                testCtx.resume().catch(() => {});
+              const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+              if (AudioCtx) {
+                const ctx = (window as any).__needAudioCtx || new AudioCtx();
+                (window as any).__needAudioCtx = ctx;
+                if (ctx.state === "suspended") {
+                  ctx.resume().catch(() => {});
+                }
+                const buffer = ctx.createBuffer(1, 1, 22050);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
               }
-            } catch (ctxErr) {}
+            } catch (ctxErr) {
+              console.warn("[Agora] AudioContext prime error:", ctxErr);
+            }
           }
-        }
+        };
+        unlockAudio();
+        window.addEventListener("touchstart", unlockAudio, { passive: true, once: true });
+        window.addEventListener("click", unlockAudio, { passive: true, once: true });
 
         // Handle browser/webview autoplay restrictions gracefully
         AgoraRTC.onAudioAutoplayFailed = () => {
-          console.warn("[Agora] Audio autoplay failed, arming touch listener to unlock audio");
+          console.warn("[Agora] Audio autoplay failed, attempting immediate unlock & arming listeners");
+          unlockAudio();
           const unlock = () => {
+            unlockAudio();
             if (clientRef.current) {
               clientRef.current.remoteUsers.forEach(u => {
                 try {
@@ -461,6 +482,10 @@ export default function AgoraCallModal({
                 }
               });
             }
+            document.querySelectorAll("audio").forEach(a => {
+              a.muted = false;
+              a.play().catch(() => {});
+            });
             window.removeEventListener("click", unlock);
             window.removeEventListener("touchstart", unlock);
           };
@@ -469,10 +494,12 @@ export default function AgoraCallModal({
         };
 
         // 1. Create local tracks: combined on video calls for single-query mobile stability
+        // Note: ANS and AGC are disabled in software because iOS hardware VoiceProcessingIO already does them.
+        // Running software ANS on hardware-processed audio causes the speech signal to be filtered as noise.
         if (isVideo) {
           try {
             const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
-              { AEC: true, ANS: true, AGC: true },
+              { AEC: true, ANS: false, AGC: false },
               { facingMode: "user" }
             );
             localA = audioTrack;
@@ -480,7 +507,7 @@ export default function AgoraCallModal({
           } catch (combinedErr) {
             console.warn("[Agora] Combined tracks creation failed, creating tracks individually:", combinedErr);
             try {
-              localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+              localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: false, AGC: false });
             } catch (aErr) {
               localA = await AgoraRTC.createMicrophoneAudioTrack();
             }
@@ -520,9 +547,8 @@ export default function AgoraCallModal({
           try {
             localA = await AgoraRTC.createMicrophoneAudioTrack({
               AEC: true,
-              ANS: true,
-              AGC: true,
-              encoderConfig: "speech_standard",
+              ANS: false,
+              AGC: false,
             });
           } catch (audioConstraintErr) {
             console.warn("[Agora] createMicrophoneAudioTrack with constraints failed, retrying default:", audioConstraintErr);
@@ -692,8 +718,25 @@ export default function AgoraCallModal({
       }
     }
     if (typeof window !== "undefined") {
-      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3");
-      audio.play().catch(e => console.warn("End call audio failed:", e));
+      try {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = (window as any).__needAudioCtx || new AudioCtx();
+          if (ctx.state !== "closed") {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(440, ctx.currentTime);
+            osc.frequency.linearRampToValueAtTime(220, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.1);
+          }
+        }
+      } catch (e) {}
     }
     if (localAudioTrack) {
       localAudioTrack.stop();

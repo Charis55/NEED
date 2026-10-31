@@ -27,14 +27,41 @@ import {
 
 const playCallSound = (type: "pickup" | "end") => {
   if (typeof window !== "undefined") {
-    // Very short, minimalist UI blip sounds
-    const url =
-      type === "pickup"
-        ? "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"
-        : "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3";
-    const audio = new Audio(url);
-    audio.volume = 0.5;
-    audio.play().catch((e) => console.warn("Audio play failed:", e));
+    // In-memory synthetic audio blip: 0 network latency, 0 external buffer delay,
+    // and instantly primes WebKit AudioContext without hijacking AVAudioSession category.
+    try {
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = (window as any).__needAudioCtx || new AudioCtx();
+        (window as any).__needAudioCtx = ctx;
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        if (type === "pickup") {
+          osc.frequency.setValueAtTime(440, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.08);
+        } else {
+          osc.frequency.setValueAtTime(440, ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(220, ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.1);
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn("Synthetic call sound error:", e);
+    }
   }
 };
 

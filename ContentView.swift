@@ -75,6 +75,7 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     static let shared = SilentAudioGateway()
     private var audioPlayer: AVAudioPlayer?
     private var isRunning: Bool = false
+    private var isCallActive: Bool = false
 
     override init() {
         super.init()
@@ -178,8 +179,8 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
 
         if type == .ended {
-            print("[SilentGateway] Audio interruption ended, resuming keepalive")
-            resumeAfterCall()
+            print("[SilentGateway] Audio interruption ended")
+            ensureActive()
         }
     }
 
@@ -203,7 +204,7 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     }
 
     func ensureActive() {
-        if NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected || NativeCallKitManager.shared.isMediaCaptureActive {
+        if isCallActive || NativeCallKitManager.shared.activeCallUUID != nil || NativeCallKitManager.shared.isCallConnected || NativeCallKitManager.shared.isMediaCaptureActive {
             print("[SilentGateway] Call active, skipping keepalive audio activation")
             return
         }
@@ -222,12 +223,14 @@ final class SilentAudioGateway: NSObject, AVAudioPlayerDelegate {
     }
 
     func pauseForCall() {
+        self.isCallActive = true
         audioPlayer?.pause()
         isRunning = false
         print("[SilentGateway] Paused for active CallKit call")
     }
 
     func resumeAfterCall() {
+        self.isCallActive = false
         ensureActive()
     }
 }
@@ -473,7 +476,15 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         }
     }
 
+    private var isAudioConfiguredForCall: Bool = false
+
     func configureAudioSession(isSpeaker: Bool = true) {
+        guard !isAudioConfiguredForCall else {
+            // Audio session is already active in voiceChat mode; only update output routing
+            setAudioMode(mode: isSpeaker ? "speaker" : "earpiece")
+            return
+        }
+        isAudioConfiguredForCall = true
         let session = AVAudioSession.sharedInstance()
         do {
             var options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP, .allowBluetoothA2DP]
@@ -489,7 +500,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
                 try session.overrideOutputAudioPort(.none)
                 UIDevice.current.isProximityMonitoringEnabled = true
             }
-            print("[CallKit] Audio session route updated: isSpeaker=\(isSpeaker)")
+            print("[CallKit] Audio session initialized for voiceChat: isSpeaker=\(isSpeaker)")
         } catch {
             print("[CallKit] Error configuring audio session:", error)
         }
@@ -593,6 +604,7 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
     }
 
     func resetCallState() {
+        self.isAudioConfiguredForCall = false
         self.activeCallUUID = nil
         self.currentJobId = nil
         self.currentCallerId = nil
@@ -695,7 +707,19 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
 
     func setAudioMode(mode: String) {
         let isSpeaker = mode != "earpiece"
-        activateCallAudio(isSpeaker: isSpeaker)
+        let session = AVAudioSession.sharedInstance()
+        do {
+            if isSpeaker {
+                try session.overrideOutputAudioPort(.speaker)
+                UIDevice.current.isProximityMonitoringEnabled = false
+            } else {
+                try session.overrideOutputAudioPort(.none)
+                UIDevice.current.isProximityMonitoringEnabled = (self.activeCallUUID != nil)
+            }
+            print("[CallKit] Audio output port overridden without session interruption: isSpeaker=\(isSpeaker)")
+        } catch {
+            print("[CallKit] Error overriding audio port:", error)
+        }
     }
 
     // MARK: - CXProviderDelegate
