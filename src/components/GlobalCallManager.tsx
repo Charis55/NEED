@@ -16,6 +16,9 @@ import {
   getPlatformName,
   getActiveOutgoingCallId,
   clearActiveOutgoingCallId,
+  setAnsweredCall,
+  isAnsweredHere,
+  clearAnsweredCall,
   safeGetSession,
   safeSetSession,
   safeRemoveSession,
@@ -219,9 +222,15 @@ export default function GlobalCallManager() {
           (status === "ongoing" || (status as string) === "connected" || (status as string) === "accepted")
         ) {
           const answeredHere =
+            isAnsweredHere(foundJob.requestId, activeCallId) ||
             (safeGetSession("need_my_answered_call") === foundJob.requestId) ||
             (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
-            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId);
+            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId) ||
+            // Fallback keep-alive: if this device is already in-call or active on this exact job, NEVER kill it!
+            (activeJobRef.current?.requestId === foundJob.requestId &&
+             (activeJobRef.current?.activeCall?.status === "ongoing" ||
+              (activeJobRef.current?.activeCall?.status as string) === "connected" ||
+              (activeJobRef.current?.activeCall?.status as string) === "accepted"));
 
           if (!answeredHere) {
             // Call was answered on another device (e.g. answered on iPhone while laptop was ringing)
@@ -428,7 +437,7 @@ export default function GlobalCallManager() {
 
     const handleNativeAnswer = (e: any) => {
       console.log("[GlobalCallManager] Native answer received from Dynamic Island / CallKit / Notification:", e?.detail);
-      acceptCall();
+      acceptCall({ fromNative: true });
     };
 
     const handleNativeDecline = (e: any) => {
@@ -593,6 +602,7 @@ export default function GlobalCallManager() {
     notifyNativeCall("endCall");
     clearCallNotification();
     clearActiveOutgoingCallId();
+    clearAnsweredCall();
     safeRemoveSession("need_active_outgoing_call_id");
     safeRemoveSession("need_active_outgoing_call_job");
     safeRemoveSession("need_active_outgoing_call");
@@ -635,7 +645,7 @@ export default function GlobalCallManager() {
     }).catch((err) => console.error("Failed to end call via server:", err));
   };
 
-  const acceptCall = async () => {
+  const acceptCall = async (options?: { fromNative?: boolean }) => {
     if (!activeJob || !activeJob.activeCall) return;
 
     clearCallNotification();
@@ -646,13 +656,13 @@ export default function GlobalCallManager() {
     const effectiveDeviceId = getDeviceId();
     const effectivePlatform = getPlatformName();
 
-    safeSetSession("need_my_answered_call", targetJobId);
-    if ((activeJob.activeCall as any)?.callId) {
-      safeSetSession("need_my_answered_call_id", (activeJob.activeCall as any).callId);
-    }
+    setAnsweredCall(targetJobId, (activeJob.activeCall as any)?.callId);
 
-    // Immediately inform native iOS CallKit / Dynamic Island that call is answered
-    notifyNativeCall("answerCall", { jobId: targetJobId });
+    // Only inform native CallKit if this answer was initiated from the in-app Web UI
+    // If the answer was initiated from native CallKit/Dynamic Island itself, avoid re-entrant CXAnswerCallAction loops
+    if (!options?.fromNative) {
+      notifyNativeCall("answerCall", { jobId: targetJobId });
+    }
 
     // Optimistically transition immediately into ongoing state on this device
     setActiveJob((prev) => {

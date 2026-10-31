@@ -59,6 +59,9 @@ function VideoTrackPlayer({
     const el = containerRef.current;
     if (!el || !track) return;
 
+    // Clean out any stale child nodes from previous attaches
+    el.innerHTML = "";
+
     try {
       track.play(el, { fit: "cover", mirror: isLocal });
 
@@ -71,10 +74,12 @@ function VideoTrackPlayer({
           video.setAttribute("autoplay", "true");
           video.playsInline = true;
           video.autoplay = true;
-          if (isLocal) {
-            video.muted = true;
-            video.setAttribute("muted", "true");
-          }
+          // In WebRTC / Agora, audio is handled separately via user.audioTrack / localAudioTrack.
+          // Setting the video element to muted=true is 100% required by iOS WebKit and Safari
+          // for autoplay and inline media playback to succeed without showing a black screen!
+          video.muted = true;
+          video.defaultMuted = true;
+          video.setAttribute("muted", "true");
           video.play().catch(() => {});
         }
       };
@@ -97,6 +102,9 @@ function VideoTrackPlayer({
         try {
           track.stop();
         } catch (e) {}
+        if (containerRef.current) {
+          containerRef.current.innerHTML = "";
+        }
       };
     } catch (err) {
       console.warn("[Agora VideoTrackPlayer] Play error:", err);
@@ -457,38 +465,47 @@ export default function AgoraCallModal({
         if (isVideo) {
           try {
             const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
-              { AEC: true, ANS: true, AGC: true, encoderConfig: "speech_standard" },
-              { facingMode: "user", encoderConfig: "480p_1" }
+              { AEC: true, ANS: true, AGC: true },
+              { facingMode: "user" }
             );
             localA = audioTrack;
             localV = videoTrack;
           } catch (combinedErr) {
-            console.warn("[Agora] Combined tracks with presets failed, trying minimal:", combinedErr);
+            console.warn("[Agora] Combined tracks creation failed, creating tracks individually:", combinedErr);
             try {
-              const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
-                {},
-                { facingMode: "user" }
-              );
-              localA = audioTrack;
-              localV = videoTrack;
-            } catch (fallbackErr) {
-              console.warn("[Agora] Combined fallback failed, creating tracks individually:", fallbackErr);
+              localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
+            } catch (aErr) {
+              localA = await AgoraRTC.createMicrophoneAudioTrack();
+            }
+            try {
+              localV = await AgoraRTC.createCameraVideoTrack({ facingMode: "user" });
+            } catch (camErr) {
               try {
-                localA = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
-              } catch (aErr) {
-                localA = await AgoraRTC.createMicrophoneAudioTrack();
-              }
-              try {
-                localV = await AgoraRTC.createCameraVideoTrack({ facingMode: "user" });
-              } catch (camErr) {
-                try {
-                  localV = await AgoraRTC.createCameraVideoTrack();
-                } catch (camErr2) {
-                  console.warn("[Agora] Camera completely unavailable:", camErr2);
-                }
+                localV = await AgoraRTC.createCameraVideoTrack();
+              } catch (camErr2) {
+                console.warn("[Agora] Camera completely unavailable:", camErr2);
               }
             }
           }
+
+          if (localV) {
+            try {
+              const mst = localV.getMediaStreamTrack();
+              if (mst) {
+                console.log(`[Agora] Local camera MediaStreamTrack: readyState=${mst.readyState}, muted=${mst.muted}, enabled=${mst.enabled}`);
+                mst.enabled = true;
+                mst.addEventListener("mute", () => {
+                  console.warn("[Agora] Local camera MediaStreamTrack muted by WebKit");
+                });
+                mst.addEventListener("unmute", () => {
+                  console.log("[Agora] Local camera MediaStreamTrack unmuted by WebKit");
+                });
+              }
+            } catch (mstErr) {
+              console.warn("[Agora] Failed inspecting MediaStreamTrack:", mstErr);
+            }
+          }
+
           if (isMounted && localV) {
             setLocalVideoTrack(localV);
           }

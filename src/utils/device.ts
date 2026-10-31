@@ -4,6 +4,8 @@ export type PlatformName = "ios" | "android" | "web";
 
 let inMemoryDeviceId: string | null = null;
 let inMemoryActiveOutgoingCallId: string | null = null;
+let inMemoryAnsweredJobId: string | null = null;
+let inMemoryAnsweredCallId: string | null = null;
 
 /**
  * Safe session storage helpers that never throw in private browsing, WKWebView, or SSR.
@@ -59,6 +61,34 @@ export function getActiveOutgoingCallId(): string | null {
 export function clearActiveOutgoingCallId(): void {
   inMemoryActiveOutgoingCallId = null;
   safeRemoveSession("need_active_outgoing_call_id");
+}
+
+/**
+ * In-memory answered call tracker.
+ * Guarantees that answering an incoming call on this physical device
+ * is never accidentally dismissed by multi-device isolation race conditions
+ * or WKWebView sessionStorage partitioning.
+ */
+export function setAnsweredCall(jobId: string, callId?: string | null): void {
+  inMemoryAnsweredJobId = jobId;
+  if (callId) inMemoryAnsweredCallId = callId;
+  safeSetSession("need_my_answered_call", jobId);
+  if (callId) safeSetSession("need_my_answered_call_id", callId);
+}
+
+export function isAnsweredHere(jobId: string, callId?: string | null): boolean {
+  if (inMemoryAnsweredJobId && inMemoryAnsweredJobId === jobId) return true;
+  if (callId && inMemoryAnsweredCallId && inMemoryAnsweredCallId === callId) return true;
+  if (safeGetSession("need_my_answered_call") === jobId) return true;
+  if (callId && safeGetSession("need_my_answered_call_id") === callId) return true;
+  return false;
+}
+
+export function clearAnsweredCall(): void {
+  inMemoryAnsweredJobId = null;
+  inMemoryAnsweredCallId = null;
+  safeRemoveSession("need_my_answered_call");
+  safeRemoveSession("need_my_answered_call_id");
 }
 
 /**
