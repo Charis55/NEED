@@ -89,11 +89,18 @@ function VideoTrackPlayer({
       const t2 = setTimeout(fixVideo, 150);
       const t3 = setTimeout(fixVideo, 400);
 
+      // Instant MutationObserver: triggers the microsecond Agora inserts the <video> tag into the DOM
+      const observer = new MutationObserver(() => {
+        fixVideo();
+      });
+      observer.observe(el, { childList: true, subtree: true });
+
       const unlockPlay = () => fixVideo();
       window.addEventListener("touchstart", unlockPlay, { passive: true });
       window.addEventListener("click", unlockPlay, { passive: true });
 
       return () => {
+        observer.disconnect();
         clearTimeout(t1);
         clearTimeout(t2);
         clearTimeout(t3);
