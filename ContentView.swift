@@ -1006,44 +1006,22 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Official NEED Native Launch Screen (Static & Rock-Solid)
+// MARK: - Official NEED Native Launch Screen (Matching Android 1:1)
 struct AndroidStyleSplashScreen: View {
     var body: some View {
         ZStack {
-            // Authentic Brutalist cream background (#FFF9E6)
-            Color(red: 255.0 / 255.0, green: 249.0 / 255.0, blue: 230.0 / 255.0)
+            // Clean white background matching Android Theme.SplashScreen
+            Color.white
                 .ignoresSafeArea()
 
             VStack {
                 Spacer()
 
                 if let logo = loadNeedLogo() {
-                    ZStack {
-                        // Yellow brutalist background shadow tile (#FFE66D)
-                        Rectangle()
-                            .fill(Color(red: 255.0 / 255.0, green: 230.0 / 255.0, blue: 109.0 / 255.0))
-                            .frame(width: 108, height: 108)
-                            .overlay(
-                                Rectangle().stroke(Color.black, lineWidth: 4)
-                            )
-                            .shadow(color: Color.black, radius: 0, x: 6, y: 6)
-                            .rotationEffect(.degrees(-2))
-
-                        // White tile with the centered NEED logo
-                        ZStack {
-                            Color.white
-                            Image(uiImage: logo)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .padding(14)
-                        }
-                        .frame(width: 100, height: 100)
-                        .overlay(
-                            Rectangle().stroke(Color.black, lineWidth: 4)
-                        )
-                        .shadow(color: Color.black, radius: 0, x: 3, y: 3)
-                        .rotationEffect(.degrees(1))
-                    }
+                    Image(uiImage: logo)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 96, height: 96)
                 }
 
                 Spacer()
