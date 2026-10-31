@@ -160,6 +160,20 @@ export default function Dashboard() {
   useEffect(() => {
     let isCancelled = false;
     async function fetchCounts() {
+      // Check if we have valid cached counts less than 15 minutes old
+      try {
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("need_explore_artisan_counts");
+          if (cached) {
+            const { counts, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < 15 * 60 * 1000 && Object.keys(counts || {}).length > 0) {
+              setArtisanCounts(counts);
+              return;
+            }
+          }
+        }
+      } catch {}
+
       try {
         const q = query(collection(db, "artisans"), where("verified", "==", true));
         const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
@@ -304,8 +318,8 @@ export default function Dashboard() {
                         alt={category.title}
                         fill
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        priority={index < 4}
-                        loading={index < 4 ? "eager" : "lazy"}
+                        priority={index < 6}
+                        loading={index < 6 ? "eager" : "lazy"}
                         className="object-cover z-0"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 z-[1]"></div>

@@ -76,6 +76,12 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
       return;
     }
 
+    const removeTouchListeners = () => {
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
+    };
+
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || isAnimating) return;
 
@@ -105,6 +111,11 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
       isHorizontalSwipeRef.current = null;
       currentDragOffsetRef.current = 0;
       activeRouteAtStartRef.current = pathname;
+
+      // Attach move and end listeners on demand to keep native scrolling unblocked
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+      window.addEventListener("touchend", handleTouchEnd, { passive: true });
+      window.addEventListener("touchcancel", handleTouchEnd, { passive: true });
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -119,7 +130,14 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
         const absX = Math.abs(diffX);
         const absY = Math.abs(diffY);
         if (absX > 8 || absY > 8) {
-          isHorizontalSwipeRef.current = absX > absY * 1.35;
+          if (absX > absY * 1.35) {
+            isHorizontalSwipeRef.current = true;
+          } else {
+            // It's a vertical scroll gesture: detach touchmove immediately so browser compositor scrolls at 120Hz
+            isHorizontalSwipeRef.current = false;
+            window.removeEventListener("touchmove", handleTouchMove);
+            return;
+          }
         }
       }
 
@@ -138,6 +156,8 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
+      removeTouchListeners();
+
       if (
         startXRef.current === null ||
         startYRef.current === null ||
@@ -199,13 +219,10 @@ export default function DockSwipeNavigator({ routes, children }: DockSwipeNaviga
     };
 
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return () => {
       window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
+      removeTouchListeners();
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
       }

@@ -39,19 +39,25 @@ export default function PullToRefresh({ children }: { children: React.ReactNode 
   };
 
   useEffect(() => {
+    // On native iOS container with bounces disabled, bypass synthetic pull-to-refresh to keep scrolling native 120Hz
+    if (typeof window !== "undefined" && (window as any).webkit?.messageHandlers?.needNative) {
+      return;
+    }
+
     const handleTouchStart = (e: TouchEvent) => {
       // Restrict pull-to-refresh activation to the top 25% of the screen (approx 200px) when scrolled to top
       const isTopQuarter = e.touches[0].clientY < Math.max(window.innerHeight * 0.25, 200);
-      if (window.scrollY <= 5 && isTopQuarter) {
+      if (window.scrollY <= 2 && isTopQuarter) {
         startYRef.current = e.touches[0].clientY;
         thresholdReachedRef.current = false;
+        document.addEventListener("touchmove", handleTouchMove, { passive: false });
       } else {
         startYRef.current = 0;
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (window.scrollY <= 5 && startYRef.current > 0) {
+      if (window.scrollY <= 2 && startYRef.current > 0) {
         const y = e.touches[0].clientY;
         const pull = y - startYRef.current;
         
@@ -80,6 +86,7 @@ export default function PullToRefresh({ children }: { children: React.ReactNode 
     };
 
     const handleTouchEnd = () => {
+      document.removeEventListener("touchmove", handleTouchMove);
       if (currentYRef.current >= THRESHOLD && !refreshingRef.current) {
         refreshingRef.current = true;
         setRefreshing(true);
@@ -98,7 +105,6 @@ export default function PullToRefresh({ children }: { children: React.ReactNode 
     };
 
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
-    document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return () => {

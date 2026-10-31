@@ -12,16 +12,17 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
   const router = useRouter();
   const pathname = usePathname();
 
-  // Instant authorization if role is already verified in this session
+  // Instant authorization if role is already verified in this session or cached locally
   const [authorized, setAuthorized] = useState(() => {
     if (typeof window === "undefined") return false;
     const currentUid = auth.currentUser?.uid;
-    if (currentUid) {
-      const cached = verifiedRolesCache.get(currentUid) || sessionStorage.getItem("need_role_" + currentUid);
-      if (cached === requiredRole) return true;
-    }
+    const cachedRole = 
+      localStorage.getItem("need_user_role") || 
+      (currentUid ? (verifiedRolesCache.get(currentUid) || localStorage.getItem("need_role_" + currentUid) || sessionStorage.getItem("need_role_" + currentUid)) : null);
+    if (cachedRole === requiredRole) return true;
+
     // Allow guest browsing on non-protected customer pages immediately
-    if (requiredRole === "customer" && !currentUid) {
+    if (requiredRole === "customer" && !currentUid && !localStorage.getItem("need_current_user_id")) {
       const isProtected = pathname.startsWith("/chat") || pathname.startsWith("/services") || pathname.startsWith("/profile") || pathname.startsWith("/payment");
       if (!isProtected) return true;
     }
@@ -31,7 +32,8 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
   useEffect(() => {
     // If already authorized and user hasn't changed, avoid redundant blocking
     const currentUid = auth.currentUser?.uid;
-    if (currentUid && verifiedRolesCache.get(currentUid) === requiredRole && authorized) {
+    const cachedRole = (currentUid && verifiedRolesCache.get(currentUid)) || localStorage.getItem("need_user_role");
+    if (cachedRole === requiredRole && authorized) {
       return;
     }
 
@@ -81,6 +83,8 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
           if (role) {
             verifiedRolesCache.set(user.uid, role);
             sessionStorage.setItem("need_role_" + user.uid, role);
+            localStorage.setItem("need_role_" + user.uid, role);
+            localStorage.setItem("need_user_role", role);
           }
           
           if (requiredRole === "artisan") {
