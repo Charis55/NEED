@@ -1006,8 +1006,10 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Official NEED Brutalist Load-Up Screen
+// MARK: - Official NEED Full-Bleed Startup Screen
 struct AndroidStyleSplashScreen: View {
+    @State private var pulse: Bool = false
+
     var body: some View {
         ZStack {
             // Authentic Brutalist cream background (#FFF9E6)
@@ -1015,96 +1017,108 @@ struct AndroidStyleSplashScreen: View {
                 .ignoresSafeArea()
 
             VStack {
-                // Brutalist card container
-                VStack(spacing: 14) {
+                Spacer()
+
+                // Centerpiece: Hero Logo + Brand + Progress
+                VStack(spacing: 20) {
                     if let logo = loadNeedLogo() {
                         ZStack {
-                            // Yellow brutalist logo tile (#FFE66D)
-                            Color(red: 255.0 / 255.0, green: 230.0 / 255.0, blue: 109.0 / 255.0)
-
-                            Image(uiImage: logo)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 76, height: 76)
-                        }
-                        .frame(width: 96, height: 96)
-                        .overlay(
+                            // Yellow brutalist background shadow tile (#FFE66D)
                             Rectangle()
-                                .stroke(Color.black, lineWidth: 4)
-                        )
-                        .shadow(color: Color.black, radius: 0, x: 4, y: 4)
-                        .rotationEffect(.degrees(-1))
-                        .padding(.top, 4)
+                                .fill(Color(red: 255.0 / 255.0, green: 230.0 / 255.0, blue: 109.0 / 255.0))
+                                .frame(width: 108, height: 108)
+                                .overlay(
+                                    Rectangle().stroke(Color.black, lineWidth: 4)
+                                )
+                                .shadow(color: Color.black, radius: 0, x: 6, y: 6)
+                                .rotationEffect(.degrees(-2))
+
+                            // White tile with the centered NEED logo
+                            ZStack {
+                                Color.white
+                                Image(uiImage: logo)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .padding(14)
+                            }
+                            .frame(width: 100, height: 100)
+                            .overlay(
+                                Rectangle().stroke(Color.black, lineWidth: 4)
+                            )
+                            .shadow(color: Color.black, radius: 0, x: 3, y: 3)
+                            .rotationEffect(.degrees(1))
+                        }
+                        .scaleEffect(pulse ? 1.03 : 0.97)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulse)
+                        .onAppear {
+                            pulse = true
+                        }
+                        .padding(.bottom, 6)
                     }
 
-                    // Brand header
+                    // Brand header: NEED ■
                     HStack(spacing: 8) {
                         Text("NEED")
-                            .font(.system(size: 32, weight: .black))
-                            .tracking(-1)
+                            .font(.system(size: 40, weight: .black))
+                            .tracking(-1.5)
                             .foregroundColor(.black)
 
                         Rectangle()
                             .fill(Color.black)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 12, height: 12)
                     }
 
-                    // Status badge (#FF9CEE)
-                    Text("AUTHENTICATING")
-                        .font(.system(size: 10, weight: .black))
-                        .tracking(1.2)
+                    // Status pill: LOADING PROFILE
+                    Text("LOADING PROFILE")
+                        .font(.system(size: 11, weight: .black))
+                        .tracking(1.5)
                         .foregroundColor(.black)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color(red: 255.0 / 255.0, green: 156.0 / 255.0, blue: 238.0 / 255.0))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 5)
+                        .background(Color.white)
                         .overlay(
-                            Rectangle()
-                                .stroke(Color.black, lineWidth: 2)
+                            Rectangle().stroke(Color.black, lineWidth: 2)
                         )
-                        .shadow(color: Color.black, radius: 0, x: 2, y: 2)
-                        .rotationEffect(.degrees(1))
+                        .shadow(color: Color.black, radius: 0, x: 3, y: 3)
+                        .rotationEffect(.degrees(-1))
 
                     // Brutalist progress bar
                     ZStack(alignment: .leading) {
                         Rectangle()
-                            .fill(Color(white: 0.95))
-                            .frame(width: 160, height: 12)
+                            .fill(Color.white)
+                            .frame(width: 220, height: 14)
                             .overlay(
-                                Rectangle()
-                                    .stroke(Color.black, lineWidth: 2)
+                                Rectangle().stroke(Color.black, lineWidth: 3)
                             )
-                            .shadow(color: Color.black, radius: 0, x: 2, y: 2)
+                            .shadow(color: Color.black, radius: 0, x: 4, y: 4)
 
                         Rectangle()
                             .fill(Color(red: 46.0 / 255.0, green: 213.0 / 255.0, blue: 115.0 / 255.0))
-                            .frame(width: 95, height: 8)
-                            .padding(.leading, 2)
+                            .frame(width: 140, height: 8)
+                            .padding(.leading, 3)
                     }
-                    .padding(.vertical, 2)
+                    .padding(.top, 4)
 
-                    // Text
-                    VStack(spacing: 4) {
-                        Text("LOADING PROFILE...")
-                            .font(.system(size: 12, weight: .black))
-                            .tracking(1)
-                            .foregroundColor(.black)
-
-                        Text("Syncing your workspace & profile")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(Color.black.opacity(0.6))
-                    }
-                    .padding(.bottom, 4)
+                    // Helper subtext
+                    Text("Syncing your verified workspace...")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color.black.opacity(0.6))
                 }
-                .padding(.horizontal, 28)
-                .padding(.vertical, 24)
-                .background(Color.white)
-                .overlay(
-                    Rectangle()
-                        .stroke(Color.black, lineWidth: 4)
-                )
-                .shadow(color: Color.black, radius: 0, x: 8, y: 8)
+
+                Spacer()
+
+                // Bottom Platform Tagline
+                HStack(spacing: 6) {
+                    Text("ON-DEMAND SERVICES")
+                    Text("•")
+                    Text("VERIFIED ARTISANS")
+                }
+                .font(.system(size: 10, weight: .black))
+                .tracking(2.0)
+                .foregroundColor(Color.black.opacity(0.45))
+                .padding(.bottom, 20)
             }
-            .padding(24)
+            .padding(.horizontal, 24)
         }
     }
 
