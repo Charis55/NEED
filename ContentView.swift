@@ -539,6 +539,24 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
                     print("[CallKit] CXAnswerCallAction successfully requested from in-app overlay")
                 }
             }
+        } else {
+            // When call is answered in foreground without prior CallKit incoming screen,
+            // register an active CallKit session so Dynamic Island and background audio stay active!
+            let uuid = UUID()
+            self.activeCallUUID = uuid
+            self.isCallAnsweredNatively = true
+            let handle = CXHandle(type: .generic, value: self.currentCallerId ?? "Active Call")
+            let startAction = CXStartCallAction(call: uuid, handle: handle)
+            startAction.isVideo = false
+            let transaction = CXTransaction(action: startAction)
+            callController.request(transaction) { [weak self] error in
+                if let error = error {
+                    print("[CallKit] Error registering active call with CallKit:", error)
+                } else {
+                    self?.provider.reportOutgoingCall(with: uuid, connectedAt: Date())
+                    print("[CallKit] Active call registered with CallKit for Dynamic Island")
+                }
+            }
         }
     }
 
@@ -672,10 +690,12 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            let deviceId = UserDefaults.standard.string(forKey: "need_native_device_id") ?? "ios_device"
             let payload: [String: Any] = [
                 "jobId": jobId,
                 "requestId": jobId,
-                "platform": "ios"
+                "platform": "ios",
+                "deviceId": deviceId
             ]
             request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
             URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
@@ -710,9 +730,13 @@ final class NativeCallKitManager: NSObject, CXProviderDelegate {
         let session = AVAudioSession.sharedInstance()
         do {
             if isSpeaker {
+                var options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
                 try session.overrideOutputAudioPort(.speaker)
                 UIDevice.current.isProximityMonitoringEnabled = false
             } else {
+                var options: AVAudioSession.CategoryOptions = [.allowBluetoothHFP, .allowBluetoothA2DP]
+                try session.setCategory(.playAndRecord, mode: .voiceChat, options: options)
                 try session.overrideOutputAudioPort(.none)
                 UIDevice.current.isProximityMonitoringEnabled = (self.activeCallUUID != nil)
             }

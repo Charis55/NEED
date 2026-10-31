@@ -9,7 +9,7 @@ import AgoraRTC, {
   IRemoteAudioTrack,
   IAgoraRTCRemoteUser
 } from "agora-rtc-sdk-ng";
-import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, Ear, SwitchCamera } from "lucide-react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { apiFetch } from "@/utils/apiBase";
@@ -148,6 +148,8 @@ export default function AgoraCallModal({
   const [joined, setJoined] = useState(false);
   const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack | null>(null);
   const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
+  const [isBackCamera, setIsBackCamera] = useState(false);
+  const isSwitchingCameraRef = useRef(false);
   const [remoteUsers, setRemoteUsers] = useState<any[]>([]);
   
   const [micMuted, setMicMuted] = useState(false);
@@ -430,8 +432,10 @@ export default function AgoraCallModal({
         client.on("user-left", (user, reason) => {
           console.log(`[Agora] Remote user ${user.uid} left with reason: ${reason}`);
           setRemoteUsers([...client.remoteUsers]);
-          // In a 1-to-1 call, if the partner leaves for any reason (Quit, ServerTimeOut), end call immediately
-          leaveCallRef.current();
+          // In a 1-to-1 call, if the partner leaves after call was established, end call cleanly
+          if (bothConnectedAt || client.remoteUsers.length === 0) {
+            leaveCallRef.current();
+          }
         });
 
         client.on("connection-state-change", (curState, revState, reason) => {
@@ -706,6 +710,54 @@ export default function AgoraCallModal({
     }
   };
 
+  const switchCamera = async () => {
+    if (!localVideoTrack || isSwitchingCameraRef.current) return;
+    isSwitchingCameraRef.current = true;
+    try {
+      const nextFacing = isBackCamera ? "user" : "environment";
+      const cameras = await AgoraRTC.getCameras().catch(() => []);
+
+      // If multiple cameras enumerated (e.g. front and rear), try device cycle
+      if (cameras && cameras.length > 1) {
+        const currentLabel = localVideoTrack.getTrackLabel();
+        const currentIndex = cameras.findIndex(
+          (c) => c.label === currentLabel || c.deviceId === (localVideoTrack as any)._deviceId
+        );
+        const nextCam = cameras[(currentIndex + 1) % cameras.length];
+        if (nextCam && nextCam.deviceId) {
+          try {
+            await localVideoTrack.setDevice(nextCam.deviceId);
+            setIsBackCamera((prev) => !prev);
+            isSwitchingCameraRef.current = false;
+            return;
+          } catch (e) {
+            console.warn("[Agora] setDevice failed, falling back to track re-creation:", e);
+          }
+        }
+      }
+
+      // Recreate track with opposite facingMode (guaranteed on iOS & Android WebViews)
+      const newVideoTrack = await AgoraRTC.createCameraVideoTrack({
+        facingMode: nextFacing,
+      });
+
+      if (clientRef.current) {
+        try {
+          await clientRef.current.unpublish(localVideoTrack);
+        } catch (e) {}
+        localVideoTrack.stop();
+        localVideoTrack.close();
+        await clientRef.current.publish(newVideoTrack);
+        setLocalVideoTrack(newVideoTrack);
+        setIsBackCamera(!isBackCamera);
+      }
+    } catch (err) {
+      console.warn("[Agora] Failed to switch camera:", err);
+    } finally {
+      isSwitchingCameraRef.current = false;
+    }
+  };
+
 
   const leaveCall = async () => {
     if (typeof window !== "undefined") {
@@ -903,9 +955,9 @@ export default function AgoraCallModal({
               <div 
                 className={`absolute ${remoteUsers.length > 0 ? 'top-6 right-6 w-28 h-40 sm:w-40 sm:h-56 border-4 border-black shadow-[8px_8px_0_0_#000]' : 'inset-0 w-full h-full'} bg-black overflow-hidden transition-all duration-300 z-20`}
               >
-                <VideoTrackPlayer track={localVideoTrack} isLocal={true} />
+                <VideoTrackPlayer track={localVideoTrack} isLocal={!isBackCamera} />
                 <div className="absolute bottom-2 left-2 z-10 bg-white text-black border-2 border-black px-2 py-1 font-black text-xs uppercase shadow-[2px_2px_0_0_#000]">
-                  You
+                  You {isBackCamera ? "(Rear)" : ""}
                 </div>
               </div>
             )}
@@ -932,7 +984,16 @@ export default function AgoraCallModal({
             </button>
           )}
 
-          {isMobileDevice() && (
+          {/* On video calls, flip camera button replaces speaker toggle. On voice calls, speaker toggle controls earpiece/speaker */}
+          {isVideo ? (
+            <button 
+              onClick={switchCamera}
+              title={isBackCamera ? "Switch to Front Camera" : "Switch to Back Camera"}
+              className={`flex-1 max-w-[4rem] aspect-square flex items-center justify-center border-4 border-black brutal-shadow-hover ${isBackCamera ? 'bg-[var(--color-brutal-yellow)] text-black' : 'bg-[var(--color-brutal-bg)] text-black'}`}
+            >
+              <SwitchCamera size={24} className="sm:w-8 sm:h-8" />
+            </button>
+          ) : isMobileDevice() ? (
             <button 
               onClick={toggleSpeaker}
               title={speakerOn ? "Loudspeaker On - Click to switch to discrete earpiece" : "Earpiece On - Click to switch to loudspeaker"}
@@ -940,7 +1001,7 @@ export default function AgoraCallModal({
             >
               {speakerOn ? <Volume2 size={24} className="sm:w-8 sm:h-8" /> : <Ear size={24} className="sm:w-8 sm:h-8" />}
             </button>
-          )}
+          ) : null}
 
           <button 
             onClick={leaveCall}

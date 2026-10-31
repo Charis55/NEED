@@ -70,10 +70,15 @@ public class AudioTogglePlugin extends Plugin {
                     channel = new NotificationChannel(
                         ONGOING_CALL_CHANNEL_ID,
                         "Ongoing Calls",
-                        NotificationManager.IMPORTANCE_LOW
+                        NotificationManager.IMPORTANCE_DEFAULT
                     );
                     channel.setDescription("Shows active call status, timer, and controls in the status bar and lock screen");
                     channel.setShowBadge(false);
+                    channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                    notificationManager.createNotificationChannel(channel);
+                } else if (channel.getImportance() < NotificationManager.IMPORTANCE_DEFAULT) {
+                    channel.setImportance(NotificationManager.IMPORTANCE_DEFAULT);
+                    channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
                     notificationManager.createNotificationChannel(channel);
                 }
             }
@@ -173,7 +178,12 @@ public class AudioTogglePlugin extends Plugin {
                 .setWhen(connectedAt > 0 ? connectedAt : System.currentTimeMillis())
                 .setShowWhen(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(contentPendingIntent);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE);
+            }
 
             try {
                 NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forOngoingCall(caller, endPendingIntent);

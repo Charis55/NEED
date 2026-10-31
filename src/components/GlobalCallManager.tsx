@@ -153,32 +153,7 @@ export default function GlobalCallManager() {
           const ongoingAge = now - syncStartTime;
 
           // Prevent phantom ghost calls on fresh login or app start:
-          // An ongoing call must only be mounted if this tab/device was actively engaged in it
-          // OR if the call was connected very recently (within 45s).
-          const callId = (data.activeCall as any)?.callId;
-          const isLocallyEngaged =
-            activeJobRef.current?.requestId === data.requestId ||
-            safeGetSession("need_my_answered_call") === data.requestId ||
-            (Boolean(callId) && safeGetSession("need_my_answered_call_id") === callId) ||
-            (Boolean(callId) && safeGetSession("need_active_outgoing_call_id") === callId);
-
-          if (!isLocallyEngaged && ongoingAge > 45 * 1000) {
-            // Stale orphaned call from earlier: silently clean it up in the database so it never haunts login
-            if (ongoingAge > 90 * 1000) {
-              apiFetch("/api/calls/end", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  jobId: data.requestId,
-                  requestId: data.requestId,
-                  callId,
-                  reason: "ended",
-                }),
-              }).catch(() => {});
-            }
-            return false;
-          }
-
+          // Ignore orphaned calls older than 3 hours
           if (ongoingAge > 3 * 60 * 60 * 1000 || ongoingAge < -10 * 1000) return false;
 
           return true;
@@ -270,24 +245,20 @@ export default function GlobalCallManager() {
         }
 
         // 2. Incoming Call Multi-Device Pick Isolation (WhatsApp style):
-        // If an incoming call was ringing and has now been answered on another device:
+        // If an incoming call was ringing and has now explicitly been answered on ANOTHER physical device:
         if (
           !isCallerJob &&
           (status === "ongoing" || (status as string) === "connected" || (status as string) === "accepted")
         ) {
-          const answeredHere =
-            isAnsweredHere(foundJob.requestId, activeCallId) ||
-            (safeGetSession("need_my_answered_call") === foundJob.requestId) ||
-            (Boolean(activeCallId) && safeGetSession("need_my_answered_call_id") === activeCallId) ||
-            (Boolean(call.acceptedByDeviceId) && call.acceptedByDeviceId === myDeviceId) ||
-            // Fallback keep-alive: if this device is already in-call or active on this exact job, NEVER kill it!
-            (activeJobRef.current?.requestId === foundJob.requestId &&
-             (activeJobRef.current?.activeCall?.status === "ongoing" ||
-              (activeJobRef.current?.activeCall?.status as string) === "connected" ||
-              (activeJobRef.current?.activeCall?.status as string) === "accepted"));
+          const answeredElsewhere =
+            Boolean(call.acceptedByDeviceId) &&
+            call.acceptedByDeviceId !== myDeviceId &&
+            !isAnsweredHere(foundJob.requestId, activeCallId) &&
+            safeGetSession("need_my_answered_call") !== foundJob.requestId &&
+            (Boolean(activeCallId) ? safeGetSession("need_my_answered_call_id") !== activeCallId : true);
 
-          if (!answeredHere) {
-            // Call was answered on another device (e.g. answered on iPhone while laptop was ringing)
+          if (answeredElsewhere) {
+            // Call was explicitly answered on another device (e.g. answered on iPhone while laptop was ringing)
             // Immediately stop ringing, dismiss incoming call modal, and stay idle.
             notifyNativeCall("endCall");
             clearCallNotification();
@@ -491,7 +462,12 @@ export default function GlobalCallManager() {
 
     const handleNativeAnswer = (e: any) => {
       console.log("[GlobalCallManager] Native answer received from Dynamic Island / CallKit / Notification:", e?.detail);
-      acceptCall({ fromNative: true });
+      const incomingJobId = e?.detail?.jobId;
+      if (incomingJobId) {
+        setAnsweredCall(incomingJobId);
+        safeSetSession("need_my_answered_call", incomingJobId);
+      }
+      acceptCall({ fromNative: true, targetJobId: incomingJobId });
     };
 
     const handleNativeDecline = (e: any) => {
@@ -699,18 +675,20 @@ export default function GlobalCallManager() {
     }).catch((err) => console.error("Failed to end call via server:", err));
   };
 
-  const acceptCall = async (options?: { fromNative?: boolean }) => {
-    if (!activeJob || !activeJob.activeCall) return;
+  const acceptCall = async (options?: { fromNative?: boolean; targetJobId?: string }) => {
+    const targetJob = activeJob || (options?.targetJobId ? ({ requestId: options.targetJobId, activeCall: { status: "ringing" } } as any) : null);
+    if (!targetJob) return;
 
     clearCallNotification();
     playCallSound("pickup");
 
-    const targetJobId = activeJob.requestId;
+    const targetJobId = options?.targetJobId || targetJob.requestId;
     const effectiveSessionId = getSessionId();
     const effectiveDeviceId = getDeviceId();
     const effectivePlatform = getPlatformName();
 
-    setAnsweredCall(targetJobId, (activeJob.activeCall as any)?.callId);
+    setAnsweredCall(targetJobId, (targetJob.activeCall as any)?.callId);
+    safeSetSession("need_my_answered_call", targetJobId);
 
     // Only inform native CallKit if this answer was initiated from the in-app Web UI
     // If the answer was initiated from native CallKit/Dynamic Island itself, avoid re-entrant CXAnswerCallAction loops
@@ -720,11 +698,11 @@ export default function GlobalCallManager() {
 
     // Optimistically transition immediately into ongoing state on this device
     setActiveJob((prev) => {
-      if (!prev || !prev.activeCall) return prev;
+      const base = prev || targetJob;
       return {
-        ...prev,
+        ...base,
         activeCall: {
-          ...prev.activeCall,
+          ...(base.activeCall || {}),
           status: "ongoing",
           connectedAt: Date.now(),
           acceptedByDeviceId: effectiveDeviceId,
