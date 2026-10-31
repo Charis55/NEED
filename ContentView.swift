@@ -993,10 +993,10 @@ struct ContentView: View {
         .onAppear {
             SilentAudioGateway.shared.start()
             BackgroundSyncGateway.shared.startMonitoring()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 if !webViewModel.hasLoadedOnce {
                     print("[NeedApp] OnAppear watchdog fired: dismissing splash screen")
-                    withAnimation {
+                    withAnimation(.easeOut(duration: 0.15)) {
                         webViewModel.isLoading = false
                         webViewModel.hasLoadedOnce = true
                     }
@@ -1006,10 +1006,8 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Official NEED Full-Bleed Startup Screen
+// MARK: - Official NEED Native Launch Screen (Static & Rock-Solid)
 struct AndroidStyleSplashScreen: View {
-    @State private var pulse: Bool = false
-
     var body: some View {
         ZStack {
             // Authentic Brutalist cream background (#FFF9E6)
@@ -1019,106 +1017,37 @@ struct AndroidStyleSplashScreen: View {
             VStack {
                 Spacer()
 
-                // Centerpiece: Hero Logo + Brand + Progress
-                VStack(spacing: 20) {
-                    if let logo = loadNeedLogo() {
-                        ZStack {
-                            // Yellow brutalist background shadow tile (#FFE66D)
-                            Rectangle()
-                                .fill(Color(red: 255.0 / 255.0, green: 230.0 / 255.0, blue: 109.0 / 255.0))
-                                .frame(width: 108, height: 108)
-                                .overlay(
-                                    Rectangle().stroke(Color.black, lineWidth: 4)
-                                )
-                                .shadow(color: Color.black, radius: 0, x: 6, y: 6)
-                                .rotationEffect(.degrees(-2))
-
-                            // White tile with the centered NEED logo
-                            ZStack {
-                                Color.white
-                                Image(uiImage: logo)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .padding(14)
-                            }
-                            .frame(width: 100, height: 100)
+                if let logo = loadNeedLogo() {
+                    ZStack {
+                        // Yellow brutalist background shadow tile (#FFE66D)
+                        Rectangle()
+                            .fill(Color(red: 255.0 / 255.0, green: 230.0 / 255.0, blue: 109.0 / 255.0))
+                            .frame(width: 108, height: 108)
                             .overlay(
                                 Rectangle().stroke(Color.black, lineWidth: 4)
                             )
-                            .shadow(color: Color.black, radius: 0, x: 3, y: 3)
-                            .rotationEffect(.degrees(1))
+                            .shadow(color: Color.black, radius: 0, x: 6, y: 6)
+                            .rotationEffect(.degrees(-2))
+
+                        // White tile with the centered NEED logo
+                        ZStack {
+                            Color.white
+                            Image(uiImage: logo)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .padding(14)
                         }
-                        .scaleEffect(pulse ? 1.03 : 0.97)
-                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulse)
-                        .onAppear {
-                            pulse = true
-                        }
-                        .padding(.bottom, 6)
-                    }
-
-                    // Brand header: NEED ■
-                    HStack(spacing: 8) {
-                        Text("NEED")
-                            .font(.system(size: 40, weight: .black))
-                            .tracking(-1.5)
-                            .foregroundColor(.black)
-
-                        Rectangle()
-                            .fill(Color.black)
-                            .frame(width: 12, height: 12)
-                    }
-
-                    // Status pill: LOADING PROFILE
-                    Text("LOADING PROFILE")
-                        .font(.system(size: 11, weight: .black))
-                        .tracking(1.5)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 5)
-                        .background(Color.white)
+                        .frame(width: 100, height: 100)
                         .overlay(
-                            Rectangle().stroke(Color.black, lineWidth: 2)
+                            Rectangle().stroke(Color.black, lineWidth: 4)
                         )
                         .shadow(color: Color.black, radius: 0, x: 3, y: 3)
-                        .rotationEffect(.degrees(-1))
-
-                    // Brutalist progress bar
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.white)
-                            .frame(width: 220, height: 14)
-                            .overlay(
-                                Rectangle().stroke(Color.black, lineWidth: 3)
-                            )
-                            .shadow(color: Color.black, radius: 0, x: 4, y: 4)
-
-                        Rectangle()
-                            .fill(Color(red: 46.0 / 255.0, green: 213.0 / 255.0, blue: 115.0 / 255.0))
-                            .frame(width: 140, height: 8)
-                            .padding(.leading, 3)
+                        .rotationEffect(.degrees(1))
                     }
-                    .padding(.top, 4)
-
-                    // Helper subtext
-                    Text("Syncing your verified workspace...")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color.black.opacity(0.6))
                 }
 
                 Spacer()
-
-                // Bottom Platform Tagline
-                HStack(spacing: 6) {
-                    Text("ON-DEMAND SERVICES")
-                    Text("•")
-                    Text("VERIFIED ARTISANS")
-                }
-                .font(.system(size: 10, weight: .black))
-                .tracking(2.0)
-                .foregroundColor(Color.black.opacity(0.45))
-                .padding(.bottom, 20)
             }
-            .padding(.horizontal, 24)
         }
     }
 

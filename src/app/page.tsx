@@ -32,6 +32,7 @@ export default function LandingPage() {
   const [bgIndex, setBgIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(20);
   const router = useRouter();
 
   useEffect(() => {
@@ -81,14 +82,18 @@ export default function LandingPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        setLoadProgress(50);
         try {
+          setLoadProgress(70);
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
+            setLoadProgress(90);
             const data = userDoc.data();
             const role = data.role || "customer";
             if (typeof window !== "undefined") {
               localStorage.setItem("need_user_role", role);
             }
+            setLoadProgress(100);
             if (role === "artisan") {
               router.replace("/technician/dashboard");
             } else {
@@ -100,6 +105,7 @@ export default function LandingPage() {
           console.error("Error redirecting authenticated user", e);
         }
       } else {
+        setLoadProgress(100);
         if (typeof window !== "undefined") {
           localStorage.removeItem("need_user_role");
           localStorage.removeItem("need_current_user_id");
@@ -120,7 +126,7 @@ export default function LandingPage() {
   if (isNativeApp() || checkingAuth) {
     return (
       <StartupLoadingScreen
-        text="LOADING PROFILE..."
+        progress={loadProgress}
         subtext="Initializing your NEED session"
         badge="STARTING UP"
       />

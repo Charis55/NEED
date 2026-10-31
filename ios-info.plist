@@ -75,13 +75,13 @@
     <key>NSCameraUsageDescription</key>
     <string>Need requires camera access to take job photos, scan documents, and verify completed tasks.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Need requires microphone access for crystal-clear in-app calling between customers and artisans.</string>
+    <string>Need requires microphone access for crystal-clear in-app calling between customers and technicians.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Need requires photo library access to upload service images and documentation.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Need requires permission to save receipts, invoices, and job summaries to your photos.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Need requires your location to connect you with nearby verified artisans and service providers.</string>
+    <string>Need requires your location to connect you with nearby verified technicians and service providers.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Need uses your location to track job progress and service arrivals in real time.</string>
 

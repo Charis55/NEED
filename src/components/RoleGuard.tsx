@@ -29,6 +29,8 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
     return false;
   });
 
+  const [loadProgress, setLoadProgress] = useState(15);
+
   useEffect(() => {
     // If already authorized and user hasn't changed, avoid redundant blocking
     const currentUid = auth.currentUser?.uid;
@@ -51,6 +53,7 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
       if (!isMounted) return;
 
       if (!user) {
+        setLoadProgress(100);
         clearTimeout(timeoutTimer);
         if (requiredRole === "artisan") {
           router.push("/login?role=artisan");
@@ -65,20 +68,25 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
         return;
       }
 
+      setLoadProgress(45);
+
       // Check cache first
       const cachedRole = verifiedRolesCache.get(user.uid) || sessionStorage.getItem("need_role_" + user.uid);
       if (cachedRole === requiredRole) {
         clearTimeout(timeoutTimer);
+        setLoadProgress(100);
         setAuthorized(true);
         return;
       }
       
       try {
+        setLoadProgress(65);
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (!isMounted) return;
         clearTimeout(timeoutTimer);
 
         if (userDoc.exists()) {
+          setLoadProgress(85);
           const role = userDoc.data().role as "artisan" | "customer";
           if (role) {
             verifiedRolesCache.set(user.uid, role);
@@ -89,29 +97,37 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
           
           if (requiredRole === "artisan") {
             if (role === "artisan") {
+              setLoadProgress(95);
               const artisanDoc = await getDoc(doc(db, "artisans", user.uid));
               if (!isMounted) return;
               if (!artisanDoc.exists() || artisanDoc.data()?.onboardingStep !== 6) {
+                setLoadProgress(100);
                 router.push("/onboarding");
               } else {
+                setLoadProgress(100);
                 setAuthorized(true);
               }
             } else {
+              setLoadProgress(100);
               router.push("/explore");
             }
           } else if (requiredRole === "customer") {
             if (role === "artisan" && pathname !== "/login" && !pathname.startsWith("/chat/")) {
+              setLoadProgress(100);
               router.push("/technician/dashboard");
             } else {
+              setLoadProgress(100);
               setAuthorized(true);
             }
           }
         } else {
+          setLoadProgress(100);
           router.push(`/login?role=${requiredRole}`);
         }
       } catch (err) {
         console.error("RoleGuard error:", err);
         clearTimeout(timeoutTimer);
+        setLoadProgress(100);
         if (isMounted) setAuthorized(true);
       }
     });
@@ -126,7 +142,7 @@ export default function RoleGuard({ children, requiredRole }: { children: React.
   if (!authorized) {
     return (
       <StartupLoadingScreen 
-        text="LOADING PROFILE..."
+        progress={loadProgress}
         subtext="Verifying access & permissions"
         badge="AUTHENTICATING"
       />
